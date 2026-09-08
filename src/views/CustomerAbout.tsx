@@ -6,7 +6,7 @@ import { FaqSection } from '../components/FaqSection';
 import { ClientTestimonials } from '../components/ClientTestimonials';
 
 export const CustomerAbout: React.FC = () => {
-  const { openBookingModal } = useSalon();
+  const { openBookingModal, settings } = useSalon();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-28 lg:pb-12 space-y-12 text-left">
@@ -21,7 +21,7 @@ export const CustomerAbout: React.FC = () => {
             "We'll Style, You'll Smile"
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed">
-            Located at B.N. Gund Complex near Kanya Prashala and ICICI Bank in Mohol, Modern Unisex Salon provides professional hair styling, bridal makeup, glowing facials, and men's grooming. Book online with an easy 10% advance deposit to guarantee your slot with no waiting time.
+            Located at B.N. Gund Complex near Kanya Prashala and ICICI Bank in Mohol, Modern Unisex Salon provides professional hair styling, bridal makeup, glowing facials, and men's grooming. Book online with an easy {settings.advancePercentage || 10}% advance deposit to guarantee your slot with no waiting time.
           </p>
 
           <div className="grid grid-cols-2 gap-3 pt-2">
@@ -30,7 +30,7 @@ export const CustomerAbout: React.FC = () => {
               <div className="text-xs text-zinc-500 dark:text-zinc-400">Happy Clients in Mohol</div>
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1 shadow-sm">
-              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-serif">10% Deposit</div>
+              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-serif">{settings.advancePercentage || 10}% Deposit</div>
               <div className="text-xs text-zinc-500 dark:text-zinc-400">Instant Slot Booking</div>
             </div>
           </div>
@@ -58,10 +58,10 @@ export const CustomerAbout: React.FC = () => {
             <ShieldCheck className="w-5 h-5" />
           </div>
           <h3 className="font-serif text-base font-bold text-zinc-900 dark:text-zinc-100">
-            10% Advance Booking
+            {settings.advancePercentage || 10}% Advance Booking
           </h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-            Paying 10% advance via UPI or Card locks your sanitized salon chair so you can walk in with zero waiting time.
+            Paying {settings.advancePercentage || 10}% advance via UPI or Card locks your sanitized salon chair so you can walk in with zero waiting time.
           </p>
         </div>
 

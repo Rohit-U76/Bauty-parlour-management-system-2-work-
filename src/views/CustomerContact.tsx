@@ -50,7 +50,7 @@ export const CustomerContact: React.FC = () => {
           onClick={() => openBookingModal()}
           className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs sm:text-sm transition shrink-0 cursor-pointer shadow-sm"
         >
-          Book Appointment (10% Deposit)
+          Book Appointment ({settings.advancePercentage || 10}% Deposit)
         </button>
       </div>
 

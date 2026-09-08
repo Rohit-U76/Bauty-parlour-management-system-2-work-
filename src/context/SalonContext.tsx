@@ -286,6 +286,43 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_services`, JSON.stringify(services));
   }, [services]);
 
+  // Sync with Backend Database API on mount
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.settings) {
+          setSettings(prev => ({ ...prev, ...data.settings }));
+          if (data.settings.advancePercentage) {
+            const pct = Number(data.settings.advancePercentage);
+            setServices(prev => prev.map(s => ({
+              ...s,
+              advanceDeposit: Math.round((s.price * pct) / 100)
+            })));
+          }
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/inquiries')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.inquiries) && data.inquiries.length > 0) {
+          setInquiries(data.inquiries);
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/auth/users')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.users) && data.users.length > 0) {
+          setUsers(data.users);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Check URL parameters for direct promo QR links (e.g. ?service=... or ?book=true)
   useEffect(() => {
     try {
@@ -401,7 +438,38 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
     }
 
-    // Attempt to find user
+    // First try backend database API
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: rawInput,
+          password: cleanSecret,
+          role: expectedRole
+        })
+      });
+      const data = await response.json();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        setIsGuestMode(false);
+        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(data.user));
+        if (data.user.role === 'ADMIN') {
+          setIsAdminMode(true);
+        }
+        setIsAuthModalOpen(false);
+        return {
+          success: true,
+          message: data.message || `Welcome back, ${data.user.name}!`,
+          user: data.user
+        };
+      }
+    } catch {
+      // Fall through to local fallback check
+    }
+
+    // Local fallback check
     let user = users.find(u => {
       const matchUsername = Boolean(u.username && u.username.toLowerCase() === cleanInput);
       const matchEmail = Boolean(u.email && u.email.toLowerCase() === cleanInput);
@@ -442,6 +510,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setCurrentUser(user);
     setIsGuestMode(false);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(user));
 
     if (user.role === 'ADMIN') {
       setIsAdminMode(true);
@@ -469,20 +538,73 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const cleanUsername = (data.username || cleanName.toLowerCase().replace(/\s+/g, '')).trim().toLowerCase();
     const cleanPassword = (data.password || 'password123').trim();
 
-    if (!cleanName || !cleanEmail || !cleanPhone) {
-      return { success: false, message: 'Please provide your Full Name, Mobile Number, and Email.' };
+    if (!cleanName || !cleanPhone) {
+      return { success: false, message: 'Please provide your Full Name and Mobile Number.' };
+    }
+
+    // Call backend database API to register and persist to database
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: cleanName,
+          username: cleanUsername,
+          email: cleanEmail || `${cleanUsername}@example.com`,
+          phone: cleanPhone,
+          password: cleanPassword,
+          preferredServices: data.preferredServices || []
+        })
+      });
+      const resData = await response.json();
+      if (resData.success && resData.user) {
+        const newUser: User = resData.user;
+        setUsers(prev => [...prev.filter(u => u.id !== newUser.id), newUser]);
+        setCurrentUser(newUser);
+        setIsGuestMode(false);
+        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
+
+        // Also register in customer CRM directory
+        setCustomers(prev => {
+          if (prev.some(c => c.phone === newUser.phone || (newUser.email && c.email === newUser.email))) return prev;
+          return [...prev, {
+            id: `cust-${Date.now()}`,
+            name: newUser.name,
+            phone: newUser.phone,
+            email: newUser.email,
+            totalVisits: 0,
+            totalSpent: 0,
+            lastVisit: 'Just Joined',
+            favoriteService: (data.preferredServices && data.preferredServices[0]) || 'General Styling',
+            memberSince: newUser.memberSince || '2026',
+            tier: 'New Client'
+          }];
+        });
+
+        setIsAuthModalOpen(false);
+        return {
+          success: true,
+          message: resData.message || `Account registered in database! Welcome to Modern Unisex Salon, ${newUser.name}.`,
+          user: newUser
+        };
+      } else if (resData.message) {
+        return { success: false, message: resData.message };
+      }
+    } catch {
+      // Fall through to local registration fallback
     }
 
     const existing = users.find(
       u => (u.username && u.username.toLowerCase() === cleanUsername) ||
-           u.email.toLowerCase() === cleanEmail ||
+           (cleanEmail && u.email.toLowerCase() === cleanEmail) ||
            (cleanPhone.replace(/\D/g, '').length >= 7 && u.phone.replace(/\D/g, '') === cleanPhone.replace(/\D/g, ''))
     );
 
     if (existing) {
       return {
         success: false,
-        message: `An account already exists with this ${existing.email.toLowerCase() === cleanEmail ? 'email' : 'mobile/username'}. Please log in directly.`
+        message: `An account already exists with this mobile or username. Please log in directly.`
       };
     }
 
@@ -490,7 +612,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       id: `usr-cust-${Date.now()}`,
       name: cleanName,
       username: cleanUsername,
-      email: cleanEmail,
+      email: cleanEmail || `${cleanUsername}@example.com`,
       phone: cleanPhone,
       role: 'CUSTOMER',
       password: cleanPassword,
@@ -506,9 +628,10 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setCurrentUser(newUser);
     setIsGuestMode(false);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
 
     // Also register in customer directory if not present
-    const existingCust = customers.find(c => c.email.toLowerCase() === cleanEmail || c.phone === cleanPhone);
+    const existingCust = customers.find(c => c.phone === cleanPhone || (cleanEmail && c.email.toLowerCase() === cleanEmail));
     if (!existingCust) {
       const newCustRecord: Customer = {
         id: `cust-${Date.now()}`,
@@ -722,6 +845,9 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const deleteInquiry = (id: string) => {
     setInquiries(prev => prev.filter(inq => inq.id !== id));
+    fetch(`/api/inquiries/${id}`, {
+      method: 'DELETE'
+    }).catch(err => console.error('Failed to delete inquiry from backend API:', err));
   };
 
   // Gallery CRUD
@@ -859,7 +985,27 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Settings
   const updateSettings = (newSettings: Partial<SalonSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    setSettings(prev => {
+      const merged = { ...prev, ...newSettings };
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_settings`, JSON.stringify(merged));
+      return merged;
+    });
+
+    // If advancePercentage changed, recalculate advanceDeposit for all services dynamically
+    if (newSettings.advancePercentage !== undefined) {
+      const newPct = Number(newSettings.advancePercentage);
+      setServices(prev => prev.map(s => ({
+        ...s,
+        advanceDeposit: Math.round((s.price * newPct) / 100)
+      })));
+    }
+
+    // Persist to backend database API
+    fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSettings)
+    }).catch(err => console.error('Failed to sync settings to API:', err));
   };
 
   // Financial & Operational Stat calculations

@@ -95,7 +95,7 @@ export const CustomerHome: React.FC = () => {
             </h1>
 
             <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-300 max-w-2xl leading-relaxed">
-              Book your appointment online in 60 seconds with a 10% advance deposit. Enjoy dedicated stylist time with zero waiting.
+              Book your appointment online in 60 seconds with a {settings.advancePercentage || 10}% advance deposit. Enjoy dedicated stylist time with zero waiting.
             </p>
 
             {/* CTA Buttons */}
@@ -106,7 +106,7 @@ export const CustomerHome: React.FC = () => {
                 className="px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
               >
                 <Calendar className="w-4 h-4 text-zinc-950" />
-                <span>Book Appointment (10% Advance)</span>
+                <span>Book Appointment ({settings.advancePercentage || 10}% Advance)</span>
               </button>
 
               <button
@@ -213,9 +213,9 @@ export const CustomerHome: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
               <Clock className="w-5 h-5" />
             </div>
-            <h3 className="font-serif text-base font-bold text-zinc-900 dark:text-zinc-100">10% Advance Booking</h3>
+            <h3 className="font-serif text-base font-bold text-zinc-900 dark:text-zinc-100">{settings.advancePercentage || 10}% Advance Booking</h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-              Pay 10% online to confirm. Pay the remaining 90% at the salon.
+              Pay {settings.advancePercentage || 10}% online to confirm. Pay the remaining {100 - (settings.advancePercentage || 10)}% at the salon.
             </p>
           </div>
         </div>
@@ -290,7 +290,7 @@ export const CustomerHome: React.FC = () => {
               Bundle Services &amp; Save Up To 20%
             </h3>
             <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed">
-              Combine haircuts, facials, party makeup, and hair treatments into a single pampering session. Lock your customized bundle with only a 10% advance deposit!
+              Combine haircuts, facials, party makeup, and hair treatments into a single pampering session. Lock your customized bundle with only a {settings.advancePercentage || 10}% advance deposit!
             </p>
           </div>
 
@@ -391,9 +391,9 @@ export const CustomerHome: React.FC = () => {
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold block">10% Advance</span>
+                      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold block">{settings.advancePercentage || 10}% Advance</span>
                       <span className="text-sm font-bold text-amber-600 dark:text-amber-400 font-mono">
-                        ₹{service.advanceDeposit || Math.round(service.price * 0.1)}
+                        ₹{Math.round((service.price * (settings.advancePercentage || 10)) / 100)}
                       </span>
                     </div>
                   </div>

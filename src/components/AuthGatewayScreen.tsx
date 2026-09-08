@@ -161,14 +161,10 @@ export const AuthGatewayScreen: React.FC = () => {
           </div>
         </div>
 
-        <button
-          id="auth-guest-explore-top-btn"
-          onClick={() => setIsGuestMode(true)}
-          className="px-4 py-2 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700/80 text-xs font-semibold text-zinc-200 hover:text-white transition flex items-center gap-2 cursor-pointer shadow-sm"
-        >
-          <Compass className="w-4 h-4 text-amber-400" />
-          <span className="hidden sm:inline">Explore as</span> Guest
-        </button>
+        <div className="px-3.5 py-1.5 rounded-xl bg-zinc-900/90 border border-amber-500/30 text-xs font-semibold text-amber-400 flex items-center gap-2 shadow-sm">
+          <Lock className="w-3.5 h-3.5 text-amber-400" />
+          <span>Authorization Required</span>
+        </div>
       </header>
 
       {/* Main Container */}
@@ -648,19 +644,14 @@ export const AuthGatewayScreen: React.FC = () => {
               </form>
             )}
 
-            {/* Bottom Option: Continue as Guest */}
-            <div className="pt-4 border-t border-zinc-800 text-center space-y-2">
-              <button
-                type="button"
-                id="auth-guest-explore-bottom-btn"
-                onClick={() => setIsGuestMode(true)}
-                className="w-full py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800/80 border border-zinc-800 text-xs font-semibold text-zinc-300 hover:text-white transition flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Compass className="w-4 h-4 text-amber-400" />
-                <span>Continue as Guest (Explore Rate Card &amp; Services)</span>
-              </button>
+            {/* Bottom Notice: Authorization Enforced */}
+            <div className="pt-4 border-t border-zinc-800 text-center space-y-1.5">
+              <div className="text-xs text-zinc-300 flex items-center justify-center gap-1.5 font-medium">
+                <Lock className="w-3.5 h-3.5 text-amber-500" />
+                <span>Authorization Required: Please sign in or create an account to enter</span>
+              </div>
               <p className="text-[11px] text-zinc-500">
-                You can sign in or register at any point while browsing.
+                All client profiles and appointments are saved directly to the salon MySQL database.
               </p>
             </div>
           </div>

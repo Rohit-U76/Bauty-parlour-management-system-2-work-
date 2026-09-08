@@ -51,6 +51,8 @@ export const AdminSuite: React.FC = () => {
     services,
     appointments,
     inquiries,
+    deleteInquiry,
+    updateInquiryStatus,
     customers,
     gallery,
     offers,
@@ -307,40 +309,34 @@ export const AdminSuite: React.FC = () => {
           </nav>
         </div>
 
-        {/* Admin Profile & Exit Controls */}
-        <div className="p-4 border-t border-zinc-800 space-y-2">
+        {/* Admin Profile & Sign Out Controls */}
+        <div className="p-4 border-t border-zinc-800 space-y-3">
           {currentUser && (
-            <div className="p-2.5 rounded-xl bg-zinc-800/60 border border-zinc-700/60 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-amber-500 text-zinc-950 flex items-center justify-center font-bold text-xs">
-                  {currentUser.name.charAt(0)}
+            <div className="p-2.5 rounded-xl bg-zinc-800/60 border border-zinc-700/60 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500 text-zinc-950 flex items-center justify-center font-bold text-xs shrink-0">
+                {currentUser.name.charAt(0)}
+              </div>
+              <div className="overflow-hidden flex-1">
+                <div className="text-xs font-bold text-zinc-200 truncate flex items-center gap-1">
+                  <span>{currentUser.name}</span>
+                  <Crown className="w-3 h-3 text-amber-400 shrink-0" />
                 </div>
-                <div className="overflow-hidden">
-                  <div className="text-xs font-bold text-zinc-200 truncate flex items-center gap-1">
-                    <span>{currentUser.name}</span>
-                    <Crown className="w-3 h-3 text-amber-400 shrink-0" />
-                  </div>
-                  <div className="text-[10px] text-zinc-400 truncate font-mono">
-                    Owner Clear (PIN: 9999)
-                  </div>
+                <div className="text-[10px] text-zinc-400 truncate font-mono">
+                  Owner Active • PIN: 9999
                 </div>
               </div>
-              <button
-                onClick={() => logout()}
-                className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-950/50 transition cursor-pointer"
-                title="Sign Out of Admin"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
             </div>
           )}
 
+          {/* Dedicated Sign Out button that returns to Authorization Page */}
           <button
-            onClick={() => setIsAdminMode(false)}
-            className="w-full py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+            id="admin-sidebar-signout-btn"
+            onClick={() => logout()}
+            className="w-full py-2.5 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+            title="Sign out and return to Authorization Page"
           >
-            <span>Return to Client Website</span>
-            <ChevronRight className="w-4 h-4 text-amber-400" />
+            <LogOut className="w-4 h-4" />
+            <span>Sign Out to Authorization Page</span>
           </button>
         </div>
       </aside>
@@ -355,17 +351,13 @@ export const AdminSuite: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <button
+            id="admin-mobile-signout-btn"
             onClick={() => logout()}
-            className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2 py-1 rounded-lg bg-rose-500/10 flex items-center gap-1 cursor-pointer"
+            className="text-xs text-rose-400 hover:text-rose-300 font-bold px-3 py-1.5 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center gap-1.5 cursor-pointer"
+            title="Sign out and return to Authorization Page"
           >
-            <LogOut className="w-3 h-3" />
-            <span>Lock</span>
-          </button>
-          <button
-            onClick={() => setIsAdminMode(false)}
-            className="text-xs text-amber-400 font-bold px-2.5 py-1 rounded-lg bg-amber-500/10 cursor-pointer"
-          >
-            Client Site
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
           </button>
         </div>
       </div>
@@ -410,7 +402,7 @@ export const AdminSuite: React.FC = () => {
 
                 <div className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2">
                   <div className="flex items-center justify-between text-xs text-zinc-400">
-                    <span>10% Advance Deposits</span>
+                    <span>{settings.advancePercentage || 10}% Advance Deposits</span>
                     <DollarSign className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div className="text-2xl font-bold font-mono text-emerald-400">₹{totalAdvanceCollected.toLocaleString()}</div>
@@ -562,7 +554,7 @@ export const AdminSuite: React.FC = () => {
                       <th className="px-4 py-3">Booking Ref / Date</th>
                       <th className="px-4 py-3">Client</th>
                       <th className="px-4 py-3">Service</th>
-                      <th className="px-4 py-3">Total / 10% Adv</th>
+                      <th className="px-4 py-3">Total / {settings.advancePercentage || 10}% Adv</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
@@ -585,7 +577,7 @@ export const AdminSuite: React.FC = () => {
                         <td className="px-4 py-3">
                           <div className="font-bold text-zinc-200">₹{app.totalAmount}</div>
                           <div className="text-emerald-400 font-mono text-[11px]">
-                            10% Adv: ₹{app.advancePaid}
+                            {settings.advancePercentage || 10}% Adv: ₹{app.advancePaid}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -700,8 +692,8 @@ export const AdminSuite: React.FC = () => {
                           <span className="font-bold text-zinc-100 font-mono">₹{srv.price}</span>
                         </div>
                         <div className="flex items-center justify-between text-xs bg-amber-500/10 p-2 rounded-lg text-amber-400 font-semibold">
-                          <span>10% Advance:</span>
-                          <span className="font-mono font-bold">₹{srv.advanceDeposit || Math.round(srv.price * 0.1)}</span>
+                          <span>{settings.advancePercentage || 10}% Advance:</span>
+                          <span className="font-mono font-bold">₹{srv.advanceDeposit || Math.round((srv.price * (settings.advancePercentage || 10)) / 100)}</span>
                         </div>
                       </div>
                     </div>
@@ -868,25 +860,92 @@ export const AdminSuite: React.FC = () => {
           {/* INQUIRIES TAB */}
           {adminTab === 'inquiries' && (
             <div className="space-y-5">
-              <div>
-                <h1 className="font-serif text-2xl font-bold text-zinc-100">Consultation Inquiries</h1>
-                <p className="text-xs text-zinc-400">Messages sent from the Contact page form.</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h1 className="font-serif text-2xl font-bold text-zinc-100">Consultation Enquiries</h1>
+                  <p className="text-xs text-zinc-400">
+                    Client consultation messages, bridal queries &amp; reported inquiries from the Contact form.
+                  </p>
+                </div>
+                <div className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-amber-400 w-fit">
+                  Total Enquiries: {inquiries.length}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {inquiries.map(inq => (
-                  <div key={inq.id} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm text-zinc-100">{inq.clientName || (inq as any).name}</span>
-                      <span className="text-[10px] text-zinc-500">{inq.receivedDate || (inq as any).date}</span>
+              {inquiries.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-2">
+                  <Mail className="w-8 h-8 text-zinc-600 mx-auto" />
+                  <p className="text-sm font-semibold text-zinc-300">No reported consultation enquiries</p>
+                  <p className="text-xs text-zinc-500">All client messages and inquiries have been cleared or resolved.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {inquiries.map(inq => (
+                    <div key={inq.id} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-3 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-zinc-100">{inq.clientName || (inq as any).name}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                              inq.status === 'NEW'
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                : inq.status === 'RESOLVED'
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                            }`}>
+                              {inq.status || 'NEW'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-zinc-500 font-mono">{inq.receivedDate || (inq as any).date}</span>
+                        </div>
+
+                        {inq.subject && (
+                          <div className="text-xs font-bold text-amber-400">
+                            Subject: {inq.subject}
+                          </div>
+                        )}
+
+                        <div className="text-xs text-zinc-400 flex flex-wrap gap-2">
+                          {inq.phone && <span>📞 {inq.phone}</span>}
+                          {inq.email && <span>✉️ {inq.email}</span>}
+                        </div>
+
+                        <p className="text-xs text-zinc-300 italic bg-zinc-950 p-3.5 rounded-xl border border-zinc-800 leading-relaxed">
+                          "{inq.message}"
+                        </p>
+                      </div>
+
+                      {/* Action buttons: Delete Reported Enquiry & Status */}
+                      <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-zinc-500">ID: {inq.id}</span>
+                        <div className="flex items-center gap-2">
+                          {inq.status !== 'RESOLVED' && (
+                            <button
+                              onClick={() => updateInquiryStatus(inq.id, 'RESOLVED')}
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-semibold transition cursor-pointer"
+                            >
+                              Mark Resolved
+                            </button>
+                          )}
+                          <button
+                            id={`delete-inquiry-${inq.id}`}
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to delete this reported enquiry from ${inq.clientName || 'Client'}?`)) {
+                                deleteInquiry(inq.id);
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-400 hover:text-rose-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                            title="Delete Reported Enquiry from Database"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete Reported Enquiry</span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-zinc-400">{inq.phone} • {inq.email}</div>
-                    <p className="text-xs text-zinc-300 italic bg-zinc-950 p-3 rounded-xl border border-zinc-800">
-                      "{inq.message}"
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1076,9 +1135,9 @@ export const AdminSuite: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-zinc-300 block mb-1">10% Advance</label>
+                  <label className="text-zinc-300 block mb-1">{settings.advancePercentage || 10}% Advance</label>
                   <div className="px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-amber-400 font-bold font-mono">
-                    ₹{Math.round(newServicePrice * 0.1)}
+                    ₹{Math.round((newServicePrice * (settings.advancePercentage || 10)) / 100)}
                   </div>
                 </div>
               </div>

@@ -80,7 +80,7 @@ export const Navbar: React.FC = () => {
               Modern Unisex Salon:
             </span>
             <span className="truncate text-zinc-300">
-              Mohol • B.N. Gund Complex • 10% Online Advance Deposit
+              Mohol • B.N. Gund Complex • {settings.advancePercentage || 10}% Online Advance Deposit
             </span>
           </div>
           <div className="hidden md:flex items-center gap-3 lg:gap-4 text-zinc-400 shrink-0">
@@ -103,7 +103,7 @@ export const Navbar: React.FC = () => {
             </a>
             <span className="text-zinc-700">|</span>
             <span className="text-emerald-400 flex items-center gap-1 font-mono text-[11px]">
-              <ShieldCheck className="w-3.5 h-3.5" /> Razorpay 10% Advance
+              <ShieldCheck className="w-3.5 h-3.5" /> Razorpay {settings.advancePercentage || 10}% Advance
             </span>
           </div>
         </div>
@@ -364,7 +364,7 @@ export const Navbar: React.FC = () => {
 
                             <div className="text-[11px] text-zinc-700 dark:text-zinc-300 flex items-center justify-between font-mono">
                               <span>📅 {apt.date} at {apt.timeSlot}</span>
-                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">10% Deposit Paid</span>
+                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{settings.advancePercentage || 10}% Deposit Paid</span>
                             </div>
 
                             <button

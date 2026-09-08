@@ -24,8 +24,8 @@ import { MobileBottomNav } from './components/MobileBottomNav';
 function SalonAppContent() {
   const { isAdminMode, currentUser, isGuestMode, activeNavTab } = useSalon();
 
-  // If user is not authenticated and has not chosen guest mode, show the Welcome Auth Gateway Screen first!
-  if (!currentUser && !isGuestMode) {
+  // Mandatory Authorization Gate: without authorization the page cannot get opened!
+  if (!currentUser) {
     return (
       <div className="min-h-screen bg-stone-950 text-zinc-100 flex flex-col transition-colors duration-200">
         <AuthGatewayScreen />

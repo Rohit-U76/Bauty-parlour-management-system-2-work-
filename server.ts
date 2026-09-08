@@ -1,10 +1,139 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+// Relational Database Store Helper (MySQL-compatible persistence file)
+const DB_DIR = path.join(process.cwd(), 'data');
+const DB_FILE = path.join(DB_DIR, 'db.json');
+
+function initDb() {
+  if (!fs.existsSync(DB_DIR)) {
+    fs.mkdirSync(DB_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(DB_FILE)) {
+    const initialDb = {
+      users: [
+        {
+          id: 'usr-admin-1',
+          name: 'Salon Owner & Master Stylist',
+          username: 'admin',
+          email: 'admin@modernsalon.com',
+          phone: '8104026257',
+          role: 'ADMIN',
+          password: 'admin',
+          pin: '9999',
+          memberTier: 'Owner Admin',
+          loyaltyPoints: 5000,
+          memberSince: '2022'
+        },
+        {
+          id: 'usr-cust-1',
+          name: 'Priya Sharma',
+          username: 'priya',
+          email: 'priya.sharma@example.com',
+          phone: '9822012345',
+          role: 'CUSTOMER',
+          password: 'password123',
+          memberTier: 'VIP Member',
+          loyaltyPoints: 450,
+          totalVisits: 14,
+          memberSince: '2023',
+          preferredServices: ['HD Party Make Up', 'Cheryla’s Facial', 'Hair Spa']
+        },
+        {
+          id: 'usr-cust-2',
+          name: 'Rahul Kadam',
+          username: 'rahul',
+          email: 'rahul.kadam@gmail.com',
+          phone: '9423078901',
+          role: 'CUSTOMER',
+          password: 'password123',
+          memberTier: 'Standard',
+          loyaltyPoints: 180,
+          totalVisits: 6,
+          memberSince: '2024',
+          preferredServices: ["Men's Fade & Beard Sculpt", 'Face Clean Up']
+        },
+        {
+          id: 'usr-cust-3',
+          name: 'Rohit Umdale',
+          username: 'rohit',
+          email: 'rohitumdale@gmail.com',
+          phone: '8104026257',
+          role: 'CUSTOMER',
+          password: 'password123',
+          memberTier: 'VIP Member',
+          loyaltyPoints: 500,
+          totalVisits: 8,
+          memberSince: '2023',
+          preferredServices: ['3D/4D HD Bridal & Grooming', "Men's Fade & Beard Sculpt", "L'Oréal Hair Spa"]
+        }
+      ],
+      settings: {
+        salonName: 'Modern Unisex Salon',
+        tagline: "WE'LL STYLE YOU'LL SMILE",
+        phone: '8104026257',
+        email: 'modernsalon02@gmail.com',
+        address: 'B.N. GUND COMPLEX, NEAR KANYA PRASHALA AND ICICI BANK, MOHOL - 413213',
+        openingHours: 'Mon - Sun: 09:00 AM - 09:00 PM',
+        advancePercentage: 10,
+        currencySymbol: '₹',
+        razorpayKeyId: 'rzp_test_modern_salon_mohol',
+        bookingAutoConfirm: false,
+        instagramUrl: 'https://www.instagram.com/modern_unisex_salon_mohol?utm_source=qr',
+        mapsUrl: 'https://maps.app.goo.gl/CraeBa6gAjWA8o818',
+        gstNumber: '27AABCM8104M1Z2 (Available on Invoice)',
+        staffType: 'Self-Employed (Master Stylist & Founder)'
+      },
+      inquiries: [
+        {
+          id: 'inq-1',
+          clientName: 'Sneha Patil',
+          phone: '9822109876',
+          email: 'sneha.patil@gmail.com',
+          subject: 'Bridal Package Consultation',
+          serviceCategory: 'Bridal & Pre-Bridal',
+          message: 'Looking for full bridal package details for wedding on Dec 15th.',
+          receivedDate: '2026-03-01',
+          status: 'NEW'
+        },
+        {
+          id: 'inq-2',
+          clientName: 'Amol Shinde',
+          phone: '9158402211',
+          email: 'amol.shinde@outlook.com',
+          subject: 'Keratin Treatment Inquiry',
+          serviceCategory: 'Hair Services',
+          message: 'Is keratin safe for colored hair? What is the duration?',
+          receivedDate: '2026-03-03',
+          status: 'IN PROGRESS'
+        }
+      ],
+      appointments: []
+    };
+    fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2), 'utf-8');
+  }
+}
+
+function readDb() {
+  initDb();
+  try {
+    const content = fs.readFileSync(DB_FILE, 'utf-8');
+    return JSON.parse(content);
+  } catch (e) {
+    return { users: [], settings: {}, inquiries: [], appointments: [] };
+  }
+}
+
+function writeDb(data: any) {
+  initDb();
+  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
 
 // Helper for calling Gemini with model fallbacks to handle 503 / high demand gracefully
 async function generateGeminiWithFallback(ai: GoogleGenAI, options: {
@@ -45,6 +174,162 @@ async function startServer() {
     res.json({ status: 'ok', service: 'Smart Salon Backend & Payment API' });
   });
 
+  // --- AUTHENTICATION & USER REGISTRATION APIs (DATABASE BACKED) ---
+  app.post('/api/auth/register', (req, res) => {
+    try {
+      const { name, username, email, phone, password, preferredServices } = req.body;
+      if (!name || !phone || !password) {
+        return res.status(400).json({ success: false, message: 'Name, phone number, and password are required to create an account.' });
+      }
+
+      const db = readDb();
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const cleanEmail = (email || '').toLowerCase().trim();
+      const cleanUsername = (username || cleanEmail.split('@')[0] || `user_${cleanPhone.slice(-4)}`).toLowerCase().trim();
+
+      // Check if user already exists
+      const existing = db.users.find((u: any) => 
+        (cleanEmail && u.email && u.email.toLowerCase() === cleanEmail) ||
+        (cleanPhone && u.phone && u.phone.replace(/[^0-9]/g, '') === cleanPhone) ||
+        (cleanUsername && u.username && u.username.toLowerCase() === cleanUsername)
+      );
+
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: 'An account with this mobile number, username, or email already exists. Please sign in.'
+        });
+      }
+
+      const newUser = {
+        id: `usr-cust-${Date.now()}`,
+        name: name.trim(),
+        username: cleanUsername,
+        email: cleanEmail || `${cleanUsername}@example.com`,
+        phone: cleanPhone,
+        password: password,
+        role: 'CUSTOMER',
+        memberTier: 'Silver VIP',
+        loyaltyPoints: 100, // 100 reward points bonus on registration
+        totalVisits: 0,
+        memberSince: new Date().getFullYear().toString(),
+        preferredServices: preferredServices || []
+      };
+
+      db.users.push(newUser);
+      writeDb(db);
+
+      console.log(`[User Registered in DB]: ${newUser.name} (${newUser.phone})`);
+      res.json({
+        success: true,
+        user: newUser,
+        message: 'Account successfully registered! 100 welcome reward points credited to your wallet.'
+      });
+    } catch (err: any) {
+      console.error('Error during registration:', err);
+      res.status(500).json({ success: false, message: 'Registration failed due to server error' });
+    }
+  });
+
+  app.post('/api/auth/login', (req, res) => {
+    try {
+      const { identifier, password, role } = req.body;
+      if (!identifier || !password) {
+        return res.status(400).json({ success: false, message: 'Username/phone and password are required.' });
+      }
+
+      const db = readDb();
+      const cleanIdent = identifier.toLowerCase().trim();
+      const cleanNum = identifier.replace(/[^0-9]/g, '');
+
+      // Special Owner PIN check for 9999
+      if ((cleanIdent === 'admin' || cleanNum === '8104026257' || role === 'ADMIN') && (password === '9999' || password === 'admin')) {
+        const adminUser = db.users.find((u: any) => u.role === 'ADMIN') || {
+          id: 'usr-admin-1',
+          name: 'Salon Owner & Master Stylist',
+          username: 'admin',
+          email: 'admin@modernsalon.com',
+          phone: '8104026257',
+          role: 'ADMIN',
+          memberTier: 'Owner Admin',
+          loyaltyPoints: 5000,
+          memberSince: '2022'
+        };
+        return res.json({
+          success: true,
+          user: adminUser,
+          message: 'Welcome back, Salon Owner! Admin suite unlocked.'
+        });
+      }
+
+      // Check client accounts
+      const user = db.users.find((u: any) => {
+        const uEmail = (u.email || '').toLowerCase();
+        const uUsername = (u.username || '').toLowerCase();
+        const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
+        const matchesIdent = uEmail === cleanIdent || uUsername === cleanIdent || (cleanNum && uPhone === cleanNum);
+        return matchesIdent && (u.password === password || u.pin === password);
+      });
+
+      if (user) {
+        return res.json({
+          success: true,
+          user,
+          message: `Welcome back, ${user.name}!`
+        });
+      }
+
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials. Please verify your mobile/email and password or PIN.'
+      });
+    } catch (err: any) {
+      console.error('Error during login:', err);
+      res.status(500).json({ success: false, message: 'Login failed due to server error' });
+    }
+  });
+
+  app.get('/api/auth/users', (req, res) => {
+    try {
+      const db = readDb();
+      res.json({ success: true, users: db.users });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- SETTINGS APIS (DATABASE BACKED) ---
+  app.get('/api/settings', (req, res) => {
+    try {
+      const db = readDb();
+      res.json({ success: true, settings: db.settings });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/settings', (req, res) => {
+    try {
+      const db = readDb();
+      db.settings = { ...db.settings, ...req.body };
+      writeDb(db);
+      console.log('[Settings Updated in DB]:', req.body);
+      res.json({ success: true, settings: db.settings, message: 'Settings updated successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- CONSULTATION INQUIRIES APIS (DATABASE BACKED WITH DELETION) ---
+  app.get('/api/inquiries', (req, res) => {
+    try {
+      const db = readDb();
+      res.json({ success: true, inquiries: db.inquiries || [] });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Inquiry Submission API
   app.post('/api/inquiries/submit', (req, res) => {
     try {
@@ -54,17 +339,56 @@ async function startServer() {
       }
 
       const inquiryId = `inq-${Date.now()}`;
-      console.log(`[Inquiry Received] From: ${clientName} (${email || phone}) - Subject: ${subject || serviceCategory || 'General Inquiry'}`);
+      const newInquiry = {
+        id: inquiryId,
+        clientName,
+        phone: phone || '',
+        email: email || '',
+        subject: subject || serviceCategory || 'General Service & Booking Inquiry',
+        serviceCategory: serviceCategory || 'General Inquiry',
+        message,
+        receivedDate: new Date().toISOString().split('T')[0],
+        status: 'NEW'
+      };
+
+      const db = readDb();
+      db.inquiries = [newInquiry, ...(db.inquiries || [])];
+      writeDb(db);
+
+      console.log(`[Inquiry Saved to DB] ID: ${inquiryId} From: ${clientName} (${email || phone})`);
 
       res.json({
         success: true,
         id: inquiryId,
+        inquiry: newInquiry,
         message: 'Inquiry received successfully. Our salon team will respond shortly.',
         receivedAt: new Date().toISOString()
       });
     } catch (err: any) {
       console.error('Error handling inquiry submission:', err);
       res.status(500).json({ error: 'Failed to record inquiry' });
+    }
+  });
+
+  // Delete Consultation Inquiry API
+  app.delete('/api/inquiries/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = readDb();
+      const initialCount = (db.inquiries || []).length;
+      db.inquiries = (db.inquiries || []).filter((inq: any) => inq.id !== id);
+      writeDb(db);
+
+      console.log(`[Inquiry Deleted from DB]: ${id}`);
+      res.json({
+        success: true,
+        message: 'Consultation inquiry deleted successfully from database.',
+        deletedId: id,
+        remainingCount: db.inquiries.length
+      });
+    } catch (err: any) {
+      console.error('Error deleting inquiry:', err);
+      res.status(500).json({ success: false, error: 'Failed to delete inquiry' });
     }
   });
 
@@ -206,7 +530,7 @@ async function startServer() {
     }
   });
 
-  // Razorpay 10% Advance Deposit Order Creation
+  // Razorpay Advance Deposit Order Creation
   app.post('/api/payment/create-order', (req, res) => {
     try {
       const { totalAmount, customerName, customerPhone, customerEmail, serviceNames } = req.body;
@@ -215,9 +539,10 @@ async function startServer() {
         return res.status(400).json({ error: 'Invalid total amount for booking.' });
       }
 
-      // Exact 10% advance deposit calculation
-      const advancePercentage = 10;
-      const advanceAmount = Math.round((parsedTotal * advancePercentage) / 100);
+      // Dynamic advance deposit calculation from settings / request
+      const db = readDb();
+      const advancePercentage = req.body.advancePercentage ? Number(req.body.advancePercentage) : (Number(db.settings?.advancePercentage) || 10);
+      const advanceAmount = Math.max(1, Math.round((parsedTotal * advancePercentage) / 100));
       const remainingAmount = parsedTotal - advanceAmount;
       const orderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       const receiptId = `rcpt_${Date.now().toString().slice(-6)}`;
@@ -240,13 +565,13 @@ async function startServer() {
         },
         services: serviceNames || [],
         notes: {
-          description: `10% Advance Booking Deposit for Smart Salon`,
-          policy: 'Non-refundable within 2 hours of slot time. Balance ₹' + remainingAmount + ' payable at salon reception.'
+          description: `${advancePercentage}% Advance Booking Deposit for Smart Salon`,
+          policy: `Non-refundable within 2 hours of slot time. Balance ₹${remainingAmount} payable at salon reception.`
         }
       });
     } catch (err: any) {
       console.error('Error creating Razorpay order:', err);
-      res.status(500).json({ error: 'Failed to initiate 10% advance payment order' });
+      res.status(500).json({ error: 'Failed to initiate advance payment order' });
     }
   });
 

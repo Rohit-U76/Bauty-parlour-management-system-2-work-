@@ -3,7 +3,7 @@ import { Tag, Copy, Check, Calendar } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 
 export const CustomerOffers: React.FC = () => {
-  const { offers, openBookingModal } = useSalon();
+  const { offers, openBookingModal, settings } = useSalon();
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const handleCopy = (code: string) => {
@@ -25,7 +25,7 @@ export const CustomerOffers: React.FC = () => {
             Special Offers &amp; Promo Codes
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-xl">
-            Copy any promo code below and apply it during appointment booking. Pay only 10% advance deposit to secure your slot.
+            Copy any promo code below and apply it during appointment booking. Pay only {settings.advancePercentage || 10}% advance deposit to secure your slot.
           </p>
         </div>
 
@@ -99,7 +99,7 @@ export const CustomerOffers: React.FC = () => {
               className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span>Apply &amp; Book (10% Deposit)</span>
+              <span>Apply &amp; Book ({settings.advancePercentage || 10}% Deposit)</span>
             </button>
           </div>
         ))}

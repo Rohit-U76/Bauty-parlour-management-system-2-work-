@@ -108,8 +108,8 @@ export const CustomerServices: React.FC = () => {
       reviewsCount: 140,
       benefits: [
         `Bundle Savings: ₹${discountAmount.toLocaleString()} (${discountRate}% Discount Applied)`,
-        `10% Online Advance Deposit: ₹${advanceDeposit.toLocaleString()} secured`,
-        `Remaining 90% Balance: ₹${(finalDiscountedPrice - advanceDeposit).toLocaleString()} payable at salon`,
+        `${settings.advancePercentage || 10}% Online Advance Deposit: ₹${advanceDeposit.toLocaleString()} secured`,
+        `Remaining ${100 - (settings.advancePercentage || 10)}% Balance: ₹${(finalDiscountedPrice - advanceDeposit).toLocaleString()} payable at salon`,
         ...selectedBundleServices.map(s => `Included: ${s.name} (${s.durationMinutes} mins)`)
       ]
     };
@@ -161,7 +161,7 @@ export const CustomerServices: React.FC = () => {
             Service Menu, Pricing &amp; Bundles
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
-            Transparent pricing with 10% advance deposit to secure your appointment. Bundle multiple services together to unlock up to <strong>20% discounts</strong> before booking!
+            Transparent pricing with {settings.advancePercentage || 10}% advance deposit to secure your appointment. Bundle multiple services together to unlock up to <strong>20% discounts</strong> before booking!
           </p>
         </div>
 
@@ -426,10 +426,10 @@ export const CustomerServices: React.FC = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">
-                          10% Deposit
+                          {settings.advancePercentage || 10}% Deposit
                         </div>
                         <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono">
-                          ₹{Math.round(srv.price * 0.1)}
+                          ₹{Math.round((srv.price * (settings.advancePercentage || 10)) / 100)}
                         </div>
                       </div>
                     </div>

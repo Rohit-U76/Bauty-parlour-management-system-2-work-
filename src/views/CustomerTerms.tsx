@@ -117,7 +117,7 @@ export const CustomerTerms: React.FC = () => {
           </p>
           <div className="pt-1 flex items-center gap-2 text-[11px] text-amber-600 dark:text-amber-400 font-semibold font-mono">
             <Info className="w-3.5 h-3.5 shrink-0" />
-            <span>Cancellations under 24 hours forfeit the 10% slot reservation deposit.</span>
+            <span>Cancellations under 24 hours forfeit the {settings.advancePercentage || 10}% slot reservation deposit.</span>
           </div>
         </div>
 
@@ -131,16 +131,16 @@ export const CustomerTerms: React.FC = () => {
                 Clause 01 &amp; 10
               </span>
               <h3 className="font-serif text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                10% Deposit &amp; 90% Counter Settlement
+                {settings.advancePercentage || 10}% Deposit &amp; {100 - (settings.advancePercentage || 10)}% Counter Settlement
               </h3>
             </div>
           </div>
           <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-            Pay only <strong>10% online</strong> via UPI, Google Pay, PhonePe, Cards to guarantee your exclusive salon slot. The remaining <strong>90% balance</strong> is settled comfortably at the counter after service completion.
+            Pay only <strong>{settings.advancePercentage || 10}% online</strong> via UPI, Google Pay, PhonePe, Cards to guarantee your exclusive salon slot. The remaining <strong>{100 - (settings.advancePercentage || 10)}% balance</strong> is settled comfortably at the counter after service completion.
           </p>
           <div className="pt-1 flex items-center gap-2 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-            <span>Instant digital pass &amp; receipt generated upon 10% advance deposit.</span>
+            <span>Instant digital pass &amp; receipt generated upon {settings.advancePercentage || 10}% advance deposit.</span>
           </div>
         </div>
       </div>

@@ -134,10 +134,11 @@ export const MobileMoreSheet: React.FC<MobileMoreSheetProps> = ({ isOpen, onClos
                   logout();
                   onClose();
                 }}
-                className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition cursor-pointer"
-                title="Sign Out"
+                className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                title="Sign Out to Authorization"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
               </button>
             </div>
           ) : (
@@ -414,7 +415,7 @@ export const MobileMoreSheet: React.FC<MobileMoreSheetProps> = ({ isOpen, onClos
             className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition cursor-pointer"
           >
             <Calendar className="w-4 h-4 text-zinc-950" />
-            <span>Book Appointment (10% Advance Deposit)</span>
+            <span>Book Appointment ({settings.advancePercentage || 10}% Advance Deposit)</span>
           </button>
         </div>
       </div>

@@ -529,7 +529,7 @@ export const BookingModal: React.FC = () => {
                       <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center gap-2">
                         <Flame className="w-4 h-4 text-amber-400 shrink-0 fill-amber-400" />
                         <span>
-                          <strong>{selectedTimeSlot} is Filling Fast!</strong> {activeSlotInfo.pendingCount > 0 ? `${activeSlotInfo.pendingCount} pending customer hold(s) active.` : 'High demand slot.'} Complete 10% advance deposit to lock your station.
+                          <strong>{selectedTimeSlot} is Filling Fast!</strong> {activeSlotInfo.pendingCount > 0 ? `${activeSlotInfo.pendingCount} pending customer hold(s) active.` : 'High demand slot.'} Complete {advancePercentage}% advance deposit to lock your station.
                         </span>
                       </div>
                     );
@@ -662,8 +662,8 @@ export const BookingModal: React.FC = () => {
                 </div>
                 <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
                   <div className="text-xs">
-                    <div className="font-bold text-amber-300">10% Online Advance Deposit Payable Now</div>
-                    <div className="text-[10px] text-zinc-400">Remaining ₹{balanceAtSalon} balance payable at salon</div>
+                    <div className="font-bold text-amber-300">{advancePercentage}% Online Advance Deposit Payable Now</div>
+                    <div className="text-[10px] text-zinc-400">Remaining {100 - advancePercentage}% (₹{balanceAtSalon}) balance payable at salon</div>
                   </div>
                   <div className="text-base font-extrabold text-amber-400 font-mono">
                     ₹{advanceDeposit}
