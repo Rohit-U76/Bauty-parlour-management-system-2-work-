@@ -1,0 +1,6 @@
+{
+  "name": "Modern Unisex Salon",
+  "description": "Modern Unisex Salon Mohol - Complete appointment scheduler with real-time 'Filling Fast' availability indicators, multi-service discount bundles, tabular rate card, 10% advance deposits, AI style quiz, and digital check-in passes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
