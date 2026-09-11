@@ -35,7 +35,7 @@ export const FloatingBundleBar: React.FC<FloatingBundleBarProps> = ({
   if (selectedServices.length === 0) return null;
 
   return (
-    <div className="fixed bottom-16 lg:bottom-4 left-0 right-0 z-40 px-3 sm:px-6 pointer-events-none animate-in slide-in-from-bottom duration-300">
+    <div className="fixed bottom-20 lg:bottom-4 left-0 right-0 z-40 px-3 sm:px-6 pointer-events-none animate-in slide-in-from-bottom duration-300">
       <div className="max-w-4xl mx-auto bg-zinc-950/95 text-white border border-amber-500/40 rounded-2xl sm:rounded-3xl shadow-2xl p-3 sm:p-4 backdrop-blur-xl pointer-events-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         
         {/* Left Info: Services count & discount status */}

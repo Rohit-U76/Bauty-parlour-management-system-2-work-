@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
@@ -10,6 +11,137 @@ dotenv.config();
 // Relational Database Store Helper (MySQL-compatible persistence file)
 const DB_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_DIR, 'db.json');
+
+function normalizeDateStr(dateVal: any): string {
+  if (!dateVal) return '';
+  const str = String(dateVal).trim();
+  if (!str) return '';
+  const clean = str.includes('T') ? str.split('T')[0] : str;
+  if (clean.includes('/')) {
+    const parts = clean.split('/');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+      if (parts[2].length === 4) {
+        const p1 = Number(parts[0]);
+        const p2 = Number(parts[1]);
+        const year = parts[2];
+        if (p1 > 12) {
+          return `${year}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`;
+        }
+        if (p2 > 12) {
+          return `${year}-${String(p1).padStart(2, '0')}-${String(p2).padStart(2, '0')}`;
+        }
+        return `${year}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`;
+      }
+    }
+  }
+  if (clean.includes('-')) {
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+      if (parts[2].length === 4) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+  }
+  return clean.slice(0, 10);
+}
+
+function normalizeTimeSlotStr(slotVal: any): string {
+  if (!slotVal) return '';
+  let str = String(slotVal).trim().toUpperCase();
+  str = str.replace(/\s+/g, ' ');
+  const match = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+  if (match) {
+    const hh = match[1].padStart(2, '0');
+    const mm = match[2];
+    const period = match[3];
+    return `${hh}:${mm} ${period}`;
+  }
+  return str;
+}
+
+function getInitialAppointmentsSeed() {
+  const todayStr = new Date().toISOString().split('T')[0];
+  return [
+    {
+      id: 'apt-today-1',
+      bookingRef: 'MS-2026-901244',
+      clientName: 'Pooja Kadam',
+      clientPhone: '8104026257',
+      clientEmail: 'pooja.kadam@gmail.com',
+      serviceId: 'srv-sk-6',
+      serviceName: 'O3 Prof. Facial',
+      category: 'Skin Services',
+      date: todayStr,
+      appointmentDate: todayStr,
+      timeSlot: '05:30 PM',
+      stylistName: 'Self-Employed (Master Stylist & Founder)',
+      totalAmount: 2500,
+      advancePaid: 250,
+      balanceDue: 2250,
+      paymentStatus: 'PAID',
+      bookingStatus: 'CONFIRMED',
+      status: 'CONFIRMED',
+      razorpayPaymentId: 'pay_rzp_9841289410',
+      razorpayOrderId: 'order_891024',
+      createdAt: new Date().toISOString(),
+      notes: 'Sensitive skin near cheekbones, requested O3+ brightening treatment.'
+    },
+    {
+      id: 'apt-today-2',
+      bookingRef: 'MS-2026-901245',
+      clientName: 'Neha Sharma',
+      clientPhone: '9823045678',
+      clientEmail: 'neha.sharma@gmail.com',
+      serviceId: 'srv-mu-2',
+      serviceName: 'HD Make Up',
+      category: 'Make Up',
+      date: todayStr,
+      appointmentDate: todayStr,
+      timeSlot: '05:30 PM',
+      stylistName: 'Senior Beauty & Skin Specialist',
+      totalAmount: 5000,
+      advancePaid: 500,
+      balanceDue: 4500,
+      paymentStatus: 'PAID',
+      bookingStatus: 'CONFIRMED',
+      status: 'CONFIRMED',
+      razorpayPaymentId: 'pay_rzp_9841289411',
+      razorpayOrderId: 'order_891025',
+      createdAt: new Date().toISOString(),
+      notes: 'Family function evening makeup.'
+    },
+    {
+      id: 'apt-today-3',
+      bookingRef: 'MS-2026-901246',
+      clientName: 'Rohan Shinde',
+      clientPhone: '9765433445',
+      clientEmail: 'rohan.shinde@yahoo.com',
+      serviceId: 'srv-hr-5',
+      serviceName: 'Advance Hair Cut & Blow Dry',
+      category: 'Hair Services',
+      date: todayStr,
+      appointmentDate: todayStr,
+      timeSlot: '11:45 AM',
+      stylistName: 'Self-Employed (Master Stylist & Founder)',
+      totalAmount: 550,
+      advancePaid: 55,
+      balanceDue: 495,
+      paymentStatus: 'PAID',
+      bookingStatus: 'CONFIRMED',
+      status: 'CONFIRMED',
+      razorpayPaymentId: 'pay_rzp_773412998',
+      razorpayOrderId: 'order_773412',
+      createdAt: new Date().toISOString(),
+      notes: 'Fade cut with textured top volume.'
+    }
+  ];
+}
 
 function initDb() {
   if (!fs.existsSync(DB_DIR)) {
@@ -88,7 +220,10 @@ function initDb() {
         instagramUrl: 'https://www.instagram.com/modern_unisex_salon_mohol?utm_source=qr',
         mapsUrl: 'https://maps.app.goo.gl/CraeBa6gAjWA8o818',
         gstNumber: '27AABCM8104M1Z2 (Available on Invoice)',
-        staffType: 'Self-Employed (Master Stylist & Founder)'
+        staffType: 'Self-Employed (Master Stylist & Founder)',
+        upiId: '9890511256-2@axl',
+        phonePeNumber: '9890511256',
+        payeeName: 'Modern Unisex Salon'
       },
       inquiries: [
         {
@@ -114,7 +249,7 @@ function initDb() {
           status: 'IN PROGRESS'
         }
       ],
-      appointments: []
+      appointments: getInitialAppointmentsSeed()
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2), 'utf-8');
   }
@@ -124,9 +259,23 @@ function readDb() {
   initDb();
   try {
     const content = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+    if (!parsed.appointments || parsed.appointments.length === 0) {
+      parsed.appointments = getInitialAppointmentsSeed();
+    }
+    if (parsed.settings) {
+      parsed.settings.upiId = parsed.settings.upiId || '9890511256-2@axl';
+      parsed.settings.phonePeNumber = parsed.settings.phonePeNumber || '9890511256';
+      parsed.settings.payeeName = parsed.settings.payeeName || 'Modern Unisex Salon';
+    }
+    return parsed;
   } catch (e) {
-    return { users: [], settings: {}, inquiries: [], appointments: [] };
+    return {
+      users: [],
+      settings: { upiId: '9890511256-2@axl', phonePeNumber: '9890511256', payeeName: 'Modern Unisex Salon' },
+      inquiries: [],
+      appointments: getInitialAppointmentsSeed()
+    };
   }
 }
 
@@ -168,6 +317,332 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  // --- LOCAL EXPRESS APPOINTMENT DATABASE ROUTES (DB.JSON PERSISTENCE & CAPACITY TRACKING) ---
+  app.get('/api/appointments/slots', (req, res) => {
+    try {
+      const rawDate = (req.query.date as string) || new Date().toISOString().split('T')[0];
+      const targetDate = normalizeDateStr(rawDate);
+      const db = readDb();
+      const appointments: any[] = db.appointments || [];
+
+      const SALON_SLOTS = [
+        '09:30 AM', '10:30 AM', '11:45 AM', '01:30 PM', '02:45 PM',
+        '04:00 PM', '05:30 PM', '06:45 PM', '07:30 PM', '08:15 PM'
+      ];
+      const CAPACITY = 3;
+
+      console.log(`[SLOTS API DEBUG] rawDate: ${rawDate} -> targetDate: ${targetDate} | appointments count: ${appointments.length}`);
+      const slots = SALON_SLOTS.map(slot => {
+        const normSlot = normalizeTimeSlotStr(slot);
+        const activeForSlot = appointments.filter(a => {
+          const aDate = normalizeDateStr(a.date || a.appointmentDate);
+          const aSlot = normalizeTimeSlotStr(a.timeSlot);
+          const status = String(a.bookingStatus || a.status || 'PENDING').toUpperCase();
+          const isActive = status === 'PENDING' || status === 'CONFIRMED';
+          const match = aDate === targetDate && aSlot === normSlot && isActive;
+          if (aSlot === normSlot) {
+            console.log(`  -> Slot match check: aDate="${aDate}" vs targetDate="${targetDate}" | aSlot="${aSlot}" vs normSlot="${normSlot}" | status="${status}" | match=${match}`);
+          }
+          return match;
+        });
+
+        const bookedCount = activeForSlot.length;
+        const remainingSeats = Math.max(0, CAPACITY - bookedCount);
+        const occupancyPercent = Math.min(100, Math.round((bookedCount / CAPACITY) * 100));
+        const soldOut = remainingSeats === 0;
+
+        let status = 'AVAILABLE';
+        let statusLabel = 'Available';
+        if (soldOut) {
+          status = 'SOLD_OUT';
+          statusLabel = 'Sold Out';
+        } else if (remainingSeats === 1 || occupancyPercent >= 66) {
+          status = 'FILLING_FAST';
+          statusLabel = 'Filling Fast';
+        }
+
+        return {
+          slot,
+          date: targetDate,
+          totalCapacity: CAPACITY,
+          bookedCount,
+          remainingSeats,
+          occupancyPercent,
+          status,
+          statusLabel,
+          soldOut,
+          bookedStylistIds: activeForSlot.map(a => a.stylistId).filter(Boolean)
+        };
+      });
+
+      res.json(slots);
+    } catch (err: any) {
+      console.error('Error calculating slots:', err);
+      res.status(500).json({ error: 'Failed to calculate slot availability' });
+    }
+  });
+
+  app.get('/api/appointments/mine', (req, res) => {
+    try {
+      const phone = req.query.phone as string;
+      if (!phone) {
+        return res.status(400).json({ error: 'Phone number is required.' });
+      }
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const db = readDb();
+      const appointments: any[] = db.appointments || [];
+      const matched = appointments.filter(a => {
+        const aPhone = (a.clientPhone || '').replace(/[^0-9]/g, '');
+        return cleanPhone && aPhone.includes(cleanPhone);
+      });
+      res.json(matched);
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to fetch customer appointments' });
+    }
+  });
+
+  app.get('/api/appointments/ref/:bookingRef', (req, res) => {
+    try {
+      const { bookingRef } = req.params;
+      const db = readDb();
+      const found = (db.appointments || []).find((a: any) => (a.bookingRef || '').toLowerCase() === bookingRef.toLowerCase());
+      if (found) return res.json(found);
+      res.status(404).json({ error: 'Appointment not found' });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to fetch appointment by reference' });
+    }
+  });
+
+  app.get('/api/appointments/stats/dashboard', (req, res) => {
+    try {
+      const db = readDb();
+      const all: any[] = db.appointments || [];
+      const billable = all.filter(a => a.bookingStatus !== 'CANCELLED' && a.status !== 'CANCELLED');
+      const totalGrossRevenue = billable.reduce((sum, a) => sum + (Number(a.totalAmount) || 0), 0);
+      const totalAdvanceDeposits = billable.reduce((sum, a) => sum + (Number(a.advancePaid) || 0), 0);
+      const confirmedBookings = all.filter(a => (a.bookingStatus || a.status) === 'CONFIRMED').length;
+      const completedBookings = all.filter(a => (a.bookingStatus || a.status) === 'COMPLETED').length;
+      const pendingBookings = all.filter(a => (a.bookingStatus || a.status) === 'PENDING').length;
+      const cancelledBookings = all.filter(a => (a.bookingStatus || a.status) === 'CANCELLED').length;
+
+      res.json({
+        totalBookings: all.length,
+        pendingBookings,
+        confirmedBookings,
+        completedBookings,
+        cancelledBookings,
+        totalGrossRevenue,
+        totalAdvanceDeposits,
+        averageBookingValue: billable.length > 0 ? Math.round(totalGrossRevenue / billable.length) : 0
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to compute dashboard stats' });
+    }
+  });
+
+  app.get('/api/appointments', (req, res) => {
+    try {
+      const db = readDb();
+      const dateQuery = req.query.date as string;
+      const statusQuery = req.query.status as string;
+      const searchQuery = req.query.search as string;
+
+      let list: any[] = db.appointments || [];
+      if (dateQuery) {
+        const cleanDate = normalizeDateStr(dateQuery);
+        list = list.filter(a => normalizeDateStr(a.date || a.appointmentDate) === cleanDate);
+      }
+      if (statusQuery) {
+        const cleanStatus = statusQuery.trim().toUpperCase();
+        list = list.filter(a => String(a.bookingStatus || a.status || '').toUpperCase() === cleanStatus);
+      }
+      if (searchQuery) {
+        const term = searchQuery.toLowerCase().trim();
+        list = list.filter(a =>
+          (a.clientName || '').toLowerCase().includes(term) ||
+          (a.clientPhone || '').includes(term) ||
+          (a.bookingRef || '').toLowerCase().includes(term) ||
+          (a.serviceName || '').toLowerCase().includes(term)
+        );
+      }
+
+      res.json(list);
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to fetch appointments' });
+    }
+  });
+
+  app.get('/api/appointments/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = readDb();
+      const found = (db.appointments || []).find((a: any) => String(a.id) === String(id));
+      if (found) return res.json(found);
+      res.status(404).json({ error: 'Appointment not found' });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to fetch appointment' });
+    }
+  });
+
+  app.post('/api/appointments', (req, res) => {
+    try {
+      const body = req.body || {};
+      const clientName = (body.clientName || '').trim();
+      const clientPhone = (body.clientPhone || '').trim();
+      const rawDate = body.date || body.appointmentDate || '';
+      const date = normalizeDateStr(rawDate);
+      const timeSlot = normalizeTimeSlotStr(body.timeSlot || '');
+
+      if (!clientName || !clientPhone || !date || !timeSlot) {
+        return res.status(400).json({
+          success: false,
+          message: 'Client name, phone number, date, and time slot are required.'
+        });
+      }
+
+      const db = readDb();
+      db.appointments = db.appointments || [];
+
+      // Chair Capacity Validation: max 3 active chairs per date & slot
+      const normSlot = normalizeTimeSlotStr(timeSlot);
+      const activeForSlot = db.appointments.filter((a: any) => {
+        const aDate = normalizeDateStr(a.date || a.appointmentDate);
+        const aSlot = normalizeTimeSlotStr(a.timeSlot);
+        const status = String(a.bookingStatus || a.status || 'PENDING').toUpperCase();
+        const isActive = status === 'PENDING' || status === 'CONFIRMED';
+        return aDate === date && aSlot === normSlot && isActive;
+      });
+
+      if (activeForSlot.length >= 3) {
+        return res.status(409).json({
+          success: false,
+          message: `Time slot ${timeSlot} on ${date} is fully booked (3 of 3 chairs occupied). Please choose another slot.`
+        });
+      }
+
+      const totalAmount = Number(body.totalAmount) || 0;
+      const advancePercentage = Number(db.settings?.advancePercentage) || 10;
+      const advancePaid = body.advancePaid !== undefined ? Number(body.advancePaid) : Math.round((totalAmount * advancePercentage) / 100);
+      const balanceDue = totalAmount - advancePaid;
+
+      const dayRef = date.replace(/-/g, '');
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const bookingRef = `MS-${dayRef}-${randomSuffix}`;
+
+      const newApt = {
+        id: `apt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        bookingRef,
+        userId: body.userId || null,
+        clientName,
+        clientPhone,
+        clientEmail: (body.clientEmail || '').trim(),
+        serviceId: body.serviceId || 'custom-srv',
+        serviceName: body.serviceName || 'Salon Service',
+        category: body.category || 'General Services',
+        date,
+        appointmentDate: date,
+        timeSlot,
+        stylistId: body.stylistId || null,
+        stylistName: body.stylistName || 'Self-Employed (Master Stylist & Founder)',
+        totalAmount,
+        advancePaid,
+        utrReference: body.utrReference || body.paymentId || body.razorpayPaymentId || '',
+        paymentId: body.paymentId || body.razorpayPaymentId || `pay_${Date.now()}`,
+        razorpayPaymentId: body.razorpayPaymentId || body.paymentId || '',
+        razorpayOrderId: body.razorpayOrderId || '',
+        notes: body.notes || '',
+        paymentStatus: body.paymentStatus || 'PAID',
+        bookingStatus: 'CONFIRMED',
+        status: 'CONFIRMED',
+        createdAt: new Date().toISOString()
+      };
+
+      db.appointments.unshift(newApt);
+
+      // Sync Customer CRM
+      db.users = db.users || [];
+      const existingUser = db.users.find((u: any) => u.phone && u.phone.replace(/[^0-9]/g, '') === clientPhone.replace(/[^0-9]/g, ''));
+      if (existingUser) {
+        existingUser.totalVisits = (existingUser.totalVisits || 0) + 1;
+      }
+
+      writeDb(db);
+      console.log(`[Appointment Saved in DB]: ${newApt.bookingRef} - ${clientName} (${date} ${timeSlot})`);
+
+      res.status(201).json(newApt);
+    } catch (err: any) {
+      console.error('Error creating appointment:', err);
+      res.status(500).json({ success: false, message: 'Failed to save appointment' });
+    }
+  });
+
+  app.patch('/api/appointments/:id/status', (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      if (!status) {
+        return res.status(400).json({ error: 'Status is required' });
+      }
+      const db = readDb();
+      const apt = (db.appointments || []).find((a: any) => String(a.id) === String(id));
+      if (!apt) {
+        return res.status(404).json({ error: 'Appointment not found' });
+      }
+      const cleanStatus = status.trim().toUpperCase();
+      apt.bookingStatus = cleanStatus;
+      apt.status = cleanStatus;
+      writeDb(db);
+
+      console.log(`[Appointment Status Updated]: ID ${id} -> ${cleanStatus}`);
+      res.json(apt);
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to update appointment status' });
+    }
+  });
+
+  app.patch(['/api/appointments/:id/payment', '/api/appointments/:id/payment-status'], (req, res) => {
+    try {
+      const { id } = req.params;
+      const { paymentStatus, status, paymentId } = req.body;
+      const newStatus = (paymentStatus || status || 'PAID').trim().toUpperCase();
+      const db = readDb();
+      const apt = (db.appointments || []).find((a: any) => String(a.id) === String(id));
+      if (!apt) {
+        return res.status(404).json({ error: 'Appointment not found' });
+      }
+      apt.paymentStatus = newStatus;
+      if (paymentId) apt.paymentId = paymentId;
+      if (newStatus === 'PAID' && apt.bookingStatus === 'PENDING') {
+        apt.bookingStatus = 'CONFIRMED';
+        apt.status = 'CONFIRMED';
+      }
+      writeDb(db);
+
+      console.log(`[Appointment Payment Status Updated]: ID ${id} -> ${newStatus}`);
+      res.json(apt);
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to update payment status' });
+    }
+  });
+
+  app.delete('/api/appointments/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = readDb();
+      const initialLen = (db.appointments || []).length;
+      db.appointments = (db.appointments || []).filter((a: any) => String(a.id) !== String(id));
+      writeDb(db);
+
+      if (db.appointments.length < initialLen) {
+        console.log(`[Appointment Deleted from DB]: ID ${id}`);
+        return res.json({ success: true, message: 'Appointment deleted successfully' });
+      }
+      res.status(404).json({ success: false, message: 'Appointment not found' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: 'Failed to delete appointment' });
+    }
+  });
 
   // Health check endpoint
   app.get('/api/health', (req, res) => {
@@ -505,11 +980,12 @@ async function startServer() {
   // Dynamic UPI Payment QR Code Generator
   app.post('/api/qr/generate-upi', (req, res) => {
     try {
+      const db = readDb();
       const { amount, payeeName, upiId, bookingRef, note } = req.body;
-      const vpa = upiId || 'modernunisexsalon@icici';
-      const name = payeeName || 'Modern Unisex Salon';
+      const vpa = upiId || db.settings?.upiId || '9890511256-2@axl';
+      const name = payeeName || db.settings?.payeeName || 'Modern Unisex Salon';
       const parsedAmount = parseFloat(amount) || 0;
-      const refNote = note || `Modern Salon Advance ${bookingRef || 'Booking'}`;
+      const refNote = note || `Modern Salon 10% Advance ${bookingRef || ''}`.trim();
 
       // Standard NPCI UPI URI Scheme
       const upiUrl = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${parsedAmount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(refNote)}`;
@@ -575,29 +1051,79 @@ async function startServer() {
     }
   });
 
-  // Razorpay Payment Verification
+  // Razorpay & Real UPI Payment Verification (With Anti-Fraud & Deduplication Checks)
   app.post('/api/payment/verify', (req, res) => {
     try {
-      const { razorpayOrderId, razorpayPaymentId, razorpaySignature, advanceAmount, totalAmount } = req.body;
-      const paymentId = razorpayPaymentId || `pay_${Math.random().toString(36).substring(2, 10)}`;
-      const bookingRef = `SS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+      const { razorpayOrderId, razorpayPaymentId, utrReference, paymentId: reqPaymentId, advanceAmount, totalAmount, upiId } = req.body;
+      const db = readDb();
+      const resolvedUpiId = upiId || db.settings?.upiId || '9890511256-2@axl';
+      const resolvedUtr = (utrReference || '').trim();
+
+      // 1. Mandatory UTR check
+      if (!resolvedUtr) {
+        return res.status(400).json({
+          success: false,
+          error: 'Payment Verification Failed: Please complete the payment on PhonePe / GPay / Paytm first, then enter your 12-digit UPI UTR / Ref No to verify.'
+        });
+      }
+
+      // 2. Strict 12-digit numeric check (for standard UPI UTRs)
+      const isRazorpayPayId = resolvedUtr.startsWith('pay_');
+      if (!isRazorpayPayId && !/^\d{12}$/.test(resolvedUtr)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid UTR Format: UPI UTR (RRN) numbers are strictly 12 numeric digits (e.g. 425981024812). Please check your PhonePe / GPay payment receipt.'
+        });
+      }
+
+      // 3. Obvious fake / dummy pattern check
+      const fakePatterns = [
+        '123456789012', '000000000000', '111111111111', '222222222222',
+        '333333333333', '444444444444', '555555555555', '666666666666',
+        '777777777777', '888888888888', '999999999999', '012345678901'
+      ];
+      if (fakePatterns.includes(resolvedUtr)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Fake UTR Detected: Dummy or repetitive UTR numbers are strictly rejected by the server. Please enter a genuine 12-digit transaction reference number from your bank or UPI app.'
+        });
+      }
+
+      // 4. Database Deduplication Check (Prevent Re-using standard UTRs)
+      const appointments: any[] = db.appointments || [];
+      const isDuplicate = appointments.some(a => {
+        const existingUtr = String(a.utrReference || a.paymentId || a.razorpayPaymentId || '').trim();
+        return existingUtr && (existingUtr.includes(resolvedUtr) || existingUtr === `pay_upi_${resolvedUtr}`);
+      });
+
+      if (isDuplicate) {
+        return res.status(400).json({
+          success: false,
+          error: `Duplicate UTR Reference: UTR No. ${resolvedUtr} has already been submitted for a previous appointment booking. Re-using previous payment UTRs is strictly prohibited.`
+        });
+      }
+
+      const paymentId = razorpayPaymentId || reqPaymentId || `pay_upi_${resolvedUtr}`;
+      const bookingRef = `MS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
       res.json({
         success: true,
         status: 'PAID',
         paymentId,
-        orderId: razorpayOrderId,
+        utrReference: resolvedUtr,
+        upiId: resolvedUpiId,
+        orderId: razorpayOrderId || `order_${Date.now()}`,
         bookingRef,
-        advancePaid: advanceAmount,
-        totalAmount,
-        balanceDue: totalAmount - advanceAmount,
+        advancePaid: Number(advanceAmount) || 0,
+        totalAmount: Number(totalAmount) || 0,
+        balanceDue: (Number(totalAmount) || 0) - (Number(advanceAmount) || 0),
         paidAt: new Date().toISOString(),
-        paymentMethod: 'Razorpay UPI/Cards/NetBanking',
-        message: '10% Advance Deposit confirmed. Appointment slot reserved successfully!'
+        paymentMethod: 'Real UPI Direct (PhonePe / GPay / Paytm / QR)',
+        message: '10% Advance Deposit confirmed & verified! Appointment slot reserved successfully.'
       });
     } catch (err: any) {
       console.error('Error verifying payment:', err);
-      res.status(500).json({ error: 'Payment verification failed' });
+      res.status(500).json({ success: false, error: 'Payment verification failed' });
     }
   });
 

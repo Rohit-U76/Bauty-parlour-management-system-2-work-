@@ -33,13 +33,13 @@ import { useSalon } from '../context/SalonContext';
 
 interface AppointmentPassModalProps {
   appointment: Appointment | null;
-  isOpen: boolean;
+  isOpen?: boolean;
   onClose: () => void;
 }
 
 export const AppointmentPassModal: React.FC<AppointmentPassModalProps> = ({
   appointment,
-  isOpen,
+  isOpen = true,
   onClose
 }) => {
   const { settings } = useSalon();
@@ -195,11 +195,11 @@ export const AppointmentPassModal: React.FC<AppointmentPassModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="relative max-w-lg w-full bg-[#141418] border border-purple-500/40 rounded-3xl shadow-2xl overflow-hidden my-6 text-left animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="relative max-w-lg w-full max-h-[92vh] flex flex-col bg-[#141418] border border-purple-500/40 rounded-3xl shadow-2xl overflow-hidden my-auto text-left animate-in zoom-in-95 duration-200">
         
         {/* Top Header */}
-        <div className="bg-[#0e0e11] p-5 sm:p-6 border-b border-zinc-800 flex items-start justify-between">
+        <div className="bg-[#0e0e11] p-4 sm:p-6 border-b border-zinc-800 flex items-start justify-between shrink-0">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 text-[10px] font-bold tracking-wider uppercase">
               <Sparkles className="w-3 h-3 text-purple-400" />
@@ -222,7 +222,7 @@ export const AppointmentPassModal: React.FC<AppointmentPassModalProps> = ({
         </div>
 
         {/* Pass Content Body */}
-        <div className="p-5 sm:p-6 space-y-5">
+        <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
           
           {/* Booking Ref & 24h Countdown Alert Banner */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#0e0e11] border border-purple-500/30">

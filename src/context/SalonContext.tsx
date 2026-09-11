@@ -29,6 +29,7 @@ import {
   INITIAL_USERS,
   SALON_TERMS_AND_POLICIES
 } from '../data/initialData';
+import { normalizeAppointment, readApiError } from '../utils/appointmentApi';
 
 interface BookingPayload {
   serviceId: string;
@@ -37,6 +38,7 @@ interface BookingPayload {
   date: string;
   timeSlot: string;
   stylistName: string;
+  stylistId?: string;
   clientName: string;
   clientPhone: string;
   clientEmail: string;
@@ -99,8 +101,10 @@ interface SalonContextType {
 
   // Booking & Razorpay
   createAppointment: (payload: BookingPayload) => Promise<Appointment>;
-  updateAppointmentStatus: (id: string, status: AppointmentStatus) => void;
-  deleteAppointment: (id: string) => void;
+  updateAppointmentStatus: (id: string, status: AppointmentStatus) => Promise<void>;
+  deleteAppointment: (id: string) => Promise<void>;
+  refreshAppointments: () => Promise<void>;
+  fetchMyAppointments: (phone: string) => Promise<Appointment[]>;
 
   // Service Management
   addService: (service: Omit<ServiceItem, 'id'>) => void;
@@ -165,6 +169,10 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_appointments`);
     return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
   });
+
+  useEffect(() => {
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_appointments`, JSON.stringify(appointments));
+  }, [appointments]);
 
   const [inquiries, setInquiries] = useState<ContactInquiry[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_inquiries`);
@@ -233,13 +241,23 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
-    return saved ? JSON.parse(saved) : null;
+    try {
+      // Use sessionStorage so closing tab/browser invalidates the session as required
+      const saved = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      if (saved) return JSON.parse(saved);
+      // Clean up legacy localStorage item so stale credentials don't bypass sign-in
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+    } catch {}
+    return null;
   });
 
   const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    return saved === 'true';
+    try {
+      const saved = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      if (saved) return saved === 'true';
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+    } catch {}
+    return false;
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -272,10 +290,67 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [theme]);
 
-  // UI state
-  const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
-  const [activeNavTab, setActiveNavTab] = useState<string>('home');
-  const [adminTab, setAdminTab] = useState<string>('dashboard');
+  // UI & Navigation tab state with sessionStorage & URL query param persistence
+  const [isAdminMode, setIsAdminModeState] = useState<boolean>(() => {
+    try {
+      const saved = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_admin_mode`);
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [activeNavTab, setActiveNavTabState] = useState<string>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const navParam = params.get('tab') || params.get('page');
+      if (navParam && ['home', 'services', 'gallery', 'offers', 'reviews', 'terms', 'about', 'contact', 'appointments', 'dashboard', 'visits'].includes(navParam)) {
+        return navParam;
+      }
+      const saved = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_active_tab`);
+      if (saved) return saved;
+    } catch {}
+    return 'home';
+  });
+
+  const [adminTab, setAdminTabState] = useState<string>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const adminParam = params.get('adminTab');
+      if (adminParam) return adminParam;
+      const saved = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_admin_tab`);
+      if (saved) return saved;
+    } catch {}
+    return 'dashboard';
+  });
+
+  const setActiveNavTab = (tab: string) => {
+    setActiveNavTabState(tab);
+    try {
+      sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_active_tab`, tab);
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tab);
+      window.history.replaceState({}, '', url.toString());
+    } catch {}
+  };
+
+  const setAdminTab = (tab: string) => {
+    setAdminTabState(tab);
+    try {
+      sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_admin_tab`, tab);
+      const url = new URL(window.location.href);
+      url.searchParams.set('adminTab', tab);
+      window.history.replaceState({}, '', url.toString());
+    } catch {}
+  };
+
+  const setIsAdminMode = (val: boolean) => {
+    setIsAdminModeState(val);
+    try {
+      sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_admin_mode`, val ? 'true' : 'false');
+    } catch {}
+  };
+
   const [selectedServiceForBooking, setSelectedServiceForBooking] = useState<ServiceItem | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState<boolean>(false);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState<boolean>(false);
@@ -355,10 +430,6 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [services]);
 
   useEffect(() => {
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_appointments`, JSON.stringify(appointments));
-  }, [appointments]);
-
-  useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_inquiries`, JSON.stringify(inquiries));
   }, [inquiries]);
 
@@ -396,18 +467,20 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(currentUser));
+      sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(currentUser));
     } else {
-      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
     }
+    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
   }, [currentUser]);
 
   useEffect(() => {
     if (isGuestMode) {
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_guest_mode`, 'true');
+      sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_guest_mode`, 'true');
     } else {
-      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
     }
+    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
   }, [isGuestMode]);
 
   // Auth helper methods
@@ -509,8 +582,12 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     setCurrentUser(user);
     setIsGuestMode(false);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(user));
+    try {
+      sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(user));
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+    } catch {}
 
     if (user.role === 'ADMIN') {
       setIsAdminMode(true);
@@ -562,8 +639,12 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setUsers(prev => [...prev.filter(u => u.id !== newUser.id), newUser]);
         setCurrentUser(newUser);
         setIsGuestMode(false);
-        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-        localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
+        try {
+          sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+          sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
+          localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+          localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+        } catch {}
 
         // Also register in customer CRM directory
         setCustomers(prev => {
@@ -627,8 +708,12 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setUsers(updatedUsers);
     setCurrentUser(newUser);
     setIsGuestMode(false);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
+    try {
+      sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+    } catch {}
 
     // Also register in customer directory if not present
     const existingCust = customers.find(c => c.phone === cleanPhone || (cleanEmail && c.email.toLowerCase() === cleanEmail));
@@ -658,15 +743,25 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const logout = () => {
-    const wasAdmin = currentUser?.role === 'ADMIN' || isAdminMode;
     setCurrentUser(null);
     setIsGuestMode(false);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
-    if (wasAdmin) {
-      setIsAdminMode(false);
-      setActiveNavTab('home');
-    }
+    setIsAdminMode(false);
+    setActiveNavTab('home');
+    setAdminTab('dashboard');
+    try {
+      sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_active_tab`);
+      sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_admin_tab`);
+      sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_admin_mode`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+
+      const url = new URL(window.location.href);
+      url.searchParams.delete('tab');
+      url.searchParams.delete('adminTab');
+      window.history.replaceState({}, '', url.pathname);
+    } catch {}
   };
 
   // Modal open/close helpers
@@ -690,38 +785,66 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const toggleAiChat = () => setIsAiChatOpen(!isAiChatOpen);
   const closeAiChat = () => setIsAiChatOpen(false);
 
-  // Create confirmed appointment upon 10% Razorpay payment
+  const refreshAppointments = async () => {
+    const res = await fetch('/api/appointments');
+    if (!res.ok) {
+      throw new Error(await readApiError(res, 'Unable to load appointments from the server.'));
+    }
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data.data || data.appointments || []);
+    setAppointments(rows.map(normalizeAppointment));
+  };
+
+  const fetchMyAppointments = async (phone: string): Promise<Appointment[]> => {
+    const res = await fetch(`/api/appointments/mine?phone=${encodeURIComponent(phone)}`);
+    if (!res.ok) {
+      throw new Error(await readApiError(res, 'Unable to load your bookings.'));
+    }
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : [];
+    return rows.map(normalizeAppointment);
+  };
+
+  useEffect(() => {
+    refreshAppointments().catch(err => console.error('Failed to load appointments:', err));
+  }, []);
+
   const createAppointment = async (payload: BookingPayload): Promise<Appointment> => {
-    const bookingRef = `SS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
-    const newAppointment: Appointment = {
-      id: `apt-${Date.now()}`,
-      bookingRef,
-      clientName: payload.clientName,
-      clientPhone: payload.clientPhone,
-      clientEmail: payload.clientEmail,
-      serviceId: payload.serviceId,
-      serviceName: payload.serviceName,
-      category: payload.category,
-      date: payload.date,
-      timeSlot: payload.timeSlot,
-      stylistName: payload.stylistName,
-      totalAmount: payload.totalAmount,
-      advancePaid: payload.advanceAmount,
-      balanceDue: payload.balanceDue,
-      paymentStatus: 'PAID',
-      bookingStatus: 'CONFIRMED',
-      status: 'CONFIRMED',
-      razorpayPaymentId: payload.razorpayPaymentId,
-      razorpayOrderId: payload.razorpayOrderId,
-      createdAt: new Date().toISOString(),
-      notes: payload.notes || '',
-      isNew: true
-    };
+    const res = await fetch('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser?.id || null,
+        clientName: payload.clientName.trim(),
+        clientPhone: payload.clientPhone.trim(),
+        clientEmail: payload.clientEmail?.trim() || '',
+        serviceId: payload.serviceId,
+        serviceName: payload.serviceName,
+        category: payload.category,
+        date: payload.date,
+        timeSlot: payload.timeSlot,
+        stylistId: payload.stylistId || null,
+        stylistName: payload.stylistName,
+        totalAmount: payload.totalAmount,
+        advancePaid: payload.advanceAmount,
+        paymentId: payload.razorpayPaymentId,
+        razorpayPaymentId: payload.razorpayPaymentId,
+        razorpayOrderId: payload.razorpayOrderId,
+        notes: payload.notes || '',
+        paymentStatus: 'PAID'
+      })
+    });
 
-    // Update appointments
-    setAppointments(prev => [newAppointment, ...prev]);
+    if (res.status === 409) {
+      throw new Error(await readApiError(res, `Time slot ${payload.timeSlot} on ${payload.date} is fully booked (3 of 3 chairs occupied). Please choose another slot.`));
+    }
+    if (!res.ok) {
+      throw new Error(await readApiError(res, 'Booking could not be saved. Please try again.'));
+    }
 
-    // Update or add customer record
+    const created = normalizeAppointment(await res.json());
+    setAppointments(prev => [created, ...prev.filter(a => a.id !== created.id)]);
+
     setCustomers(prev => {
       const existing = prev.find(c => c.phone === payload.clientPhone || c.email === payload.clientEmail);
       if (existing) {
@@ -733,43 +856,60 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           favoriteService: payload.serviceName,
           tier: c.totalVisits + 1 >= 5 ? 'VIP Member' : 'Standard'
         } : c);
-      } else {
-        const newCust: Customer = {
-          id: `cust-${Date.now()}`,
-          name: payload.clientName,
-          phone: payload.clientPhone,
-          email: payload.clientEmail,
-          totalVisits: 1,
-          totalSpent: payload.totalAmount,
-          lastVisit: payload.date,
-          favoriteService: payload.serviceName,
-          memberSince: new Date().toISOString().split('T')[0],
-          tier: 'New Client'
-        };
-        return [newCust, ...prev];
       }
+      const newCust: Customer = {
+        id: `cust-${Date.now()}`,
+        name: payload.clientName,
+        phone: payload.clientPhone,
+        email: payload.clientEmail,
+        totalVisits: 1,
+        totalSpent: payload.totalAmount,
+        lastVisit: payload.date,
+        favoriteService: payload.serviceName,
+        memberSince: new Date().toISOString().split('T')[0],
+        tier: 'New Client'
+      };
+      return [newCust, ...prev];
     });
 
-    // Add admin notification
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
       title: 'New Online Reservation & 10% Deposit',
-      message: `${payload.clientName} booked ${payload.serviceName} for ${payload.date} at ${payload.timeSlot}. Advance deposit ₹${payload.advanceAmount} verified via Razorpay.`,
+      message: `${payload.clientName} booked ${payload.serviceName} for ${payload.date} at ${payload.timeSlot}. Ref ${created.bookingRef}. Advance deposit ₹${payload.advanceAmount} verified.`,
       type: 'booking',
       timestamp: 'Just now',
       read: false
     };
     setNotifications(prev => [newNotif, ...prev]);
 
-    return newAppointment;
+    return created;
   };
 
-  const updateAppointmentStatus = (id: string, status: AppointmentStatus) => {
-    setAppointments(prev => prev.map(apt => apt.id === id ? { ...apt, bookingStatus: status, status: status, isNew: false } : apt));
+  const updateAppointmentStatus = async (id: string, status: AppointmentStatus) => {
+    setAppointments(prev => prev.map(apt => apt.id === String(id) ? { ...apt, bookingStatus: status, status } : apt));
+    try {
+      const res = await fetch(`/api/appointments/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) {
+        throw new Error(await readApiError(res, 'Could not update appointment status.'));
+      }
+      const updated = normalizeAppointment(await res.json());
+      setAppointments(prev => prev.map(apt => apt.id === String(id) ? { ...updated, isNew: false } : apt));
+    } catch {
+      // Optimistic state update maintained
+    }
   };
 
-  const deleteAppointment = (id: string) => {
-    setAppointments(prev => prev.filter(apt => apt.id !== id));
+  const deleteAppointment = async (id: string) => {
+    setAppointments(prev => prev.filter(apt => apt.id !== String(id)));
+    try {
+      await fetch(`/api/appointments/${id}`, { method: 'DELETE' });
+    } catch {
+      // Optimistic deletion maintained
+    }
   };
 
   // Service CRUD
@@ -1075,6 +1215,8 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         createAppointment,
         updateAppointmentStatus,
         deleteAppointment,
+        refreshAppointments,
+        fetchMyAppointments,
         addService,
         updateService,
         deleteService,

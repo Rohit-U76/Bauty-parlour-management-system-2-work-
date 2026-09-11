@@ -179,6 +179,9 @@ export interface SalonSettings {
   mapsUrl?: string;
   gstNumber?: string;
   staffType?: string;
+  upiId?: string;
+  phonePeNumber?: string;
+  payeeName?: string;
 }
 
 export interface SalonPolicyItem {

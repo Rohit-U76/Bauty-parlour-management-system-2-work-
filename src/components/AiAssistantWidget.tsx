@@ -88,7 +88,7 @@ export const AiAssistantWidget: React.FC = () => {
   return (
     <>
       {/* Floating Widget Trigger Button (Matches Screenshot 2 & 3) */}
-      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40">
+      <div className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-40">
         <button
           id="ai-assistant-floating-btn"
           onClick={toggleAiChat}
@@ -102,7 +102,7 @@ export const AiAssistantWidget: React.FC = () => {
 
       {/* Expandable Chat Drawer/Modal */}
       {isAiChatOpen && (
-        <div className="fixed inset-x-3 bottom-18 sm:inset-x-auto sm:bottom-20 sm:right-6 z-50 sm:w-96 max-w-md rounded-2xl bg-[#141418] border border-yellow-500/40 shadow-2xl overflow-hidden flex flex-col h-[480px] sm:h-[520px] max-h-[82vh] text-zinc-200 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed inset-x-3 bottom-20 sm:inset-x-auto sm:bottom-20 sm:right-6 z-50 sm:w-96 max-w-md rounded-2xl bg-[#141418] border border-yellow-500/40 shadow-2xl overflow-hidden flex flex-col h-[480px] sm:h-[520px] max-h-[80vh] text-zinc-200 animate-in fade-in slide-in-from-bottom-4 duration-200">
           
           {/* Header */}
           <div className="bg-gradient-to-r from-zinc-950 via-[#1c190c] to-zinc-950 border-b border-yellow-500/20 px-4 py-3 flex items-center justify-between">

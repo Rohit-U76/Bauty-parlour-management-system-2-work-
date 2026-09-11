@@ -50,11 +50,62 @@ export interface DayAvailabilitySummary {
 }
 
 /**
- * Normalized comparison for time slots (handles casing & minor whitespace)
+ * Normalized comparison for time slots (handles casing, minor whitespace, leading zeroes)
  */
 export function normalizeTimeSlot(slotStr: string): string {
   if (!slotStr) return '';
-  return slotStr.trim().toUpperCase();
+  let str = String(slotStr).trim().toUpperCase();
+  str = str.replace(/\s+/g, ' ');
+  const match = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+  if (match) {
+    const hh = match[1].padStart(2, '0');
+    const mm = match[2];
+    const period = match[3];
+    return `${hh}:${mm} ${period}`;
+  }
+  return str;
+}
+
+/**
+ * Standardized date string normalization (handles YYYY-MM-DD, ISO strings, and slash formats)
+ */
+export function normalizeDateStr(dateStr: string): string {
+  if (!dateStr) return '';
+  const str = String(dateStr).trim();
+  if (!str) return '';
+  const clean = str.includes('T') ? str.split('T')[0] : str;
+  if (clean.includes('/')) {
+    const parts = clean.split('/');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+      if (parts[2].length === 4) {
+        const p1 = Number(parts[0]);
+        const p2 = Number(parts[1]);
+        const year = parts[2];
+        if (p1 > 12) {
+          return `${year}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`;
+        }
+        if (p2 > 12) {
+          return `${year}-${String(p1).padStart(2, '0')}-${String(p2).padStart(2, '0')}`;
+        }
+        return `${year}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`;
+      }
+    }
+  }
+  if (clean.includes('-')) {
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+      if (parts[2].length === 4) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+  }
+  return clean.slice(0, 10);
 }
 
 /**
@@ -67,12 +118,13 @@ export function getSlotAvailability(
   capacity: number = MAX_PARALLEL_CHAIRS
 ): SlotAvailabilityInfo {
   const normSlot = normalizeTimeSlot(timeSlot);
+  const normTargetDate = normalizeDateStr(date);
 
   // Filter active appointments (Pending or Confirmed)
   const slotBookings = appointments.filter(apt => {
-    const isSameDate = apt.date === date;
+    const isSameDate = normalizeDateStr(apt.date) === normTargetDate;
     const isSameSlot = normalizeTimeSlot(apt.timeSlot) === normSlot;
-    const isActive = apt.bookingStatus === 'PENDING' || apt.bookingStatus === 'CONFIRMED';
+    const isActive = apt.bookingStatus === 'PENDING' || apt.bookingStatus === 'CONFIRMED' || apt.status === 'PENDING' || apt.status === 'CONFIRMED';
     return isSameDate && isSameSlot && isActive;
   });
 

@@ -103,13 +103,13 @@ export const ReceptionistQrScannerModal: React.FC<ReceptionistQrScannerModalProp
   };
 
   const handleCheckIn = (app: Appointment) => {
-    updateAppointmentStatus(app.id, 'CONFIRMED');
+    updateAppointmentStatus(app.id, 'CONFIRMED').catch(err => setScanStatusMessage(err.message));
     setScanStatusMessage(`Client ${app.clientName} Checked In Successfully!`);
     playSuccessBeep();
   };
 
   const handleMarkCompleted = (app: Appointment) => {
-    updateAppointmentStatus(app.id, 'COMPLETED');
+    updateAppointmentStatus(app.id, 'COMPLETED').catch(err => setScanStatusMessage(err.message));
     setScanStatusMessage(`Service Completed & Settled for ${app.clientName}!`);
   };
 

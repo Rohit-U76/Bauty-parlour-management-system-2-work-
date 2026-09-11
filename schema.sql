@@ -9,6 +9,7 @@ CREATE DATABASE IF NOT EXISTS `smart_salon_db`
   DEFAULT COLLATE utf8mb4_unicode_ci;
 
 USE `smart_salon_db`;
+SET FOREIGN_KEY_CHECKS = 0;
 
 -- Set session settings for strict validation
 SET foreign_key_checks = 0;
@@ -22,7 +23,7 @@ DROP TABLE IF EXISTS `service_price_tiers`;
 DROP TABLE IF EXISTS `services`;
 DROP TABLE IF EXISTS `stylists`;
 DROP TABLE IF EXISTS `users`;
-SET foreign_key_checks = 1;
+
 
 -- -----------------------------------------------------------------------------
 -- 1. USERS & ACCOUNTS
@@ -133,18 +134,18 @@ CREATE TABLE `service_price_tiers` (
 
 -- -----------------------------------------------------------------------------
 -- 4. APPOINTMENTS & BOOKINGS
--- Customer bookings with 10% advance deposit and Razorpay integration
+-- BIGINT PK for ACID row identity. user_id / stylist_id remain VARCHAR(64) so
+-- foreign keys match existing `users.id` and `stylists.id` (VARCHAR PKs).
+-- Line items live in appointment_services (bundles / multi-service bookings).
 -- -----------------------------------------------------------------------------
 CREATE TABLE `appointments` (
-  `id` VARCHAR(64) NOT NULL,
-  `booking_ref` VARCHAR(32) NOT NULL COMMENT 'Readable code e.g. BK-2026-9042',
-  `user_id` VARCHAR(64) DEFAULT NULL COMMENT 'Optional linked registered user',
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `booking_ref` VARCHAR(32) NOT NULL COMMENT 'Readable code e.g. SS-20260908-4821',
+  `user_id` VARCHAR(64) DEFAULT NULL COMMENT 'Optional linked registered user (guest bookings NULL)',
   `client_name` VARCHAR(120) NOT NULL,
   `client_phone` VARCHAR(20) NOT NULL,
-  `client_email` VARCHAR(191) NOT NULL,
-  `service_id` VARCHAR(64) NOT NULL,
-  `service_name` VARCHAR(150) NOT NULL,
-  `category` VARCHAR(100) NOT NULL,
+  `client_email` VARCHAR(191) DEFAULT NULL,
+  `category` VARCHAR(100) DEFAULT NULL,
   `appointment_date` DATE NOT NULL,
   `time_slot` VARCHAR(30) NOT NULL COMMENT 'e.g. "10:30 AM", "02:00 PM"',
   `stylist_id` VARCHAR(64) DEFAULT NULL,
@@ -152,24 +153,48 @@ CREATE TABLE `appointments` (
   `total_amount` DECIMAL(10, 2) NOT NULL,
   `advance_paid` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
   `balance_due` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-  `payment_status` ENUM('PAID', 'PENDING', 'REFUNDED') NOT NULL DEFAULT 'PENDING',
-  `booking_status` ENUM('PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED') NOT NULL DEFAULT 'CONFIRMED',
+  `booking_status` ENUM('PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
+  `payment_status` ENUM('PENDING', 'PAID', 'PARTIAL', 'REFUNDED') NOT NULL DEFAULT 'PENDING',
+  `payment_id` VARCHAR(100) DEFAULT NULL,
   `razorpay_order_id` VARCHAR(100) DEFAULT NULL,
-  `razorpay_payment_id` VARCHAR(100) DEFAULT NULL,
   `notes` TEXT DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `active_slot_key` VARCHAR(180) GENERATED ALWAYS AS (
+    CASE
+      WHEN `booking_status` IN ('PENDING', 'CONFIRMED') AND `stylist_id` IS NOT NULL
+        THEN CONCAT(`appointment_date`, '|', `time_slot`, '|', `stylist_id`)
+      ELSE NULL
+    END
+  ) STORED,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_appointments_booking_ref` (`booking_ref`),
+  UNIQUE KEY `uk_appointments_active_stylist_slot` (`active_slot_key`),
   KEY `idx_appointments_user_id` (`user_id`),
-  KEY `idx_appointments_service_id` (`service_id`),
   KEY `idx_appointments_stylist_id` (`stylist_id`),
   KEY `idx_appointments_date_slot` (`appointment_date`, `time_slot`),
   KEY `idx_appointments_phone` (`client_phone`),
-  KEY `idx_appointments_status` (`booking_status`),
-  CONSTRAINT `fk_appointments_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_appointments_service` FOREIGN KEY (`service_id`) REFERENCES `services` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `fk_appointments_stylist` FOREIGN KEY (`stylist_id`) REFERENCES `stylists` (`id`) ON DELETE SET NULL
+  KEY `idx_appointments_status` (`booking_status`)
+  -- CONSTRAINT `fk_appointments_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+-- CONSTRAINT `fk_appointments_stylist` FOREIGN KEY (`stylist_id`) REFERENCES `stylists` (`id`) ON DELETE SET NULL
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- 4b. APPOINTMENT LINE ITEMS (one booking can include multiple services / bundles)
+-- service_id is a snapshot string so custom bundles are not blocked by catalog FK.
+-- -----------------------------------------------------------------------------
+CREATE TABLE `appointment_services` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `appointment_id` BIGINT NOT NULL,
+  `service_id` VARCHAR(64) DEFAULT NULL,
+  `service_name` VARCHAR(150) NOT NULL,
+  `price` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+  `duration_minutes` INT UNSIGNED NOT NULL DEFAULT 45,
+  PRIMARY KEY (`id`),
+  KEY `idx_appointment_services_appointment_id` (`appointment_id`),
+  CONSTRAINT `fk_appointment_services_appointment`
+    FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------
@@ -178,7 +203,7 @@ CREATE TABLE `appointments` (
 -- -----------------------------------------------------------------------------
 CREATE TABLE `reviews` (
   `id` VARCHAR(64) NOT NULL,
-  `appointment_id` VARCHAR(64) DEFAULT NULL,
+  `appointment_id` BIGINT DEFAULT NULL,
   `booking_ref` VARCHAR(32) DEFAULT NULL,
   `user_id` VARCHAR(64) DEFAULT NULL,
   `client_name` VARCHAR(120) NOT NULL,
@@ -354,24 +379,21 @@ VALUES
   JSON_ARRAY('0% Formaldehyde & eye irritation', 'Smooth wash-and-go hair', 'Infused with argan & caviar oils')
 );
 
--- 4. Initial Sample Appointment
+-- 4. Initial Sample Appointment (AUTO_INCREMENT id)
 INSERT INTO `appointments` (
-  `id`, `booking_ref`, `user_id`, `client_name`, `client_phone`, `client_email`,
-  `service_id`, `service_name`, `category`, `appointment_date`, `time_slot`,
+  `booking_ref`, `user_id`, `client_name`, `client_phone`, `client_email`,
+  `category`, `appointment_date`, `time_slot`,
   `stylist_id`, `stylist_name`, `total_amount`, `advance_paid`, `balance_due`,
-  `payment_status`, `booking_status`, `razorpay_payment_id`, `notes`
+  `payment_status`, `booking_status`, `payment_id`, `notes`
 ) VALUES (
-  'apt_sample_1',
-  'BK-2026-8801',
+  'SS-20260909-8801',
   'usr_cust_1',
   'Pooja Sharma',
   '+919822334455',
   'pooja.sharma@example.com',
-  'srv_hydra_facial',
-  'Hydra-Glow Medical Grade Facial Therapy',
   'Skin & Facial Therapy',
   CURDATE() + INTERVAL 1 DAY,
-  '11:00 AM',
+  '11:45 AM',
   'sty_2',
   'Sneha Kulkarni',
   2499.00,
@@ -383,6 +405,11 @@ INSERT INTO `appointments` (
   'Client requested sensitive skin serum application.'
 );
 
+SET @apt_id = LAST_INSERT_ID();
+
+INSERT INTO `appointment_services` (`appointment_id`, `service_id`, `service_name`, `price`, `duration_minutes`)
+VALUES (@apt_id, 'srv_hydra_facial', 'Hydra-Glow Medical Grade Facial Therapy', 2499.00, 60);
+
 -- 5. Verified Review
 INSERT INTO `reviews` (
   `id`, `appointment_id`, `booking_ref`, `user_id`, `client_name`, `client_phone`,
@@ -392,8 +419,8 @@ INSERT INTO `reviews` (
   `owner_reply`, `owner_reply_date`, `featured`, `sentiment`, `status`
 ) VALUES (
   'rev_1',
-  'apt_sample_1',
-  'BK-2026-8801',
+  @apt_id,
+  'SS-20260909-8801',
   'usr_cust_1',
   'Pooja Sharma',
   '+919822334455',
@@ -434,3 +461,5 @@ VALUES
 ('advance_deposit_percent', '10', 'Required deposit percentage for reserving appointment slots'),
 ('currency_symbol', '₹', 'Currency display symbol'),
 ('booking_auto_confirm', 'true', 'Automatically confirm bookings once 10% advance is paid');
+
+SET FOREIGN_KEY_CHECKS = 1;

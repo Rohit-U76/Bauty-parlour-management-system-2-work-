@@ -17,7 +17,6 @@ public class SalonDataInitService implements CommandLineRunner {
     @Autowired private CustomerRepository customerRepository;
     @Autowired private ReviewRepository reviewRepository;
     @Autowired private GalleryItemRepository galleryRepository;
-    @Autowired private AppointmentRepository appointmentRepository;
 
     @Override
     public void run(String... args) throws Exception {
@@ -26,7 +25,6 @@ public class SalonDataInitService implements CommandLineRunner {
         seedCustomers();
         seedReviews();
         seedGallery();
-        seedAppointments();
     }
 
     private void seedServices() {
@@ -105,20 +103,4 @@ public class SalonDataInitService implements CommandLineRunner {
         galleryRepository.saveAll(gallery);
     }
 
-    private void seedAppointments() {
-        if (appointmentRepository.count() > 0) return;
-
-        List<Appointment> list = Arrays.asList(
-                new Appointment("apt-101", "SS-2026-849201", "Pooja Sharma", "+91 98450 12345", "pooja.sharma@example.com",
-                        "srv-2", "Radiance 24K Gold Facial Therapy", "Skin & Facial Therapy", "2026-08-15", "11:00 AM",
-                        "Ananya Roy", 1800.0, 180.0, 1620.0, "PAID", "CONFIRMED", "pay_rzp_98412", "order_rzp_98412",
-                        "2026-08-14T10:15:00", "Prefers organic facial mask."),
-                new Appointment("apt-102", "SS-2026-391024", "Aditya Verma", "+91 98111 22334", "aditya.v@example.com",
-                        "srv-4", "Executive Haircut & Beard Craft", "Men's Executive Grooming", "2026-08-15", "03:30 PM",
-                        "Aarav Sharma", 650.0, 65.0, 585.0, "PAID", "CONFIRMED", "pay_rzp_11094", "order_rzp_11094",
-                        "2026-08-14T12:00:00", "Zero side fade.")
-        );
-
-        appointmentRepository.saveAll(list);
-    }
 }

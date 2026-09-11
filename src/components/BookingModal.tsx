@@ -25,7 +25,8 @@ import { useSalon } from '../context/SalonContext';
 import { RazorpayModal } from './RazorpayModal';
 import { ServiceItem, Appointment, PriceTierVariant } from '../types';
 import { ModernSalonLogo } from './ModernSalonLogo';
-import { SALON_TIME_SLOTS, getSlotAvailability, getDayAvailabilitySummary } from '../utils/availability';
+import { SALON_TIME_SLOTS, getSlotAvailability } from '../utils/availability';
+import { SlotAvailabilityApi } from '../utils/appointmentApi';
 
 export const BookingModal: React.FC = () => {
   const {
@@ -35,9 +36,9 @@ export const BookingModal: React.FC = () => {
     selectedServiceForBooking,
     offers,
     createAppointment,
+    appointments,
     settings,
-    currentUser,
-    appointments
+    currentUser
   } = useSalon();
 
   // Wizard steps: 1 = Service & Tier Variant, 2 = Date & Slot, 3 = Client Details & Advance Payment, 4 = Confirmation Receipt
@@ -46,7 +47,7 @@ export const BookingModal: React.FC = () => {
   const [selectedTier, setSelectedTier] = useState<PriceTierVariant | null>(null);
   const [selectedStylist, setSelectedStylist] = useState<string>('Self-Employed (Master Stylist & Founder)');
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('11:00 AM');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   
   // Client details
   const [clientName, setClientName] = useState<string>('');
@@ -62,6 +63,10 @@ export const BookingModal: React.FC = () => {
   // Payment modal state
   const [showRazorpayModal, setShowRazorpayModal] = useState<boolean>(false);
   const [confirmedBooking, setConfirmedBooking] = useState<Appointment | null>(null);
+  const [apiSlots, setApiSlots] = useState<SlotAvailabilityApi[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState<string>('');
+  const [bookingError, setBookingError] = useState<string>('');
 
   // Stylists list - "Self Employed" default
   const stylists = [
@@ -70,24 +75,11 @@ export const BookingModal: React.FC = () => {
     'Certified Hair & Chemical Treatment Expert'
   ];
 
-  // Time slots
-  const timeSlots = [
-    '09:30 AM',
-    '10:30 AM',
-    '11:45 AM',
-    '01:30 PM',
-    '02:45 PM',
-    '04:00 PM',
-    '05:30 PM',
-    '06:45 PM',
-    '07:30 PM'
-  ];
-
   const resetBookingForm = (targetService?: ServiceItem | null) => {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
     setSelectedDate(dateStr);
-    setSelectedTimeSlot('11:00 AM');
+    setSelectedTimeSlot('');
     setSelectedStylist('Self-Employed (Master Stylist & Founder)');
     const srv = targetService !== undefined ? targetService : (selectedServiceForBooking || services[0] || null);
     setSelectedService(srv);
@@ -130,8 +122,69 @@ export const BookingModal: React.FC = () => {
       setAppliedCoupon(null);
       setCouponCode('');
       setCouponError('');
+      setBookingError('');
     }
   }, [isBookingModalOpen, selectedServiceForBooking, currentUser]);
+
+  useEffect(() => {
+    if (!isBookingModalOpen || !selectedDate) return;
+    let cancelled = false;
+    const loadSlots = async () => {
+      setSlotsLoading(true);
+      setSlotsError('');
+
+      const computeLocalFallback = () => {
+        return SALON_TIME_SLOTS.map(slot => {
+          const info = getSlotAvailability(appointments, selectedDate, slot);
+          return {
+            slot,
+            date: selectedDate,
+            totalCapacity: info.totalCapacity,
+            bookedCount: info.bookedCount,
+            remainingSeats: info.remainingSeats,
+            occupancyPercent: info.occupancyPercent,
+            status: info.status,
+            statusLabel: info.statusLabel,
+            soldOut: info.remainingSeats === 0
+          };
+        });
+      };
+
+      try {
+        const res = await fetch(`/api/appointments/slots?date=${encodeURIComponent(selectedDate)}`);
+        if (!res.ok) {
+          throw new Error('Could not load live slot availability.');
+        }
+        const data: SlotAvailabilityApi[] = await res.json();
+        if (cancelled) return;
+        const slots = Array.isArray(data) && data.length > 0 ? data : computeLocalFallback();
+        setApiSlots(slots);
+        setSelectedTimeSlot(prev => {
+          const stillOpen = slots.find(s => s.slot === prev && !s.soldOut);
+          if (stillOpen) return stillOpen.slot;
+          const firstOpen = slots.find(s => !s.soldOut);
+          return firstOpen?.slot || '';
+        });
+      } catch (err: any) {
+        if (cancelled) return;
+        setSlotsError('');
+        const fallbackSlots = computeLocalFallback();
+        setApiSlots(fallbackSlots);
+        setSelectedTimeSlot(prev => {
+          const stillOpen = fallbackSlots.find(s => s.slot === prev && !s.soldOut);
+          if (stillOpen) return stillOpen.slot;
+          const firstOpen = fallbackSlots.find(s => !s.soldOut);
+          return firstOpen?.slot || '';
+        });
+      } finally {
+        if (!cancelled) setSlotsLoading(false);
+      }
+    };
+    loadSlots();
+    return () => {
+      cancelled = true;
+    };
+  }, [isBookingModalOpen, selectedDate, appointments]);
 
   const handleSelectService = (srv: ServiceItem) => {
     setSelectedService(srv);
@@ -188,8 +241,18 @@ export const BookingModal: React.FC = () => {
   };
 
   const handleProceedToRazorpay = () => {
+    setBookingError('');
     if (!clientName.trim() || !clientPhone.trim()) {
-      alert('Please provide your name and mobile number for appointment confirmation and 24h reminder notification.');
+      setBookingError('Please provide your name and mobile number for appointment confirmation.');
+      return;
+    }
+    if (clientPhone.replace(/[^0-9]/g, '').length < 10) {
+      setBookingError('Enter a valid 10-digit mobile number.');
+      return;
+    }
+    const chosen = apiSlots.find(s => s.slot === selectedTimeSlot);
+    if (!selectedTimeSlot || chosen?.soldOut) {
+      setBookingError('Please choose an available time slot. Sold-out slots cannot be booked.');
       return;
     }
     setShowRazorpayModal(true);
@@ -204,6 +267,7 @@ export const BookingModal: React.FC = () => {
       : selectedService.name;
 
     try {
+      setBookingError('');
       const created = await createAppointment({
         serviceId: selectedService.id,
         serviceName: serviceTitle,
@@ -211,9 +275,9 @@ export const BookingModal: React.FC = () => {
         date: selectedDate,
         timeSlot: selectedTimeSlot,
         stylistName: selectedStylist,
-        clientName,
-        clientPhone,
-        clientEmail: clientEmail || `${clientName.toLowerCase().replace(/\s+/g, '')}@example.com`,
+        clientName: clientName.trim(),
+        clientPhone: clientPhone.trim(),
+        clientEmail: clientEmail.trim(),
         notes: specialNotes,
         couponCode: appliedCoupon?.code,
         totalAmount: netTotal,
@@ -225,8 +289,8 @@ export const BookingModal: React.FC = () => {
 
       setConfirmedBooking(created);
       setStep(4);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setBookingError(e?.message || 'Booking failed. The slot may have just been taken.');
     }
   };
 
@@ -261,20 +325,20 @@ export const BookingModal: React.FC = () => {
 
         {/* Step Indicator (Steps 1 to 3) */}
         {step < 4 && (
-          <div className="bg-[#101014] border-b border-zinc-800 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs shrink-0">
-            <div className={`flex items-center gap-1.5 ${step >= 1 ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 1 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold' : 'bg-zinc-800 text-zinc-500'}`}>1</span>
-              <span>Select Service</span>
+          <div className="bg-[#101014] border-b border-zinc-800 px-3 sm:px-6 py-2.5 flex items-center justify-between gap-1 sm:gap-2 text-xs shrink-0 overflow-x-auto no-scrollbar">
+            <div className={`flex items-center gap-1.5 shrink-0 ${step >= 1 ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${step >= 1 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold' : 'bg-zinc-800 text-zinc-500'}`}>1</span>
+              <span className="whitespace-nowrap">Select Service</span>
             </div>
-            <span className="text-zinc-700">→</span>
-            <div className={`flex items-center gap-1.5 ${step >= 2 ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 2 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold' : 'bg-zinc-800 text-zinc-500'}`}>2</span>
-              <span>Date &amp; Slot</span>
+            <span className="text-zinc-700 shrink-0">→</span>
+            <div className={`flex items-center gap-1.5 shrink-0 ${step >= 2 ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${step >= 2 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold' : 'bg-zinc-800 text-zinc-500'}`}>2</span>
+              <span className="whitespace-nowrap">Date &amp; Slot</span>
             </div>
-            <span className="text-zinc-700">→</span>
-            <div className={`flex items-center gap-1.5 ${step >= 3 ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 3 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold' : 'bg-zinc-800 text-zinc-500'}`}>3</span>
-              <span>10% Advance Deposit</span>
+            <span className="text-zinc-700 shrink-0">→</span>
+            <div className={`flex items-center gap-1.5 shrink-0 ${step >= 3 ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${step >= 3 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold' : 'bg-zinc-800 text-zinc-500'}`}>3</span>
+              <span className="whitespace-nowrap">10% Advance Deposit</span>
             </div>
           </div>
         )}
@@ -466,23 +530,34 @@ export const BookingModal: React.FC = () => {
                   </label>
                   <span className="text-[11px] text-amber-400 font-medium flex items-center gap-1">
                     <Zap className="w-3 h-3 text-amber-400" />
-                    <span>Real-time chair capacity</span>
+                    <span>{slotsLoading ? 'Checking chairs…' : 'Live chair capacity'}</span>
                   </span>
                 </div>
+                {slotsError && (
+                  <p className="text-[11px] text-amber-400 mb-2">{slotsError}</p>
+                )}
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {SALON_TIME_SLOTS.map((slot) => {
-                    const slotInfo = getSlotAvailability(appointments, selectedDate, slot);
-                    const isSoldOut = slotInfo.status === 'SOLD_OUT';
-                    const isFast = slotInfo.isFillingFast && !isSoldOut;
-                    const isSelected = selectedTimeSlot === slot;
+                  {(apiSlots.length > 0 ? apiSlots : SALON_TIME_SLOTS.map(slot => ({
+                    slot,
+                    soldOut: false,
+                    status: 'AVAILABLE',
+                    statusLabel: 'Available',
+                    remainingSeats: 3,
+                    occupancyPercent: 0,
+                    bookedCount: 0,
+                    totalCapacity: 3
+                  }))).map((slotInfo) => {
+                    const isSoldOut = slotInfo.soldOut || slotInfo.status === 'SOLD_OUT';
+                    const isFast = slotInfo.status === 'FILLING_FAST' && !isSoldOut;
+                    const isSelected = selectedTimeSlot === slotInfo.slot;
 
                     return (
                       <button
-                        key={slot}
+                        key={slotInfo.slot}
                         type="button"
                         disabled={isSoldOut}
-                        onClick={() => setSelectedTimeSlot(slot)}
+                        onClick={() => setSelectedTimeSlot(slotInfo.slot)}
                         className={`p-2.5 rounded-xl border text-left transition relative flex flex-col justify-between cursor-pointer ${
                           isSoldOut
                             ? 'border-zinc-800 bg-[#121216] opacity-50 cursor-not-allowed text-zinc-500'
@@ -494,10 +569,10 @@ export const BookingModal: React.FC = () => {
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-mono font-bold">{slot}</span>
+                          <span className="text-xs font-mono font-bold">{slotInfo.slot}</span>
                           {isSoldOut ? (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
-                              Full
+                              Sold Out
                             </span>
                           ) : isFast ? (
                             <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500 text-zinc-950 flex items-center gap-0.5 animate-pulse">
@@ -513,7 +588,9 @@ export const BookingModal: React.FC = () => {
 
                         <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
                           <span className={isSelected ? 'text-white/80' : isFast ? 'text-amber-300/90' : 'text-zinc-400'}>
-                            {slotInfo.urgencyText}
+                            {isSoldOut
+                              ? 'No chairs left'
+                              : `${slotInfo.remainingSeats} of ${slotInfo.totalCapacity} chairs open`}
                           </span>
                         </div>
                       </button>
@@ -523,13 +600,13 @@ export const BookingModal: React.FC = () => {
 
                 {/* Selected Slot Real-Time Note */}
                 {selectedTimeSlot && (() => {
-                  const activeSlotInfo = getSlotAvailability(appointments, selectedDate, selectedTimeSlot);
-                  if (activeSlotInfo.isFillingFast && activeSlotInfo.status !== 'SOLD_OUT') {
+                  const activeSlotInfo = apiSlots.find(s => s.slot === selectedTimeSlot);
+                  if (activeSlotInfo && activeSlotInfo.status === 'FILLING_FAST' && !activeSlotInfo.soldOut) {
                     return (
                       <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center gap-2">
                         <Flame className="w-4 h-4 text-amber-400 shrink-0 fill-amber-400" />
                         <span>
-                          <strong>{selectedTimeSlot} is Filling Fast!</strong> {activeSlotInfo.pendingCount > 0 ? `${activeSlotInfo.pendingCount} pending customer hold(s) active.` : 'High demand slot.'} Complete {advancePercentage}% advance deposit to lock your station.
+                          <strong>{selectedTimeSlot} is Filling Fast!</strong> {activeSlotInfo.remainingSeats} chair(s) left. Complete {advancePercentage}% advance deposit to lock your station.
                         </span>
                       </div>
                     );
@@ -774,7 +851,14 @@ export const BookingModal: React.FC = () => {
 
         {/* Modal Footer Controls (Steps 1 to 3) */}
         {step < 4 && (
-          <div className="bg-[#0e0e11] border-t border-zinc-800 px-4 sm:px-6 py-3.5 flex items-center justify-between shrink-0">
+          <div className="bg-[#0e0e11] border-t border-zinc-800 px-4 sm:px-6 py-3.5 shrink-0 space-y-2">
+            {bookingError && (
+              <p className="text-[11px] text-red-400 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{bookingError}</span>
+              </p>
+            )}
+            <div className="flex items-center justify-between">
             {step > 1 ? (
               <button
                 type="button"
@@ -790,7 +874,14 @@ export const BookingModal: React.FC = () => {
             {step < 3 ? (
               <button
                 type="button"
-                onClick={() => setStep(step + 1)}
+                onClick={() => {
+                  if (step === 2 && !selectedTimeSlot) {
+                    setBookingError('Please select an available time slot.');
+                    return;
+                  }
+                  setBookingError('');
+                  setStep(step + 1);
+                }}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-zinc-950 font-extrabold text-xs inline-flex items-center gap-1.5 transition shadow-lg shadow-amber-500/20 active:scale-95 border border-amber-400/40 cursor-pointer"
               >
                 <span>Continue</span>
@@ -806,6 +897,7 @@ export const BookingModal: React.FC = () => {
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             )}
+            </div>
           </div>
         )}
 
@@ -821,7 +913,7 @@ export const BookingModal: React.FC = () => {
           totalAmount={netTotal}
           serviceName={selectedTier ? `${selectedService.name} (${selectedTier.label})` : selectedService.name}
           clientName={clientName}
-          clientEmail={clientEmail || `${clientName.toLowerCase().replace(/\s+/g, '')}@example.com`}
+          clientEmail={clientEmail}
           clientPhone={clientPhone}
         />
       )}

@@ -1390,7 +1390,10 @@ export const INITIAL_SETTINGS: SalonSettings = {
   instagramUrl: 'https://www.instagram.com/modern_unisex_salon_mohol?utm_source=qr',
   mapsUrl: 'https://maps.app.goo.gl/CraeBa6gAjWA8o818',
   gstNumber: '27AABCM8104M1Z2 (Available on Invoice)',
-  staffType: 'Self-Employed (Master Stylist & Founder)'
+  staffType: 'Self-Employed (Master Stylist & Founder)',
+  upiId: '9890511256-2@axl',
+  phonePeNumber: '9890511256',
+  payeeName: 'Modern Unisex Salon'
 };
 
 export const INITIAL_USERS: import('../types').User[] = [

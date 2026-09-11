@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Calendar,
   Clock,
@@ -33,15 +33,19 @@ import { CustomerFeedbackForm } from '../components/CustomerFeedbackForm';
 
 export const CustomerPastAppointments: React.FC = () => {
   const {
-    appointments,
     services,
     reviews,
     openBookingModal,
     setActiveNavTab,
     currentUser,
-    openAuthModal
+    openAuthModal,
+    fetchMyAppointments
   } = useSalon();
   
+  const [myBookings, setMyBookings] = useState<Appointment[]>([]);
+  const [lookupPhone, setLookupPhone] = useState(currentUser?.phone || '');
+  const [listError, setListError] = useState<string>('');
+  const [listLoading, setListLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'>('ALL');
   const [selectedPassAppointment, setSelectedPassAppointment] = useState<Appointment | null>(null);
@@ -50,9 +54,34 @@ export const CustomerPastAppointments: React.FC = () => {
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'appointments' | 'feedback'>('appointments');
 
+  const loadMine = async (phone: string) => {
+    const trimmed = phone.trim();
+    if (!trimmed) {
+      setMyBookings([]);
+      return;
+    }
+    setListLoading(true);
+    setListError('');
+    try {
+      const rows = await fetchMyAppointments(trimmed);
+      setMyBookings(rows);
+    } catch (err: any) {
+      setListError(err?.message || 'Could not load bookings from the server.');
+      setMyBookings([]);
+    } finally {
+      setListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const phone = currentUser?.phone || '';
+    setLookupPhone(phone);
+    loadMine(phone);
+  }, [currentUser?.phone]);
+
   // Filter appointments
   const filteredAppointments = useMemo(() => {
-    return appointments
+    return myBookings
       .filter(apt => {
         const matchesStatus = 
           statusFilter === 'ALL' || 
@@ -66,12 +95,12 @@ export const CustomerPastAppointments: React.FC = () => {
           apt.clientName.toLowerCase().includes(q) ||
           apt.clientPhone.toLowerCase().includes(q) ||
           apt.serviceName.toLowerCase().includes(q) ||
-          apt.category.toLowerCase().includes(q);
+          (apt.category || '').toLowerCase().includes(q);
 
         return matchesStatus && matchesSearch;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [appointments, statusFilter, searchQuery]);
+  }, [myBookings, statusFilter, searchQuery]);
 
   const handleCopy = (ref: string) => {
     navigator.clipboard?.writeText(ref);
@@ -232,7 +261,7 @@ export const CustomerPastAppointments: React.FC = () => {
           }`}
         >
           <Calendar className="w-4 h-4" />
-          <span>My Salon Bookings ({appointments.length})</span>
+          <span>My Salon Bookings ({myBookings.length})</span>
         </button>
 
         <button
@@ -265,18 +294,18 @@ export const CustomerPastAppointments: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
               <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">Total Bookings</span>
-              <div className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-serif">{appointments.length}</div>
+              <div className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-serif">{myBookings.length}</div>
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
               <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Confirmed / Active</span>
               <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-serif">
-                {appointments.filter(a => a.bookingStatus === 'CONFIRMED' || a.status === 'CONFIRMED').length}
+                {myBookings.filter(a => a.bookingStatus === 'CONFIRMED' || a.status === 'CONFIRMED').length}
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
               <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">Completed Visits</span>
               <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 font-serif">
-                {appointments.filter(a => a.bookingStatus === 'COMPLETED' || a.status === 'COMPLETED').length}
+                {myBookings.filter(a => a.bookingStatus === 'COMPLETED' || a.status === 'COMPLETED').length}
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
@@ -287,6 +316,23 @@ export const CustomerPastAppointments: React.FC = () => {
 
           {/* Filter & Search Bar */}
           <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3.5 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="tel"
+                value={lookupPhone}
+                onChange={(e) => setLookupPhone(e.target.value)}
+                placeholder="Lookup bookings by mobile number"
+                className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-amber-500"
+              />
+              <button
+                type="button"
+                onClick={() => loadMine(lookupPhone)}
+                className="px-4 py-2 rounded-xl bg-amber-500 text-zinc-950 text-xs font-bold"
+              >
+                {listLoading ? 'Loading…' : 'Find my bookings'}
+              </button>
+            </div>
+            {listError && <p className="text-xs text-red-500">{listError}</p>}
             <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
               {/* Search Box */}
               <div className="relative flex-1">
