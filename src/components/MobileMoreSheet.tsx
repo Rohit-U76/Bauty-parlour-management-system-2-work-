@@ -387,22 +387,6 @@ export const MobileMoreSheet: React.FC<MobileMoreSheetProps> = ({ isOpen, onClos
               <span>WhatsApp</span>
             </a>
           </div>
-
-          {/* Admin Suite Button */}
-          <button
-            onClick={() => {
-              onClose();
-              if (currentUser?.role === 'ADMIN') {
-                setIsAdminMode(true);
-              } else {
-                openAuthModal('admin', 'login');
-              }
-            }}
-            className="w-full py-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
-          >
-            <ShieldCheck className="w-4 h-4 text-amber-500" />
-            <span>Salon Owner / Staff Admin Portal</span>
-          </button>
         </div>
 
         {/* Sticky Bottom Action in Sheet */}
@@ -412,9 +396,9 @@ export const MobileMoreSheet: React.FC<MobileMoreSheetProps> = ({ isOpen, onClos
               onClose();
               openBookingModal();
             }}
-            className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition cursor-pointer"
+            className="w-full py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/20 active:scale-95 transition cursor-pointer"
           >
-            <Calendar className="w-4 h-4 text-zinc-950" />
+            <Calendar className="w-4 h-4 text-white" />
             <span>Book Appointment ({settings.advancePercentage || 10}% Advance Deposit)</span>
           </button>
         </div>

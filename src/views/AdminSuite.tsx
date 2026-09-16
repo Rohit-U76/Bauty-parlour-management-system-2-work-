@@ -36,7 +36,9 @@ import {
   Smartphone,
   Bot,
   LogOut,
-  Crown
+  Crown,
+  Menu,
+  MessageSquare
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { ServiceItem, Appointment, GalleryItem, OfferCoupon, AppointmentStatus } from '../types';
@@ -81,6 +83,7 @@ export const AdminSuite: React.FC = () => {
   // Search & Filter
   const [appointmentSearch, setAppointmentSearch] = useState('');
   const [appointmentFilter, setAppointmentFilter] = useState('all');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Modals state
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
@@ -342,39 +345,138 @@ export const AdminSuite: React.FC = () => {
       </aside>
 
       {/* MOBILE TOP BAR */}
-      <div className="md:hidden p-3 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
-            <Scissors className="w-4 h-4" />
+      <div className="md:hidden p-3 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between sticky top-0 z-30">
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-xl bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 focus:outline-none cursor-pointer"
+            aria-label="Toggle Admin Navigation Menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5 text-amber-400" /> : <Menu className="w-5 h-5" />}
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+              <Scissors className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-serif text-sm font-bold text-zinc-100 block leading-tight">Admin Suite</span>
+              <span className="text-[10px] text-zinc-400 capitalize">{adminTab.replace('-', ' ')}</span>
+            </div>
           </div>
-          <span className="font-serif text-sm font-bold text-zinc-100">Modern Salon Admin</span>
         </div>
+
         <div className="flex items-center gap-2">
           <button
             id="admin-mobile-signout-btn"
             onClick={() => logout()}
-            className="text-xs text-rose-400 hover:text-rose-300 font-bold px-3 py-1.5 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center gap-1.5 cursor-pointer"
+            className="text-xs text-rose-400 hover:text-rose-300 font-bold px-3 py-2 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center gap-1.5 cursor-pointer active:scale-95"
             title="Sign out and return to Authorization Page"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
+            <span>Exit</span>
           </button>
         </div>
       </div>
 
-      {/* MOBILE HORIZONTAL TABS */}
-      <div className="md:hidden flex items-center gap-1 overflow-x-auto p-2 bg-zinc-900/60 border-b border-zinc-800 scrollbar-none text-xs">
-        {navTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setAdminTab(tab.id as any)}
-            className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-medium ${
-              adminTab === tab.id ? 'bg-amber-500 text-zinc-950 font-bold' : 'text-zinc-400'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* MOBILE EXPANDABLE DRAWER MENU */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-40 bg-black/80 backdrop-blur-sm pt-14 flex flex-col justify-between overflow-y-auto animate-in fade-in duration-150">
+          <div className="p-4 space-y-2">
+            <div className="flex items-center justify-between px-2 pb-2 border-b border-zinc-800">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Navigation Menu</span>
+              <span className="text-[11px] text-amber-400 font-mono">12 Modules</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+              {navTabs.map(tab => {
+                const Icon = tab.icon;
+                const isActive = adminTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setAdminTab(tab.id as any);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full min-h-[44px] flex items-center justify-between px-4 py-3 rounded-2xl transition cursor-pointer text-left text-sm ${
+                      isActive
+                        ? 'bg-amber-500 text-zinc-950 font-bold shadow-lg shadow-amber-500/20'
+                        : 'bg-zinc-900 border border-zinc-800/80 text-zinc-300 hover:bg-zinc-800/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span>{tab.label}</span>
+                    </div>
+                    {tab.badge !== undefined && tab.badge > 0 && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${
+                        isActive ? 'bg-zinc-950 text-amber-400' : 'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {tab.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Drawer Footer with Admin Details & Exit */}
+          <div className="p-4 border-t border-zinc-800 bg-zinc-900/90 space-y-3">
+            {currentUser && (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/60">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-zinc-950 flex items-center justify-center font-bold text-sm">
+                  {currentUser.name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-zinc-100 truncate flex items-center gap-1.5">
+                    <span>{currentUser.name}</span>
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <div className="text-[11px] text-zinc-400 truncate">
+                    Owner Active • PIN: 9999
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => logout()}
+              className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out to Authorization Page</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE HORIZONTAL TABS (Touch-friendly pill scroller) */}
+      <div className="md:hidden flex items-center gap-1.5 overflow-x-auto p-2.5 bg-zinc-900/90 border-b border-zinc-800 scrollbar-none text-xs sticky top-[57px] z-20 backdrop-blur-md">
+        {navTabs.map(tab => {
+          const isActive = adminTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setAdminTab(tab.id as any)}
+              className={`min-h-[36px] px-3.5 py-1.5 rounded-xl whitespace-nowrap font-bold flex items-center gap-1.5 transition active:scale-95 ${
+                isActive
+                  ? 'bg-amber-500 text-zinc-950 shadow-md font-extrabold'
+                  : 'bg-zinc-800/80 text-zinc-300 border border-zinc-700/50 hover:bg-zinc-700/70'
+              }`}
+            >
+              <span>{tab.label}</span>
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                  isActive ? 'bg-zinc-950 text-amber-400' : 'bg-amber-400/20 text-amber-300'
+                }`}>
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* MAIN CONTENT AREA */}
@@ -546,8 +648,8 @@ export const AdminSuite: React.FC = () => {
                 </div>
               </div>
 
-              {/* Table */}
-              <div className="rounded-2xl bg-zinc-900 border border-zinc-800 overflow-x-auto">
+              {/* Desktop Table */}
+              <div className="hidden md:block rounded-2xl bg-zinc-900 border border-zinc-800 overflow-x-auto">
                 <table className="w-full text-left text-xs min-w-[700px]">
                   <thead className="bg-zinc-950 text-zinc-400 uppercase font-semibold border-b border-zinc-800">
                     <tr>
@@ -624,6 +726,124 @@ export const AdminSuite: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Appointment Cards (Clean, high-density, touch-friendly) */}
+              <div className="md:hidden space-y-3">
+                {filteredAppointments.length === 0 ? (
+                  <div className="p-8 text-center bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 text-xs">
+                    No appointments match your filter criteria.
+                  </div>
+                ) : (
+                  filteredAppointments.map(app => {
+                    const status = getAppStatus(app);
+                    const cleanPhone = (app.clientPhone || '').replace(/\D/g, '');
+                    const whatsappDirectUrl = app.whatsappUrl || `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hello ${app.clientName}, your appointment for ${app.serviceName} at Modern Unisex Salon Mohol is confirmed for ${app.date} at ${app.timeSlot}. Ref: ${app.bookingRef}.`)}`;
+
+                    return (
+                      <div
+                        key={app.id}
+                        className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-3 shadow-sm"
+                      >
+                        {/* Card Header */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-amber-400">
+                                {app.bookingRef}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                status === 'CONFIRMED'
+                                  ? 'bg-emerald-500/20 text-emerald-400'
+                                  : status === 'COMPLETED'
+                                  ? 'bg-blue-500/20 text-blue-400'
+                                  : 'bg-red-500/20 text-red-400'
+                              }`}>
+                                {status}
+                              </span>
+                            </div>
+                            <h3 className="font-serif font-bold text-base text-zinc-100 mt-1">
+                              {app.clientName}
+                            </h3>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-xs text-zinc-400 block">Total Bill</span>
+                            <span className="font-mono font-bold text-sm text-zinc-100">₹{app.totalAmount}</span>
+                          </div>
+                        </div>
+
+                        {/* Service & Time details */}
+                        <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800/80 text-xs space-y-1">
+                          <div className="flex items-center justify-between text-zinc-300">
+                            <span className="font-semibold text-amber-300/90">{app.serviceName}</span>
+                            <span className="text-zinc-500">{app.stylistName}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-zinc-400 text-[11px] pt-1 border-t border-zinc-800/60">
+                            <span>📅 {app.date} • ⏰ {app.timeSlot}</span>
+                            <span className="font-mono text-emerald-400 font-semibold">
+                              Adv: ₹{app.advancePaid} (Paid)
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Direct Communication & Mobile Actions */}
+                        <div className="pt-1 flex items-center gap-2 flex-wrap">
+                          {app.clientPhone && (
+                            <a
+                              href={`tel:${app.clientPhone}`}
+                              className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 flex-1 justify-center min-h-[40px]"
+                            >
+                              <Phone className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Call</span>
+                            </a>
+                          )}
+
+                          <a
+                            href={whatsappDirectUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 text-xs font-bold flex items-center gap-1.5 flex-1 justify-center min-h-[40px]"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>WhatsApp</span>
+                          </a>
+
+                          <button
+                            onClick={() => {
+                              setSelectedAppForMessaging(app);
+                              setShowSmsHubModal(true);
+                            }}
+                            className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 text-xs font-bold flex items-center gap-1.5 min-h-[40px]"
+                            title="SMS & WhatsApp Hub"
+                          >
+                            <Smartphone className="w-3.5 h-3.5" />
+                            <span>Notify</span>
+                          </button>
+                        </div>
+
+                        {/* Status Change Buttons on Mobile */}
+                        {status === 'CONFIRMED' && (
+                          <div className="flex items-center gap-2 pt-1 border-t border-zinc-800/80">
+                            <button
+                              onClick={() => updateAppointmentStatus(app.id, 'COMPLETED')}
+                              className="flex-1 py-2 px-3 rounded-xl bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-600/40 text-xs font-bold flex items-center justify-center gap-1.5 min-h-[40px]"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Mark Completed</span>
+                            </button>
+                            <button
+                              onClick={() => updateAppointmentStatus(app.id, 'CANCELLED')}
+                              className="py-2 px-3 rounded-xl bg-red-600/15 text-red-400 hover:bg-red-600/25 border border-red-600/30 text-xs font-bold min-h-[40px]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
@@ -827,7 +1047,8 @@ export const AdminSuite: React.FC = () => {
                 <p className="text-xs text-zinc-400">List of registered clients and repeat visit history.</p>
               </div>
 
-              <div className="rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden">
+              {/* Desktop Table */}
+              <div className="hidden md:block rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-zinc-950 text-zinc-400 uppercase font-semibold border-b border-zinc-800">
                     <tr>
@@ -853,6 +1074,57 @@ export const AdminSuite: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Customers Cards */}
+              <div className="md:hidden space-y-3">
+                {customers.map(c => {
+                  const cleanPhone = (c.phone || '').replace(/\D/g, '');
+                  return (
+                    <div key={c.id} className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2.5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-bold text-sm text-zinc-100">{c.name}</h3>
+                          <div className="text-xs text-zinc-400">{c.phone}</div>
+                          {c.email && <div className="text-[11px] text-zinc-500 truncate">{c.email}</div>}
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-zinc-400 block">Spent</span>
+                          <span className="font-mono font-bold text-amber-400 text-sm">₹{c.totalSpent.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80 text-xs">
+                        <span className="px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-300 font-mono">
+                          {c.totalVisits} visits
+                        </span>
+                        <span className="text-zinc-500 text-[11px]">Last: {c.lastVisit || 'Recent'}</span>
+                        <div className="flex items-center gap-1.5">
+                          {c.phone && (
+                            <a
+                              href={`tel:${c.phone}`}
+                              className="p-2 rounded-lg bg-zinc-800 text-amber-400 hover:bg-zinc-700"
+                              title="Call Client"
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                          {cleanPhone && (
+                            <a
+                              href={`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hello ${c.name}, greetings from Modern Unisex Salon Mohol!`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
+                              title="WhatsApp Client"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

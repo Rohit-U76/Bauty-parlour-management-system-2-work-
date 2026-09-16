@@ -70,12 +70,12 @@ export const MobileBottomNav: React.FC = () => {
             <button
               id="mobile-nav-book-action-btn"
               onClick={() => openBookingModal()}
-              className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-amber-400 text-zinc-950 flex items-center justify-center shadow-lg shadow-amber-500/30 active:scale-90 transition-transform cursor-pointer border-2 border-white dark:border-zinc-950"
+              className="w-12 h-12 rounded-full bg-gradient-to-tr from-purple-700 via-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-600/30 active:scale-90 transition-transform cursor-pointer border-2 border-white dark:border-zinc-950"
               aria-label="Book Appointment"
             >
-              <Calendar className="w-5 h-5 stroke-[2.5px]" />
+              <Calendar className="w-5 h-5 stroke-[2.5px] text-white" />
             </button>
-            <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 tracking-tight mt-0.5">
+            <span className="text-[10px] font-extrabold text-purple-700 dark:text-purple-300 tracking-tight mt-0.5">
               Book
             </span>
           </div>

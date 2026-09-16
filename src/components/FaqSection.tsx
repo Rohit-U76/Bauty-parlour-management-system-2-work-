@@ -37,14 +37,14 @@ export const FaqSection: React.FC = () => {
     'Payments & Booking'
   ];
 
-  const faqs: FaqItem[] = [
+  const faqs: FaqItem[] = useMemo(() => [
     // ==================== 1. SALON POLICIES ====================
     {
       id: 'faq-policy-1',
       category: 'Salon Policies',
-      question: 'Why does Modern Unisex Salon require a 10% advance deposit for reservations?',
-      answer: 'Our 10% advance deposit locks your dedicated time slot with our master stylists and ensures stations are pre-sanitized before your arrival. It eliminates overlapping bookings and guarantees zero wait-time for all scheduled clients.',
-      highlight: '10% online deposit locks your slot with zero wait-time.'
+      question: `Why does Modern Unisex Salon require a ${settings.advancePercentage || 10}% advance deposit for reservations?`,
+      answer: `Our ${settings.advancePercentage || 10}% advance deposit locks your dedicated time slot with our master stylists and ensures stations are pre-sanitized before your arrival. It eliminates overlapping bookings and guarantees zero wait-time for all scheduled clients.`,
+      highlight: `${settings.advancePercentage || 10}% online deposit locks your slot with zero wait-time.`
     },
     {
       id: 'faq-policy-2',
@@ -136,7 +136,7 @@ export const FaqSection: React.FC = () => {
       answer: 'Walk-ins are welcomed subject to chair availability, but clients with pre-booked 10% online deposits always receive first priority. On weekends and wedding festival dates, online booking is highly recommended.',
       highlight: 'Advance online bookings receive priority VIP seating.'
     }
-  ];
+  ], [settings.advancePercentage]);
 
   const filteredFaqs = useMemo(() => {
     return faqs.filter(faq => {
@@ -228,8 +228,8 @@ export const FaqSection: React.FC = () => {
                 key={faq.id}
                 className={`rounded-2xl border transition-all overflow-hidden ${
                   isOpen
-                    ? 'bg-[#18181f] border-yellow-500/40 shadow-lg shadow-yellow-500/5'
-                    : 'bg-[#141418] border-zinc-800/90 hover:border-zinc-700'
+                    ? 'bg-purple-50/70 dark:bg-[#18181f] border-purple-400/80 dark:border-yellow-500/40 shadow-md shadow-purple-500/5'
+                    : 'bg-white dark:bg-[#141418] border-purple-100 dark:border-zinc-800/90 hover:border-purple-300 dark:hover:border-zinc-700 shadow-sm'
                 }`}
               >
                 <button
@@ -239,25 +239,25 @@ export const FaqSection: React.FC = () => {
                   aria-expanded={isOpen}
                 >
                   <div className="flex items-center gap-3">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${isOpen ? 'bg-yellow-400 ring-4 ring-yellow-400/20' : 'bg-zinc-600'}`} />
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${isOpen ? 'bg-purple-600 dark:bg-yellow-400 ring-4 ring-purple-600/20 dark:ring-yellow-400/20' : 'bg-zinc-400 dark:bg-zinc-600'}`} />
                     <span className={`font-serif text-sm sm:text-base font-bold transition-colors ${
-                      isOpen ? 'text-yellow-400' : 'text-zinc-100'
+                      isOpen ? 'text-purple-900 dark:text-yellow-400' : 'text-zinc-900 dark:text-zinc-100'
                     }`}>
                       {faq.question}
                     </span>
                   </div>
                   <ChevronDown
                     className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-300 ${
-                      isOpen ? 'rotate-180 text-yellow-400' : ''
+                      isOpen ? 'rotate-180 text-purple-600 dark:text-yellow-400' : ''
                     }`}
                   />
                 </button>
 
                 {isOpen && (
-                  <div className="px-5 pb-5 pt-1 text-xs sm:text-sm text-zinc-300 leading-relaxed border-t border-zinc-800/60">
-                    <p className="mt-2 text-zinc-300">{faq.answer}</p>
+                  <div className="px-5 pb-5 pt-1 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed border-t border-purple-100 dark:border-zinc-800/60">
+                    <p className="mt-2">{faq.answer}</p>
                     {faq.highlight && (
-                      <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-medium">
+                      <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-100/70 dark:bg-yellow-500/10 border border-purple-200 dark:border-yellow-500/20 text-purple-800 dark:text-yellow-400 text-xs font-semibold">
                         <Sparkles className="w-3.5 h-3.5 shrink-0" />
                         <span>{faq.highlight}</span>
                       </div>
@@ -271,13 +271,13 @@ export const FaqSection: React.FC = () => {
       </div>
 
       {/* QUICK ASSISTANCE BANNER */}
-      <div className="max-w-4xl mx-auto p-6 rounded-3xl border flex flex-col sm:flex-row items-center justify-between gap-4 transition-all bg-gradient-to-r from-[#141418] to-[#1c1c24] border-yellow-500/30">
+      <div className="max-w-4xl mx-auto p-6 rounded-3xl border flex flex-col sm:flex-row items-center justify-between gap-4 transition-all bg-gradient-to-r from-purple-50/90 via-white to-purple-50/90 dark:from-[#141418] dark:to-[#1c1c24] border-purple-200 dark:border-yellow-500/30 shadow-md">
         <div className="space-y-1 text-center sm:text-left">
-          <h3 className="font-serif text-base font-bold text-yellow-400 flex items-center justify-center sm:justify-start gap-2">
+          <h3 className="font-serif text-base font-bold text-purple-700 dark:text-yellow-400 flex items-center justify-center sm:justify-start gap-2">
             <MessageSquare className="w-4 h-4" />
             <span>Still have questions about a treatment?</span>
           </h3>
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-zinc-600 dark:text-zinc-400">
             Our AI beauty concierge is online 24/7 to recommend tailored packages and styling tips.
           </p>
         </div>
@@ -286,17 +286,9 @@ export const FaqSection: React.FC = () => {
           <button
             type="button"
             onClick={() => toggleAiWidget()}
-            className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs border border-zinc-700 transition-colors"
+            className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 font-semibold text-xs border border-purple-600 dark:border-zinc-700 transition-colors shadow-sm cursor-pointer"
           >
             Chat with AI
-          </button>
-          <button
-            type="button"
-            onClick={() => openBookingModal()}
-            className="px-4 py-2.5 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-xs inline-flex items-center gap-1.5 shadow-md transition-colors"
-          >
-            <span>Book with 10% Adv</span>
-            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

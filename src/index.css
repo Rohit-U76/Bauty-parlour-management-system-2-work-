@@ -27,10 +27,10 @@
 
   html.light, html:not(.dark), [data-theme="light"] {
     --app-bg: #faf7ff;
-    --app-text: #1e1b4b;
+    --app-text: #000000;
     color-scheme: light;
     background-color: #faf7ff;
-    color: #1e1b4b;
+    color: #000000;
   }
 
   body {
@@ -48,7 +48,7 @@
 
   html.light body, html:not(.dark) body {
     background-color: #faf7ff;
-    color: #1e1b4b;
+    color: #000000;
   }
   
   h1, h2, h3, .font-serif-luxury {
@@ -117,27 +117,51 @@ html.light .bg-zinc-800\/20 {
   background-color: #f5edfd !important;
 }
 
-/* Text Hierarchy in Light Mode */
+/* Text Hierarchy in Light Mode: Crisp Black for High Contrast */
 html.light .text-zinc-100,
 html.light .text-zinc-200,
-html.light .text-white {
-  color: #1e1b4b !important;
-}
-
-html.light .text-zinc-300 {
-  color: #312e81 !important;
-}
-
-html.light .text-zinc-400 {
-  color: #64748b !important;
-}
-
-html.light .text-zinc-500 {
-  color: #94a3b8 !important;
-}
-
-html.light .text-zinc-600 {
-  color: #64748b !important;
+html.light .text-white,
+html.light .text-zinc-300,
+html.light .text-zinc-400,
+html.light .text-zinc-500,
+html.light .text-zinc-600,
+html.light .text-zinc-700,
+html.light .text-zinc-800,
+html.light .text-gray-400,
+html.light .text-gray-500,
+html.light .text-gray-600,
+html.light .text-gray-700,
+html.light .text-slate-400,
+html.light .text-slate-500,
+html.light .text-slate-600,
+html.light .text-slate-700,
+html.light .text-stone-400,
+html.light .text-stone-500,
+html.light .text-stone-600,
+html.light .text-neutral-500,
+html.light .text-neutral-600,
+html.light p,
+html:not(.dark) .text-zinc-400,
+html:not(.dark) .text-zinc-500,
+html:not(.dark) .text-zinc-600,
+html:not(.dark) .text-zinc-700,
+html:not(.dark) .text-gray-400,
+html:not(.dark) .text-gray-500,
+html:not(.dark) .text-gray-600,
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-slate-500,
+html:not(.dark) .text-slate-600,
+[data-theme="light"] .text-zinc-400,
+[data-theme="light"] .text-zinc-500,
+[data-theme="light"] .text-zinc-600,
+[data-theme="light"] .text-zinc-700,
+[data-theme="light"] .text-gray-400,
+[data-theme="light"] .text-gray-500,
+[data-theme="light"] .text-gray-600,
+[data-theme="light"] .text-slate-400,
+[data-theme="light"] .text-slate-500,
+[data-theme="light"] .text-slate-600 {
+  color: #000000 !important;
 }
 
 /* Borders in Light Mode */
@@ -276,7 +300,7 @@ html.light header .text-zinc-400 {
 html.light footer {
   background-color: #f7f2fd !important;
   border-color: #ebdcf9 !important;
-  color: #64748b !important;
+  color: #000000 !important;
 }
 
 html.light footer .bg-zinc-950,

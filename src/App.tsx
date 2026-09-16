@@ -27,7 +27,7 @@ function SalonAppContent() {
   // Mandatory Authorization Gate: without authorization the page cannot get opened!
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-stone-950 text-zinc-100 flex flex-col transition-colors duration-200">
+      <div className="min-h-screen bg-[#faf7ff] dark:bg-stone-950 text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors duration-200">
         <AuthGatewayScreen />
         <AuthModal />
       </div>

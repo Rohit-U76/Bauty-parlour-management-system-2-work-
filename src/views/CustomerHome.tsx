@@ -103,9 +103,9 @@ export const CustomerHome: React.FC = () => {
               <button
                 id="hero-schedule-btn"
                 onClick={() => openBookingModal()}
-                className="px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                className="px-6 py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-600/25 transition-all cursor-pointer"
               >
-                <Calendar className="w-4 h-4 text-zinc-950" />
+                <Calendar className="w-4 h-4 text-white" />
                 <span>Book Appointment ({settings.advancePercentage || 10}% Advance)</span>
               </button>
 
@@ -115,10 +115,10 @@ export const CustomerHome: React.FC = () => {
                   setActiveNavTab('services');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="px-6 py-3.5 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="px-6 py-3.5 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-purple-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <span>View Price List</span>
-                <ArrowRight className="w-4 h-4 text-amber-500" />
+                <ArrowRight className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               </button>
             </div>
 
@@ -507,7 +507,7 @@ export const CustomerHome: React.FC = () => {
             </a>
             <button
               onClick={() => openBookingModal()}
-              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold flex items-center justify-center gap-2 transition shadow-md shadow-amber-500/20 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white text-xs font-bold flex items-center justify-center gap-2 transition shadow-md shadow-purple-600/20 cursor-pointer"
             >
               <Calendar className="w-3.5 h-3.5" />
               <span>Book Appointment</span>

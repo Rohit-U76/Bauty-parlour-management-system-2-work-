@@ -693,6 +693,31 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Create confirmed appointment upon 10% Razorpay payment
   const createAppointment = async (payload: BookingPayload): Promise<Appointment> => {
     const bookingRef = `SS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    const ownerPhone = '8104026257';
+    const cleanClientPhone = (payload.clientPhone || '').replace(/[^0-9]/g, '');
+    const formattedClientPhone = cleanClientPhone.length === 10 ? `91${cleanClientPhone}` : cleanClientPhone;
+    
+    const waText = `✨ *NEW APPOINTMENT CONFIRMED* ✨\n*Modern Unisex Salon, Mohol*\n` +
+      `────────────────────\n` +
+      `📋 *Booking Ref:* ${bookingRef}\n` +
+      `👤 *Client Name:* ${payload.clientName}\n` +
+      `📱 *Client Mobile:* ${payload.clientPhone}\n` +
+      `💇‍♀️ *Service:* ${payload.serviceName}\n` +
+      `📅 *Date & Slot:* ${payload.date} at ${payload.timeSlot}\n` +
+      `✂️ *Stylist:* ${payload.stylistName || 'Master Stylist'}\n` +
+      `💰 *Total Bill:* ₹${payload.totalAmount}\n` +
+      `✅ *10% Advance Deposit Paid:* ₹${payload.advanceAmount} (Verified via Razorpay)\n` +
+      `💵 *Balance at Salon Counter:* ₹${payload.balanceDue}\n` +
+      `────────────────────\n` +
+      `📍 *Salon Address:* B.N. Gund Complex, Near Kanya Prashala & ICICI Bank, Mohol (413213)\n` +
+      `📞 *Salon Helpline:* +91 81040 26257`;
+
+    const encodedWaText = encodeURIComponent(waText);
+    const ownerWhatsappUrl = `https://api.whatsapp.com/send?phone=91${ownerPhone}&text=${encodedWaText}`;
+    const clientWhatsappUrl = formattedClientPhone 
+      ? `https://api.whatsapp.com/send?phone=${formattedClientPhone}&text=${encodedWaText}` 
+      : `https://api.whatsapp.com/send?text=${encodedWaText}`;
+
     const newAppointment: Appointment = {
       id: `apt-${Date.now()}`,
       bookingRef,
@@ -715,8 +740,33 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       razorpayOrderId: payload.razorpayOrderId,
       createdAt: new Date().toISOString(),
       notes: payload.notes || '',
-      isNew: true
+      isNew: true,
+      whatsappUrl: clientWhatsappUrl,
+      ownerWhatsappUrl: ownerWhatsappUrl
     };
+
+    // Trigger Automated WhatsApp dispatch to server API
+    try {
+      fetch('/api/notifications/send-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: ownerPhone,
+          clientName: payload.clientName,
+          clientPhone: payload.clientPhone,
+          serviceName: payload.serviceName,
+          date: payload.date,
+          timeSlot: payload.timeSlot,
+          bookingRef,
+          advancePaid: payload.advanceAmount,
+          balanceDue: payload.balanceDue,
+          totalAmount: payload.totalAmount,
+          stylistName: payload.stylistName
+        })
+      }).catch(err => console.log('WhatsApp notification dispatched background:', err));
+    } catch {
+      // Fallback safe
+    }
 
     // Update appointments
     setAppointments(prev => [newAppointment, ...prev]);

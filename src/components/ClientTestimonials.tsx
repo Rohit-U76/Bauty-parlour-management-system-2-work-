@@ -245,9 +245,9 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
           <button
             id="book-from-testimonials-btn"
             onClick={() => openBookingModal()}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-zinc-950 text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-yellow-500/20 transition-all cursor-pointer active:scale-95"
+            className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-purple-600/20 transition-all cursor-pointer active:scale-95"
           >
-            <Calendar className="w-4 h-4 text-zinc-950" />
+            <Calendar className="w-4 h-4 text-white" />
             <span>Book Appointment (10% Adv)</span>
           </button>
         </div>

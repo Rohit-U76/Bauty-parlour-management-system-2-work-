@@ -214,18 +214,10 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
             <div className="flex items-center gap-3 shrink-0">
               <button
                 onClick={() => setIsWriteModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-zinc-900 border border-yellow-500/40 hover:border-yellow-400 text-yellow-400 hover:text-yellow-300 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+                className="px-4 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-zinc-900 border border-purple-300 dark:border-yellow-500/40 hover:border-purple-400 dark:hover:border-yellow-400 text-purple-700 dark:text-yellow-400 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
               >
                 <PlusCircle className="w-4 h-4" />
                 <span>Write a Review</span>
-              </button>
-
-              <button
-                onClick={() => openBookingModal()}
-                className="px-4 py-2.5 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-zinc-950 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-yellow-500/20"
-              >
-                <Calendar className="w-4 h-4" />
-                <span>Book with 10% Adv</span>
               </button>
             </div>
           </div>
@@ -487,28 +479,18 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
       </div>
 
       {/* BOTTOM SOCIAL PROOF CALLOUT */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-[#17150d] via-[#141418] to-[#17150d] border border-yellow-500/30 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
+      <div className="p-6 rounded-3xl bg-gradient-to-r from-purple-50/90 via-white to-purple-50/90 dark:from-[#17150d] dark:via-[#141418] dark:to-[#17150d] border border-purple-200/90 dark:border-yellow-500/30 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 transition-all">
         <div className="space-y-1.5 text-center md:text-left">
-          <div className="inline-flex items-center gap-2 text-xs font-bold text-yellow-400 uppercase tracking-wider">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <div className="inline-flex items-center gap-2 text-xs font-extrabold text-purple-900 dark:text-amber-400 uppercase tracking-wider px-3.5 py-1.5 rounded-full bg-purple-100/90 dark:bg-amber-400/10 border border-purple-300/80 dark:border-amber-400/30 shadow-sm">
+            <CheckCircle2 className="w-4 h-4 text-purple-700 dark:text-amber-400" />
             <span>Ready for Your Transformation?</span>
           </div>
-          <h3 className="font-serif text-lg sm:text-xl font-bold text-zinc-100">
-            Book Your Appointment in 60 Seconds with 10% Deposit
+          <h3 className="font-serif text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100">
+            Certified Master Stylists &amp; 100% Genuine Branded Care
           </h3>
-          <p className="text-xs text-zinc-400 max-w-xl">
-            Choose your specialist, pick your time slot, and lock your reservation with a refundable 10% online deposit via UPI or Cards.
+          <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-xl">
+            Experience premium haircuts, Keratin therapies, luxury Hydra-facials, and signature bridal makeovers at Mohol's premier unisex destination.
           </p>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={() => openBookingModal()}
-            className="px-6 py-3 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-zinc-950 font-bold text-xs sm:text-sm flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-yellow-500/20 active:scale-95"
-          >
-            <Calendar className="w-4 h-4 text-zinc-950" />
-            <span>Reserve Slot Now (10% Adv)</span>
-          </button>
         </div>
       </div>
 

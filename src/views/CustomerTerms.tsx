@@ -236,7 +236,7 @@ export const CustomerTerms: React.FC = () => {
           </button>
           <button
             onClick={() => openBookingModal()}
-            className="px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition cursor-pointer"
+            className="px-5 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition cursor-pointer"
           >
             <span>Book Appointment</span>
             <ArrowRight className="w-3.5 h-3.5" />

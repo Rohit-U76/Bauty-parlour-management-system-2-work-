@@ -60,13 +60,6 @@ export const Footer: React.FC = () => {
               Modern Unisex Salon in Mohol. Specialized in HD Bridal Makeup, Hydrafacials, Hair Chemical Straightening/Keratin, and Executive Grooming.
             </p>
             <div className="pt-2 flex flex-wrap gap-2">
-              <button
-                onClick={() => openBookingModal()}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition shadow-sm active:scale-95 cursor-pointer"
-              >
-                <span>Reserve Appointment</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
               <a
                 href={settings.instagramUrl || "https://www.instagram.com/modern_unisex_salon_mohol?utm_source=qr"}
                 target="_blank"
@@ -155,15 +148,6 @@ export const Footer: React.FC = () => {
                   About Master Stylist
                 </button>
               </li>
-              <li>
-                <button
-                  onClick={() => setIsAdminMode(true)}
-                  className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 pt-1"
-                >
-                  <span>Owner Admin Dashboard</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/20 font-mono">Portal</span>
-                </button>
-              </li>
             </ul>
           </div>
 
@@ -219,11 +203,7 @@ export const Footer: React.FC = () => {
             <span>•</span>
             <span>24h Cancellation Notice</span>
             <span>•</span>
-            <span>10% Advance Deposit</span>
-            <span>•</span>
-            <button onClick={() => setIsAdminMode(true)} className="hover:text-amber-400">
-              Admin Login
-            </button>
+            <span>{settings.advancePercentage || 10}% Advance Deposit</span>
           </div>
         </div>
       </div>

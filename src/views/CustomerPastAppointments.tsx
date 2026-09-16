@@ -30,6 +30,7 @@ import { useSalon } from '../context/SalonContext';
 import { Appointment } from '../types';
 import { AppointmentPassModal } from '../components/AppointmentPassModal';
 import { CustomerFeedbackForm } from '../components/CustomerFeedbackForm';
+import { CustomerProfileView } from '../components/CustomerProfileView';
 
 export const CustomerPastAppointments: React.FC = () => {
   const {
@@ -48,7 +49,7 @@ export const CustomerPastAppointments: React.FC = () => {
   const [selectedFeedbackAppointment, setSelectedFeedbackAppointment] = useState<Appointment | null>(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'appointments' | 'feedback'>('appointments');
+  const [viewMode, setViewMode] = useState<'appointments' | 'profile' | 'feedback'>('appointments');
 
   // Filter appointments
   const filteredAppointments = useMemo(() => {
@@ -167,11 +168,11 @@ export const CustomerPastAppointments: React.FC = () => {
       {currentUser ? (
         <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-zinc-950 font-bold flex items-center justify-center text-base shadow-sm">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-zinc-950 font-bold flex items-center justify-center text-base shadow-sm shrink-0">
               {currentUser.name.charAt(0)}
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-sm text-zinc-900 dark:text-white">
                   {currentUser.name}
                 </span>
@@ -185,16 +186,20 @@ export const CustomerPastAppointments: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-3 text-xs flex-wrap">
             {currentUser.loyaltyPoints !== undefined && (
               <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-500/30 text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
                 <Gift className="w-4 h-4 text-amber-500" />
                 <span>Rewards: <strong className="text-amber-600 dark:text-amber-400 font-mono">{currentUser.loyaltyPoints} pts</strong></span>
               </div>
             )}
-            <div className="text-[11px] text-zinc-500">
-              Member since {currentUser.memberSince || '2026'}
-            </div>
+            <button
+              onClick={() => setViewMode('profile')}
+              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1 transition cursor-pointer shadow-sm"
+            >
+              <span>View Full Profile</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       ) : (
@@ -222,12 +227,12 @@ export const CustomerPastAppointments: React.FC = () => {
       )}
 
       {/* Sub-view Switcher Tabs */}
-      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3 flex-wrap">
         <button
           onClick={() => setViewMode('appointments')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
             viewMode === 'appointments'
-              ? 'bg-amber-500 text-zinc-950 shadow-sm'
+              ? 'bg-amber-500 text-zinc-950 shadow-sm font-extrabold'
               : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700'
           }`}
         >
@@ -236,22 +241,43 @@ export const CustomerPastAppointments: React.FC = () => {
         </button>
 
         <button
+          onClick={() => setViewMode('profile')}
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
+            viewMode === 'profile'
+              ? 'bg-amber-500 text-zinc-950 shadow-sm font-extrabold'
+              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700'
+          }`}
+        >
+          <Crown className="w-4 h-4 text-amber-500" />
+          <span>My Profile &amp; Rewards</span>
+          {currentUser?.loyaltyPoints !== undefined && (
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-mono font-bold">
+              {currentUser.loyaltyPoints} pts
+            </span>
+          )}
+        </button>
+
+        <button
           onClick={() => setViewMode('feedback')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
             viewMode === 'feedback'
-              ? 'bg-purple-600 text-white shadow-sm'
+              ? 'bg-purple-600 text-white shadow-sm font-extrabold'
               : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700'
           }`}
         >
           <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-          <span>Real-Time Feedback Form</span>
-          <span className="px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 text-[10px]">
-            Direct Sync
-          </span>
+          <span>Submit Feedback</span>
         </button>
       </div>
 
-      {viewMode === 'feedback' ? (
+      {viewMode === 'profile' ? (
+        <div className="animate-in fade-in duration-200">
+          <CustomerProfileView
+            appointments={appointments}
+            onBookAppointment={() => openBookingModal()}
+          />
+        </div>
+      ) : viewMode === 'feedback' ? (
         <div className="max-w-3xl mx-auto animate-in fade-in duration-300">
           <CustomerFeedbackForm
             onSuccess={() => {

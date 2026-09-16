@@ -48,7 +48,7 @@ export const CustomerGallery: React.FC = () => {
 
         <button
           onClick={() => openBookingModal()}
-          className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition shrink-0 cursor-pointer"
+          className="px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition shrink-0 cursor-pointer"
         >
           <Calendar className="w-4 h-4" />
           <span>Book Appointment</span>

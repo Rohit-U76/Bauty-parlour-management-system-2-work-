@@ -395,16 +395,22 @@ export const Navbar: React.FC = () => {
                 <button
                   id="navbar-user-profile-btn"
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-2 cursor-pointer shadow-sm"
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-zinc-900 border border-purple-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 hover:border-purple-400 dark:hover:border-zinc-500 transition flex items-center gap-2 cursor-pointer shadow-sm shrink-0"
                 >
-                  <div className="w-5 h-5 rounded-full bg-amber-500 text-zinc-950 flex items-center justify-center font-extrabold text-[10px]">
-                    {currentUser.name.charAt(0)}
+                  <div className="w-6 h-6 rounded-full bg-purple-600 text-white dark:bg-purple-500 dark:text-white flex items-center justify-center font-extrabold text-[11px] shrink-0 shadow-sm">
+                    {currentUser.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="max-w-[100px] truncate">{currentUser.name}</span>
-                  {currentUser.role === 'ADMIN' && (
-                    <Crown className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="whitespace-nowrap font-bold text-zinc-900 dark:text-zinc-100">
+                    {currentUser.name}
+                  </span>
+                  {currentUser.role === 'ADMIN' ? (
+                    <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 text-[10px] font-extrabold uppercase shrink-0">
+                      Owner
+                    </span>
+                  ) : (
+                    <Crown className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
                   )}
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {userDropdownOpen && (
@@ -417,15 +423,15 @@ export const Navbar: React.FC = () => {
                         <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100">
                           {currentUser.name}
                         </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-extrabold">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-extrabold">
                           {currentUser.role === 'ADMIN' ? 'Owner' : (currentUser.memberTier || 'Client')}
                         </span>
                       </div>
-                      <p className="text-[11px] text-zinc-500 truncate">{currentUser.email}</p>
+                      <p className="text-[11px] text-zinc-700 dark:text-zinc-400 truncate">{currentUser.email}</p>
                       {currentUser.loyaltyPoints !== undefined && (
                         <div className="mt-1 pt-1 border-t border-zinc-200/60 dark:border-zinc-700 flex items-center justify-between text-[11px]">
-                          <span className="text-zinc-500">Reward Balance:</span>
-                          <span className="font-bold text-amber-600 dark:text-amber-400 font-mono">
+                          <span className="text-zinc-700 dark:text-zinc-400 font-medium">Reward Balance:</span>
+                          <span className="font-bold text-purple-700 dark:text-purple-300 font-mono">
                             💎 {currentUser.loyaltyPoints} pts
                           </span>
                         </div>
@@ -433,36 +439,23 @@ export const Navbar: React.FC = () => {
                     </div>
 
                     <div className="flex flex-col gap-1 text-xs">
-                      {currentUser.role === 'ADMIN' ? (
-                        <button
-                          onClick={() => {
-                            setIsAdminMode(true);
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 font-bold flex items-center gap-2 cursor-pointer"
-                        >
-                          <ShieldCheck className="w-4 h-4" />
-                          <span>Open Owner Admin Suite</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            handleNav('appointments');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer"
-                        >
-                          <Calendar className="w-4 h-4 text-amber-500" />
-                          <span>My Bookings &amp; Passes</span>
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          handleNav('appointments');
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-zinc-900 dark:text-zinc-100 hover:bg-purple-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer font-bold"
+                      >
+                        <Crown className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <span>My Profile &amp; Loyalty Rewards</span>
+                      </button>
 
                       <button
                         onClick={() => {
                           logout();
                           setUserDropdownOpen(false);
                         }}
-                        className="w-full text-left px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 cursor-pointer"
+                        className="w-full text-left px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 cursor-pointer font-semibold"
                       >
                         <LogOut className="w-4 h-4" />
                         <span>Sign Out</span>
@@ -482,30 +475,13 @@ export const Navbar: React.FC = () => {
               </button>
             )}
 
-            {/* Admin Portal Toggle */}
-            <button
-              id="navbar-admin-toggle-btn"
-              onClick={() => {
-                if (currentUser?.role === 'ADMIN') {
-                  setIsAdminMode(true);
-                } else {
-                  openAuthModal('admin', 'login');
-                }
-              }}
-              className="px-3 py-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-1.5 cursor-pointer"
-              title="Staff / Admin Authentication"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-              <span>Admin</span>
-            </button>
-
-            {/* Golden Book Appointment Button */}
+            {/* Book Appointment Button */}
             <button
               id="navbar-book-appointment-btn"
               onClick={() => openBookingModal()}
-              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-xs flex items-center gap-2 shadow-md shadow-amber-500/20 active:scale-95 transition cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white font-extrabold text-xs flex items-center gap-2 shadow-md shadow-purple-600/25 active:scale-95 transition cursor-pointer"
             >
-              <Calendar className="w-4 h-4 text-zinc-950" />
+              <Calendar className="w-4 h-4 text-white" />
               <span>Book Appointment</span>
             </button>
           </div>
@@ -691,24 +667,10 @@ export const Navbar: React.FC = () => {
                 setMobileMenuOpen(false);
                 openBookingModal();
               }}
-              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20"
+              className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md shadow-purple-600/20 cursor-pointer"
             >
-              <Calendar className="w-4 h-4 text-zinc-950" />
+              <Calendar className="w-4 h-4 text-white" />
               <span>Book Appointment (10% Advance)</span>
-            </button>
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                if (currentUser?.role === 'ADMIN') {
-                  setIsAdminMode(true);
-                } else {
-                  openAuthModal('admin', 'login');
-                }
-              }}
-              className="w-full py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <ShieldCheck className="w-4 h-4 text-amber-500" />
-              <span>Owner Admin Suite</span>
             </button>
           </div>
         </div>

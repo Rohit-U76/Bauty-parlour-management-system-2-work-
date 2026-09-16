@@ -19,7 +19,8 @@ import {
   Info,
   Flame,
   Zap,
-  AlertCircle
+  AlertCircle,
+  MessageSquare
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { RazorpayModal } from './RazorpayModal';
@@ -736,6 +737,49 @@ export const BookingModal: React.FC = () => {
                 <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                   <span>Modern Unisex Salon, B.N. Gund Complex, Near ICICI Bank, Mohol</span>
+                </div>
+              </div>
+
+              {/* WhatsApp Automated Notification Status Card */}
+              <div className="p-4 rounded-3xl bg-emerald-950/40 border border-emerald-500/40 text-left space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-xs font-bold text-emerald-400">
+                      Automated WhatsApp Notification Enabled
+                    </span>
+                  </div>
+                  <span className="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    DISPATCHED
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  Booking verification pass and appointment details have been automatically queued to the salon owner WhatsApp (<strong className="text-emerald-400 font-mono">+91 81040 26257</strong>). You can also click below to chat directly or save your digital pass.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <a
+                    href={confirmedBooking.ownerWhatsappUrl || `https://api.whatsapp.com/send?phone=918104026257&text=${encodeURIComponent(`✨ Modern Unisex Salon Booking ✨\nRef: ${confirmedBooking.bookingRef}\nClient: ${confirmedBooking.clientName} (${confirmedBooking.clientPhone})\nService: ${confirmedBooking.serviceName}\nDate: ${confirmedBooking.date} at ${confirmedBooking.timeSlot}\nAdvance Paid: ₹${confirmedBooking.advancePaid}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Open Salon WhatsApp (+91 81040 26257)</span>
+                  </a>
+                  {confirmedBooking.whatsappUrl && (
+                    <a
+                      href={confirmedBooking.whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2 px-3 rounded-xl bg-[#18181f] hover:bg-zinc-800 text-zinc-200 border border-zinc-700 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                    >
+                      <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Save / Share on WhatsApp</span>
+                    </a>
+                  )}
                 </div>
               </div>
 

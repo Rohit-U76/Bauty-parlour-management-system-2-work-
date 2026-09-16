@@ -167,13 +167,6 @@ export const CustomerReviewsPage: React.FC = () => {
               <PlusCircle className="w-4 h-4" />
               <span>Write a Review</span>
             </button>
-            <button
-              onClick={() => openBookingModal()}
-              className="px-5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Book Appointment</span>
-            </button>
           </div>
         </div>
       </div>

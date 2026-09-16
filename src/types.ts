@@ -63,6 +63,8 @@ export interface Appointment {
   createdAt: string;
   notes?: string;
   isNew?: boolean;
+  whatsappUrl?: string;
+  ownerWhatsappUrl?: string;
 }
 
 export type InquiryStatus = 'NEW' | 'IN PROGRESS' | 'RESOLVED';
