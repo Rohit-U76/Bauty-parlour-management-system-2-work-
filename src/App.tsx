@@ -18,6 +18,7 @@ import { BookingModal } from './components/BookingModal';
 import { SmartRecommendationQuiz } from './components/SmartRecommendationQuiz';
 import { AiAssistantWidget } from './components/AiAssistantWidget';
 import { AppointmentReminderToast } from './components/AppointmentReminderToast';
+import { ClientProfileModal } from './components/ClientProfileModal';
 import { CustomerTerms } from './views/CustomerTerms';
 import { MobileBottomNav } from './components/MobileBottomNav';
 
@@ -58,7 +59,7 @@ function SalonAppContent() {
     <div className="min-h-screen bg-stone-50 dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors duration-200 selection:bg-amber-500 selection:text-black">
       <Navbar />
 
-      <main className="flex-1">
+      <main className="flex-1 pb-20 lg:pb-0">
         {activeNavTab === 'home' && <CustomerHome />}
         {activeNavTab === 'services' && <CustomerServices />}
         {activeNavTab === 'gallery' && <CustomerGallery />}
@@ -75,6 +76,7 @@ function SalonAppContent() {
       {/* Global Interactive Modals, AI Widgets, Auth & 24h Reminder Toast */}
       <AuthModal />
       <BookingModal />
+      <ClientProfileModal />
       <SmartRecommendationQuiz />
       <AiAssistantWidget />
       <AppointmentReminderToast />

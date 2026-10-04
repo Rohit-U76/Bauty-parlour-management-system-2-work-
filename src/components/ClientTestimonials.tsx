@@ -37,7 +37,7 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
   limit,
   className = ''
 }) => {
-  const { reviews, addReview, services, openBookingModal } = useSalon();
+  const { reviews, addReview, updateReview, services, openBookingModal, settings } = useSalon();
 
   // State
   const [selectedCategory, setSelectedCategory] = useState<string>(initialFilter);
@@ -47,8 +47,14 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
   const [carouselIndex, setCarouselIndex] = useState<number>(0);
   const [isWriteModalOpen, setIsWriteModalOpen] = useState<boolean>(false);
   const [zoomedPhoto, setZoomedPhoto] = useState<{ url: string; name: string; service: string } | null>(null);
-  const [helpfulLikes, setHelpfulLikes] = useState<Record<string, number>>({});
-  const [userLikedReviews, setUserLikedReviews] = useState<Record<string, boolean>>({});
+  const [userLikedReviews, setUserLikedReviews] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('modern_salon_user_liked_reviews');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Form State for Write Review
@@ -102,7 +108,7 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
     return () => { isMounted = false; };
   }, []);
 
-  const allReviews = apiFetchedReviews || reviews;
+  const allReviews = reviews;
 
   // Filter and Sort Reviews
   const filteredReviews = useMemo(() => {
@@ -122,6 +128,9 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
       if (minRating > 0 && rev.rating < minRating) return false;
       return true;
     }).sort((a, b) => {
+      // Pinned / featured reviews always appear at the top
+      if (a.featured && !b.featured) return -1;
+      if (!a.featured && b.featured) return 1;
       if (sortBy === 'rating') return b.rating - a.rating;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
@@ -151,15 +160,27 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
   }, [allReviews]);
 
   const handleHelpfulToggle = (reviewId: string) => {
-    setUserLikedReviews(prev => {
-      const isCurrentlyLiked = !!prev[reviewId];
-      const nextState = !isCurrentlyLiked;
-      setHelpfulLikes(likes => ({
-        ...likes,
-        [reviewId]: (likes[reviewId] || 0) + (nextState ? 1 : -1)
-      }));
-      return { ...prev, [reviewId]: nextState };
-    });
+    const rev = reviews.find(r => r.id === reviewId);
+    if (!rev) return;
+
+    const isCurrentlyLiked = !!userLikedReviews[reviewId];
+    const currentCount = typeof rev.helpfulCount === 'number' ? rev.helpfulCount : 0;
+    const newCount = isCurrentlyLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
+
+    const nextLiked = { ...userLikedReviews, [reviewId]: !isCurrentlyLiked };
+    setUserLikedReviews(nextLiked);
+    try {
+      localStorage.setItem('modern_salon_user_liked_reviews', JSON.stringify(nextLiked));
+    } catch {}
+
+    updateReview(reviewId, { helpfulCount: newCount });
+
+    if (!isCurrentlyLiked) {
+      setToastMessage('Marked review as helpful (+1)');
+    } else {
+      setToastMessage('Removed helpful mark');
+    }
+    setTimeout(() => setToastMessage(null), 2000);
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -215,16 +236,16 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
       )}
 
       {/* SECTION HEADER & SOCIAL PROOF TRUST METRICS */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2 border-b border-zinc-800/80">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2 border-b border-zinc-200 dark:border-zinc-800/80">
         <div className="space-y-2 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-[11px] font-bold tracking-wider uppercase">
-            <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 dark:bg-yellow-500/10 border border-purple-200 dark:border-yellow-500/30 text-purple-800 dark:text-yellow-400 text-[11px] font-bold tracking-wider uppercase">
+            <Sparkles className="w-3.5 h-3.5 text-purple-700 dark:text-yellow-400" />
             <span>REAL CLIENT TESTIMONIALS &amp; PROOF</span>
           </div>
-          <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-zinc-100 tracking-tight">
+          <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
             Client Experiences, Verified Ratings &amp; Trust
           </h2>
-          <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
             Every review is from a verified salon guest with an authentic appointment booking. Discover why 98% of our clients re-book their styling and skincare with us.
           </p>
         </div>
@@ -248,88 +269,88 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
             className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-purple-600/20 transition-all cursor-pointer active:scale-95"
           >
             <Calendar className="w-4 h-4 text-white" />
-            <span>Book Appointment (10% Adv)</span>
+            <span>Book Appointment ({settings.advancePercentage || 10}% Adv)</span>
           </button>
         </div>
       </div>
 
       {/* OVERALL RATING & TRUST SCORECARD BANNER */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 bg-[#131317] border border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-xl">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 bg-white dark:bg-[#131317] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-xl">
         {/* Left: Overall Big Score */}
-        <div className="md:col-span-4 flex flex-col justify-center items-center md:items-start text-center md:text-left border-b md:border-b-0 md:border-r border-zinc-800/80 pb-5 md:pb-0 md:pr-6 space-y-2">
+        <div className="md:col-span-4 flex flex-col justify-center items-center md:items-start text-center md:text-left border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800/80 pb-5 md:pb-0 md:pr-6 space-y-2">
           <div className="flex items-baseline gap-2">
-            <span className="font-serif text-4xl sm:text-5xl font-bold text-yellow-400 font-mono">
+            <span className="font-serif text-4xl sm:text-5xl font-bold text-yellow-500 dark:text-yellow-400 font-mono">
               {ratingStats.avg}
             </span>
             <span className="text-zinc-500 text-sm font-semibold">/ 5.0</span>
           </div>
-          <div className="flex items-center gap-1 text-yellow-400">
+          <div className="flex items-center gap-1 text-yellow-500 dark:text-yellow-400">
             {[...Array(5)].map((_, i) => (
               <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
             ))}
           </div>
-          <div className="text-xs text-zinc-300 font-medium">
-            Based on <span className="text-yellow-400 font-bold font-mono">{ratingStats.total}</span> verified salon appointments
+          <div className="text-xs text-zinc-600 dark:text-zinc-300 font-medium">
+            Based on <span className="text-yellow-600 dark:text-yellow-400 font-bold font-mono">{ratingStats.total}</span> verified salon appointments
           </div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-bold">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>100% Verified Customer Feedback</span>
           </div>
         </div>
 
         {/* Middle: Rating Breakdown Bars */}
-        <div className="md:col-span-5 flex flex-col justify-center space-y-2 sm:space-y-2.5 py-2 md:py-0 border-b md:border-b-0 md:border-r border-zinc-800/80 pb-5 md:pb-0 md:pr-6">
-          <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+        <div className="md:col-span-5 flex flex-col justify-center space-y-2 sm:space-y-2.5 py-2 md:py-0 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800/80 pb-5 md:pb-0 md:pr-6">
+          <div className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
             Rating Breakdown
           </div>
           {/* 5 Stars */}
           <div className="flex items-center gap-3 text-xs">
-            <span className="w-12 text-zinc-400 font-medium flex items-center gap-1">
+            <span className="w-12 text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
               5 <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 inline" />
             </span>
-            <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
+            <div className="flex-1 h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
               <div
                 className="h-full bg-yellow-400 rounded-full transition-all duration-500"
                 style={{ width: `${ratingStats.pct5}%` }}
               />
             </div>
-            <span className="w-10 text-right text-zinc-300 font-mono text-[11px]">{ratingStats.pct5}%</span>
+            <span className="w-10 text-right text-zinc-700 dark:text-zinc-300 font-mono text-[11px]">{ratingStats.pct5}%</span>
           </div>
           {/* 4 Stars */}
           <div className="flex items-center gap-3 text-xs">
-            <span className="w-12 text-zinc-400 font-medium flex items-center gap-1">
+            <span className="w-12 text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
               4 <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 inline" />
             </span>
-            <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
+            <div className="flex-1 h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
               <div
                 className="h-full bg-yellow-500/70 rounded-full transition-all duration-500"
                 style={{ width: `${ratingStats.pct4}%` }}
               />
             </div>
-            <span className="w-10 text-right text-zinc-300 font-mono text-[11px]">{ratingStats.pct4}%</span>
+            <span className="w-10 text-right text-zinc-700 dark:text-zinc-300 font-mono text-[11px]">{ratingStats.pct4}%</span>
           </div>
           {/* 3 Stars & Under */}
           <div className="flex items-center gap-3 text-xs">
-            <span className="w-12 text-zinc-400 font-medium flex items-center gap-1">
+            <span className="w-12 text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
               3 <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 inline" />
             </span>
-            <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
+            <div className="flex-1 h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
               <div
-                className="h-full bg-zinc-600 rounded-full transition-all duration-500"
+                className="h-full bg-zinc-400 dark:bg-zinc-600 rounded-full transition-all duration-500"
                 style={{ width: `${ratingStats.pct3}%` }}
               />
             </div>
-            <span className="w-10 text-right text-zinc-300 font-mono text-[11px]">{ratingStats.pct3}%</span>
+            <span className="w-10 text-right text-zinc-700 dark:text-zinc-300 font-mono text-[11px]">{ratingStats.pct3}%</span>
           </div>
         </div>
 
         {/* Right: Trust Badges */}
         <div className="md:col-span-3 flex flex-col justify-center space-y-3">
           <div className="flex items-start gap-2.5">
-            <CheckCircle2 className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-4 h-4 text-yellow-500 dark:text-yellow-400 shrink-0 mt-0.5" />
             <div>
-              <div className="text-xs font-bold text-zinc-200">10% Advance Guarantee</div>
-              <div className="text-[11px] text-zinc-400">Guaranteed slot, zero waiting line</div>
+              <div className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{settings.advancePercentage || 10}% Advance Guarantee</div>
+              <div className="text-[11px] text-zinc-500 dark:text-zinc-400">Guaranteed slot, zero waiting line</div>
             </div>
           </div>
           <div className="flex items-start gap-2.5">
@@ -440,15 +461,25 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {displayReviews.map(rev => {
             const isLiked = !!userLikedReviews[rev.id];
-            const likesCount = (helpfulLikes[rev.id] || 0) + 12; // Base authentic count
+            const likesCount = typeof rev.helpfulCount === 'number' ? rev.helpfulCount : 0;
 
             return (
               <div
                 key={rev.id}
-                className="rounded-2xl bg-[#131317] border border-zinc-800/90 hover:border-yellow-500/40 p-6 flex flex-col justify-between space-y-4 shadow-lg hover:shadow-yellow-500/5 transition-all group"
+                className={`rounded-2xl bg-white dark:bg-[#131317] border p-6 flex flex-col justify-between space-y-4 shadow-sm dark:shadow-lg transition-all group ${
+                  rev.featured
+                    ? 'border-amber-400 dark:border-yellow-500/70 ring-1 ring-amber-400/30'
+                    : 'border-purple-200/80 dark:border-zinc-800/90 hover:border-purple-300 dark:hover:border-yellow-500/40'
+                }`}
               >
                 {/* Card Top: Client Photo, Name, Verified Badge & Stars */}
                 <div className="space-y-3">
+                  {rev.featured && (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-yellow-500/20 text-amber-800 dark:text-yellow-400 border border-amber-300 dark:border-yellow-500/40 text-[10px] font-bold">
+                      <Sparkles className="w-3 h-3 text-amber-500 fill-amber-400" />
+                      <span>Pinned to Featured</span>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
                       {/* Avatar Image with Click to Zoom */}
@@ -462,8 +493,8 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
                             });
                           }
                         }}
-                        className={`relative w-12 h-12 rounded-full overflow-hidden border-2 border-yellow-500/40 bg-zinc-800 shrink-0 ${
-                          rev.avatarUrl ? 'cursor-pointer hover:border-yellow-400 group-hover:scale-105 transition-transform' : ''
+                        className={`relative w-12 h-12 rounded-full overflow-hidden border-2 border-purple-300 dark:border-yellow-500/40 bg-zinc-100 dark:bg-zinc-800 shrink-0 ${
+                          rev.avatarUrl ? 'cursor-pointer hover:border-purple-500 dark:hover:border-yellow-400 group-hover:scale-105 transition-transform' : ''
                         }`}
                         title="Click to view photo"
                       >
@@ -475,7 +506,7 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
                             referrerPolicy="no-referrer"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-yellow-500/10 text-yellow-400 font-bold text-sm">
+                          <div className="w-full h-full flex items-center justify-center bg-purple-100 dark:bg-yellow-500/10 text-purple-700 dark:text-yellow-400 font-bold text-sm">
                             {rev.clientName.charAt(0)}
                           </div>
                         )}
@@ -488,10 +519,10 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
 
                       {/* Name & Date */}
                       <div>
-                        <h4 className="font-serif text-sm font-bold text-zinc-100 group-hover:text-yellow-400 transition-colors">
+                        <h4 className="font-serif text-sm font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-purple-700 dark:group-hover:text-yellow-400 transition-colors">
                           {rev.clientName}
                         </h4>
-                        <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                        <div className="flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
                           <span>{rev.date}</span>
                         </div>
                       </div>
@@ -499,45 +530,45 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
 
                     {/* Verified Badge */}
                     {rev.verifiedBooking && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 shrink-0">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 shrink-0">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
                         <span>Verified</span>
                       </span>
                     )}
                   </div>
 
                   {/* Rating Stars & Service Tag */}
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-800/60">
-                    <div className="flex items-center gap-1 text-yellow-400">
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-purple-100 dark:border-zinc-800/60">
+                    <div className="flex items-center gap-1 text-amber-500 dark:text-yellow-400">
                       {[...Array(rev.rating)].map((_, i) => (
-                        <Star key={i} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                        <Star key={i} className="w-3.5 h-3.5 fill-amber-400 dark:fill-yellow-400 text-amber-400 dark:text-yellow-400" />
                       ))}
                     </div>
-                    <span className="text-[11px] font-semibold text-yellow-400/90 bg-yellow-500/10 px-2 py-0.5 rounded-md border border-yellow-500/20 truncate max-w-[170px]">
+                    <span className="text-[11px] font-semibold text-purple-700 dark:text-yellow-400/90 bg-purple-50 dark:bg-yellow-500/10 px-2 py-0.5 rounded-md border border-purple-200 dark:border-yellow-500/20 truncate max-w-[170px]">
                       {rev.serviceName}
                     </span>
                   </div>
 
                   {/* Comment Text with Quote Icon */}
                   <div className="relative pt-1">
-                    <Quote className="w-5 h-5 text-yellow-500/20 absolute -top-1 -left-1 transform -rotate-12 pointer-events-none" />
-                    <p className="text-xs text-zinc-300 italic leading-relaxed pl-2">
+                    <Quote className="w-5 h-5 text-purple-200 dark:text-yellow-500/20 absolute -top-1 -left-1 transform -rotate-12 pointer-events-none" />
+                    <p className="text-xs text-zinc-700 dark:text-zinc-300 italic leading-relaxed pl-2">
                       "{rev.comment}"
                     </p>
                   </div>
                 </div>
 
                 {/* Card Bottom: Helpful Button & Quick Book Link */}
-                <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+                <div className="pt-3 border-t border-purple-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
                   <button
                     onClick={() => handleHelpfulToggle(rev.id)}
                     className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
                       isLiked
-                        ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400 font-bold'
-                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                        ? 'bg-purple-100 dark:bg-yellow-500/20 border-purple-300 dark:border-yellow-500/50 text-purple-700 dark:text-yellow-400 font-bold'
+                        : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-700'
                     }`}
                   >
-                    <ThumbsUp className={`w-3 h-3 ${isLiked ? 'text-yellow-400 fill-yellow-400' : ''}`} />
+                    <ThumbsUp className={`w-3 h-3 ${isLiked ? 'text-purple-600 dark:text-yellow-400 fill-purple-600 dark:fill-yellow-400' : ''}`} />
                     <span>Helpful ({likesCount})</span>
                   </button>
 
@@ -546,7 +577,7 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
                       const matchedService = services.find(s => s.name === rev.serviceName);
                       openBookingModal(matchedService || undefined);
                     }}
-                    className="text-[11px] font-bold text-yellow-400 hover:text-yellow-300 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    className="text-[11px] font-bold text-purple-700 dark:text-yellow-400 hover:text-purple-800 dark:hover:text-yellow-300 inline-flex items-center gap-1 transition-colors cursor-pointer"
                   >
                     <span>Book this service</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -831,7 +862,7 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
                 <textarea
                   required
                   rows={4}
-                  placeholder="Share details about the stylist, ambience, results, and 10% advance booking ease..."
+                  placeholder={`Share details about the stylist, ambience, results, and ${settings.advancePercentage || 10}% advance booking ease...`}
                   value={formData.comment}
                   onChange={e => setFormData({ ...formData, comment: e.target.value })}
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs sm:text-sm text-zinc-200 placeholder-zinc-500 focus:border-yellow-500 focus:outline-none"

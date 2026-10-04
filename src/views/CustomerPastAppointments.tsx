@@ -20,17 +20,21 @@ import {
   Check,
   Star,
   MessageSquare,
-  Send,
-  Plus,
   Crown,
   Gift,
-  LogIn
+  LogIn,
+  MapPin,
+  ExternalLink,
+  Edit3,
+  CalendarCheck,
+  Printer
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { Appointment } from '../types';
 import { AppointmentPassModal } from '../components/AppointmentPassModal';
 import { CustomerFeedbackForm } from '../components/CustomerFeedbackForm';
 import { CustomerProfileView } from '../components/CustomerProfileView';
+import { printSalonReceipt, downloadReceiptFile } from '../utils/receiptPrinter';
 
 export const CustomerPastAppointments: React.FC = () => {
   const {
@@ -40,25 +44,68 @@ export const CustomerPastAppointments: React.FC = () => {
     openBookingModal,
     setActiveNavTab,
     currentUser,
-    openAuthModal
+    openAuthModal,
+    openProfileModal,
+    cancelAppointment,
+    settings
   } = useSalon();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'UPCOMING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'>('UPCOMING');
   const [selectedPassAppointment, setSelectedPassAppointment] = useState<Appointment | null>(null);
   const [selectedFeedbackAppointment, setSelectedFeedbackAppointment] = useState<Appointment | null>(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'appointments' | 'profile' | 'feedback'>('appointments');
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
-  // Filter appointments
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // User-scoped appointments: For client accounts, strictly show bookings belonging to the active user!
+  // If a new user creates an account, userAppointments is strictly empty [] to prevent any data leakage.
+  const userAppointments = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'ADMIN') return appointments;
+
+    const userPhoneClean = (currentUser.phone || '').replace(/\D/g, '').slice(-10);
+    const userId = currentUser.id;
+
+    return appointments.filter(apt => {
+      // 1. Strict match by persistent userId
+      if (apt.userId && apt.userId === userId) return true;
+      // 2. Strict phone match only if appointment has no assigned userId and phone is 10 digits
+      if (!apt.userId && userPhoneClean && userPhoneClean.length === 10) {
+        const aptPhoneClean = (apt.clientPhone || '').replace(/\D/g, '').slice(-10);
+        if (aptPhoneClean === userPhoneClean) return true;
+      }
+      return false;
+    });
+  }, [appointments, currentUser]);
+
+  // Separate upcoming appointments from completed/cancelled for this user
+  const upcomingAppointments = useMemo(() => {
+    return userAppointments.filter(apt => {
+      const status = apt.bookingStatus || apt.status;
+      return (status === 'CONFIRMED' || status === 'PENDING') && apt.date >= todayStr;
+    }).sort((a, b) => new Date(`${a.date} ${a.timeSlot}`).getTime() - new Date(`${b.date} ${b.timeSlot}`).getTime());
+  }, [userAppointments, todayStr]);
+
+  // Filtered appointments list for this user
   const filteredAppointments = useMemo(() => {
-    return appointments
+    return userAppointments
       .filter(apt => {
-        const matchesStatus = 
-          statusFilter === 'ALL' || 
-          apt.bookingStatus === statusFilter || 
-          apt.status === statusFilter;
+        const status = apt.bookingStatus || apt.status;
+        
+        let matchesStatus = true;
+        if (statusFilter === 'UPCOMING') {
+          matchesStatus = (status === 'CONFIRMED' || status === 'PENDING') && apt.date >= todayStr;
+        } else if (statusFilter === 'CONFIRMED') {
+          matchesStatus = status === 'CONFIRMED';
+        } else if (statusFilter === 'COMPLETED') {
+          matchesStatus = status === 'COMPLETED';
+        } else if (statusFilter === 'CANCELLED') {
+          matchesStatus = status === 'CANCELLED';
+        }
         
         const q = searchQuery.toLowerCase().trim();
         const matchesSearch = 
@@ -72,7 +119,7 @@ export const CustomerPastAppointments: React.FC = () => {
         return matchesStatus && matchesSearch;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [appointments, statusFilter, searchQuery]);
+  }, [userAppointments, statusFilter, searchQuery, todayStr]);
 
   const handleCopy = (ref: string) => {
     navigator.clipboard?.writeText(ref);
@@ -94,32 +141,62 @@ export const CustomerPastAppointments: React.FC = () => {
     setShowFeedbackModal(true);
   };
 
-  const getStatusBadge = (status?: string) => {
+  const handlePrintReceipt = (apt: Appointment) => {
+    printSalonReceipt(apt);
+  };
+
+  const handleDownloadPdf = (apt: Appointment) => {
+    downloadReceiptFile(apt);
+  };
+
+  const handleWhatsAppHelp = (apt: Appointment) => {
+    const text = encodeURIComponent(
+      `Hello Rohit, I have an upcoming booking at Modern Unisex Salon Mohol.\n` +
+      `*Booking Ref:* ${apt.bookingRef}\n` +
+      `*Service:* ${apt.serviceName}\n` +
+      `*Date & Time:* ${apt.date} at ${apt.timeSlot}\n` +
+      `*Client:* ${apt.clientName}`
+    );
+    window.open(`https://wa.me/918104026257?text=${text}`, '_blank');
+  };
+
+  const getStatusBadge = (status?: string, aptDate?: string) => {
+    const isUpcoming = aptDate && aptDate >= todayStr && status === 'CONFIRMED';
+    
+    if (isUpcoming) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-600 dark:text-purple-400 text-xs font-bold animate-pulse">
+          <CalendarCheck className="w-3.5 h-3.5" />
+          <span>Upcoming Slot</span>
+        </span>
+      );
+    }
+
     switch (status) {
       case 'CONFIRMED':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Confirmed Slot</span>
           </span>
         );
       case 'COMPLETED':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-bold">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs font-bold">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Completed</span>
           </span>
         );
       case 'CANCELLED':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-bold">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold">
             <XCircle className="w-3.5 h-3.5" />
             <span>Cancelled</span>
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-bold">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold">
             <Clock className="w-3.5 h-3.5" />
             <span>Pending</span>
           </span>
@@ -133,32 +210,32 @@ export const CustomerPastAppointments: React.FC = () => {
       {/* Header Banner */}
       <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6">
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-semibold">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-semibold">
             <Calendar className="w-3.5 h-3.5" />
-            <span>Client Appointment &amp; Satisfaction Portal</span>
+            <span>Modern Unisex Salon • Mohol</span>
           </div>
           <h1 className="font-serif text-2xl sm:text-4xl font-bold text-zinc-900 dark:text-zinc-100">
-            Customer Dashboard &amp; Visits
+            Client Appointments &amp; Profile Portal
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
-            Manage your past and upcoming salon bookings, verify 10% advance deposits, access digital check-in passes, or submit real-time feedback directly to the salon owner.
+            Manage your upcoming and past bookings, easily reschedule slots with preserved 10% advance deposit, access digital check-in passes, and keep your client styling profile updated.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto shrink-0">
           <button
-            onClick={() => handleOpenFeedback()}
-            className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs sm:text-sm inline-flex items-center gap-2 shadow-sm transition cursor-pointer"
+            onClick={openProfileModal}
+            className="px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-purple-300 dark:border-purple-600/40 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 font-bold text-xs sm:text-sm inline-flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
           >
-            <Star className="w-4 h-4 fill-amber-300 text-amber-300" />
-            <span>Submit Live Feedback</span>
+            <Edit3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <span>Edit Profile &amp; Save</span>
           </button>
 
           <button
             onClick={() => openBookingModal()}
-            className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs sm:text-sm inline-flex items-center gap-2 shadow-sm transition cursor-pointer shrink-0"
+            className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs sm:text-sm inline-flex items-center justify-center gap-2 shadow-sm shadow-purple-600/25 transition cursor-pointer shrink-0"
           >
-            <Calendar className="w-4 h-4 text-zinc-950" />
+            <Calendar className="w-4 h-4 text-white" />
             <span>Book New Appointment</span>
           </button>
         </div>
@@ -166,39 +243,41 @@ export const CustomerPastAppointments: React.FC = () => {
 
       {/* Logged in User Status Banner or Login Prompt */}
       {currentUser ? (
-        <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-amber-500/10 to-transparent border border-purple-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-zinc-950 font-bold flex items-center justify-center text-base shadow-sm shrink-0">
-              {currentUser.name.charAt(0)}
+            <div className="w-11 h-11 rounded-2xl bg-purple-600 text-white font-bold flex items-center justify-center text-base shadow-sm shrink-0">
+              {currentUser.name.charAt(0).toUpperCase()}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-sm text-zinc-900 dark:text-white">
                   {currentUser.name}
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-extrabold text-[10px] uppercase tracking-wider">
-                  {currentUser.memberTier || 'Verified Client'}
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-extrabold text-[10px] uppercase tracking-wider flex items-center gap-1">
+                  <Crown className="w-3 h-3" />
+                  <span>{currentUser.memberTier || 'VIP Member'}</span>
                 </span>
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                {currentUser.email} • {currentUser.phone}
+                {currentUser.phone} • Preferred: {currentUser.preferredStylist || 'Master Stylist (Rohit Umdale)'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs flex-wrap">
+          <div className="flex items-center gap-2 text-xs flex-wrap">
             {currentUser.loyaltyPoints !== undefined && (
-              <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-500/30 text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+              <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-purple-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 flex items-center gap-2 font-mono">
                 <Gift className="w-4 h-4 text-amber-500" />
-                <span>Rewards: <strong className="text-amber-600 dark:text-amber-400 font-mono">{currentUser.loyaltyPoints} pts</strong></span>
+                <span>Rewards: <strong className="text-purple-600 dark:text-purple-400 font-bold">{currentUser.loyaltyPoints} pts</strong></span>
               </div>
             )}
+
             <button
-              onClick={() => setViewMode('profile')}
-              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1 transition cursor-pointer shadow-sm"
+              onClick={openProfileModal}
+              className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
             >
-              <span>View Full Profile</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Edit Profile &amp; Save</span>
             </button>
           </div>
         </div>
@@ -206,22 +285,154 @@ export const CustomerPastAppointments: React.FC = () => {
         <div className="p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 text-xs text-zinc-700 dark:text-zinc-300">
             <Crown className="w-4 h-4 text-amber-500 shrink-0" />
-            <span>Have a registered salon profile? Sign in to unlock loyalty reward points, digital passes, and instant auto-fill!</span>
+            <span>Personalize your bookings, unlock styling profile auto-fill, and manage upcoming visits seamlessly!</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => openAuthModal('customer', 'login')}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              onClick={openProfileModal}
+              className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
             >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Client Sign In</span>
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Setup Client Profile</span>
             </button>
             <button
-              onClick={() => openAuthModal('customer', 'register')}
+              onClick={() => openAuthModal('customer', 'login')}
               className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs transition cursor-pointer"
             >
-              Register (+100 pts)
+              Sign In
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* UPCOMING APPOINTMENTS SPOTLIGHT (Works in a modern, intuitive way) */}
+      {upcomingAppointments.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+              <h2 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <span>⭐ Upcoming Salon Appointments</span>
+                <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400 text-xs font-mono font-extrabold">
+                  {upcomingAppointments.length} Confirmed
+                </span>
+              </h2>
+            </div>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 hidden sm:inline">
+              10% advance deposit confirmed • Zero reschedule fee
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {upcomingAppointments.map((apt) => (
+              <div
+                key={`upcoming-${apt.id}`}
+                className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md space-y-4 text-left transition-shadow"
+              >
+                {/* Top Details */}
+                <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-purple-700 dark:text-purple-400">
+                        #{apt.bookingRef}
+                      </span>
+                      <button
+                        onClick={() => handleCopy(apt.bookingRef)}
+                        className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition"
+                        title="Copy reference"
+                      >
+                        {copiedRef === apt.bookingRef ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-0.5">
+                      {apt.serviceName}
+                    </h3>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                      Stylist: <strong className="text-zinc-900 dark:text-zinc-200">{apt.stylistName || 'Master Stylist (Rohit Umdale)'}</strong>
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Slot Reserved</span>
+                    </span>
+                    <div className="text-[11px] font-mono font-semibold text-emerald-700 dark:text-emerald-400 mt-1">
+                      ₹{apt.advancePaid} advance paid
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timing & Date Callout */}
+                <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700/80 text-xs">
+                  <div className="space-y-1">
+                    <span className="text-zinc-600 dark:text-zinc-400 block text-[11px] font-medium">Appointment Date:</span>
+                    <span className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 font-mono text-sm">
+                      <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>{apt.date}</span>
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-zinc-600 dark:text-zinc-400 block text-[11px] font-medium">Reserved Time Slot:</span>
+                    <span className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 font-mono text-sm">
+                      <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      <span>{apt.timeSlot}</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Balance Due Notice */}
+                <div className="flex items-center justify-between text-xs px-1">
+                  <span className="text-zinc-600 dark:text-zinc-400 font-medium">Remaining balance at salon counter:</span>
+                  <span className="font-bold font-mono text-amber-700 dark:text-amber-400 text-sm">
+                    ₹{apt.balanceDue}
+                  </span>
+                </div>
+
+                {/* Action Buttons: Pass & QR, Print Receipt, PDF Receipt, WhatsApp */}
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    onClick={() => setSelectedPassAppointment(apt)}
+                    className="py-2 px-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                    title="View Digital Pass and QR"
+                  >
+                    <Receipt className="w-3.5 h-3.5" />
+                    <span>View Pass</span>
+                  </button>
+
+                  <button
+                    onClick={() => handlePrintReceipt(apt)}
+                    className="py-2 px-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                    title="Print Appointment Receipt"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-zinc-200" />
+                    <span>Print Receipt</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleDownloadPdf(apt)}
+                    className="py-2 px-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                    title="Download PDF Pass"
+                  >
+                    <Receipt className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                    <span>PDF Pass</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleWhatsAppHelp(apt)}
+                    className="py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    title="Contact salon desk on WhatsApp"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>WhatsApp</span>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -232,24 +443,24 @@ export const CustomerPastAppointments: React.FC = () => {
           onClick={() => setViewMode('appointments')}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
             viewMode === 'appointments'
-              ? 'bg-amber-500 text-zinc-950 shadow-sm font-extrabold'
+              ? 'bg-purple-600 text-white shadow-sm font-extrabold'
               : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700'
           }`}
         >
           <Calendar className="w-4 h-4" />
-          <span>My Salon Bookings ({appointments.length})</span>
+          <span>All Bookings &amp; History ({userAppointments.length})</span>
         </button>
 
         <button
           onClick={() => setViewMode('profile')}
           className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
             viewMode === 'profile'
-              ? 'bg-amber-500 text-zinc-950 shadow-sm font-extrabold'
+              ? 'bg-purple-600 text-white shadow-sm font-extrabold'
               : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700'
           }`}
         >
           <Crown className="w-4 h-4 text-amber-500" />
-          <span>My Profile &amp; Rewards</span>
+          <span>Client Profile &amp; Preferences</span>
           {currentUser?.loyaltyPoints !== undefined && (
             <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-mono font-bold">
               {currentUser.loyaltyPoints} pts
@@ -273,7 +484,7 @@ export const CustomerPastAppointments: React.FC = () => {
       {viewMode === 'profile' ? (
         <div className="animate-in fade-in duration-200">
           <CustomerProfileView
-            appointments={appointments}
+            appointments={userAppointments}
             onBookAppointment={() => openBookingModal()}
           />
         </div>
@@ -291,18 +502,18 @@ export const CustomerPastAppointments: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
               <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">Total Bookings</span>
-              <div className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-serif">{appointments.length}</div>
+              <div className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-serif">{userAppointments.length}</div>
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
-              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Confirmed / Active</span>
-              <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-serif">
-                {appointments.filter(a => a.bookingStatus === 'CONFIRMED' || a.status === 'CONFIRMED').length}
+              <span className="text-[11px] text-purple-600 dark:text-purple-400 font-medium">Upcoming / Active</span>
+              <div className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400 font-serif">
+                {upcomingAppointments.length}
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
               <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">Completed Visits</span>
               <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 font-serif">
-                {appointments.filter(a => a.bookingStatus === 'COMPLETED' || a.status === 'COMPLETED').length}
+                {userAppointments.filter(a => a.bookingStatus === 'COMPLETED' || a.status === 'COMPLETED').length}
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
@@ -322,7 +533,7 @@ export const CustomerPastAppointments: React.FC = () => {
                   placeholder="Search by Booking Ref, Client Name, Phone or Service..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-amber-500"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-purple-500"
                 />
                 {searchQuery && (
                   <button
@@ -338,7 +549,8 @@ export const CustomerPastAppointments: React.FC = () => {
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
                 <Filter className="w-3.5 h-3.5 text-zinc-400 shrink-0 mr-1" />
                 {[
-                  { id: 'ALL', label: 'All' },
+                  { id: 'UPCOMING', label: `Upcoming (${upcomingAppointments.length})` },
+                  { id: 'ALL', label: `All (${userAppointments.length})` },
                   { id: 'CONFIRMED', label: 'Confirmed' },
                   { id: 'COMPLETED', label: 'Completed' },
                   { id: 'CANCELLED', label: 'Cancelled' }
@@ -348,7 +560,7 @@ export const CustomerPastAppointments: React.FC = () => {
                     onClick={() => setStatusFilter(f.id as any)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
                       statusFilter === f.id
-                        ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
+                        ? 'bg-purple-600 text-white font-bold shadow-sm'
                         : 'bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-200'
                     }`}
                   >
@@ -362,39 +574,51 @@ export const CustomerPastAppointments: React.FC = () => {
           {/* Appointments List */}
           {filteredAppointments.length === 0 ? (
             <div className="p-12 text-center rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-sm">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400 mx-auto">
                 <Calendar className="w-7 h-7" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">No Appointment Records Found</h3>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                  {userAppointments.length === 0
+                    ? 'No Appointments Yet'
+                    : statusFilter === 'UPCOMING'
+                    ? 'No Upcoming Appointments Scheduled'
+                    : 'No Appointment Records Found'}
+                </h3>
                 <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
-                  {searchQuery || statusFilter !== 'ALL'
-                    ? 'No bookings match your selected filter criteria. Try resetting the filters or search term.'
-                    : 'You have not booked any appointments yet. Book a customized hair, facial, or grooming session in Mohol with our 10% advance deposit.'}
+                  {userAppointments.length === 0
+                    ? 'Welcome to Modern Unisex Salon Mohol! You have not booked any salon visits on this account yet. Reserve your slot below with our simple 10% advance deposit.'
+                    : statusFilter === 'UPCOMING'
+                    ? 'You do not have any active appointments due. Book your preferred slot below with our simple 10% advance deposit.'
+                    : 'No bookings match your selected filter criteria. Try resetting the filters or search term.'}
                 </p>
               </div>
               <button
                 onClick={() => openBookingModal()}
-                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs shadow-sm transition cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm transition cursor-pointer"
               >
-                Book Your First Appointment
+                Book Your Next Appointment
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {filteredAppointments.map(apt => {
                 const status = apt.bookingStatus || apt.status;
+                const isUpcomingSlot = apt.date >= todayStr && status === 'CONFIRMED';
+
                 return (
                   <div
                     key={apt.id}
-                    className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-amber-500/40 transition-all shadow-sm space-y-4 flex flex-col justify-between"
+                    className={`p-5 sm:p-6 rounded-3xl bg-white dark:bg-zinc-900 border transition-all shadow-sm space-y-4 flex flex-col justify-between ${
+                      isUpcomingSlot ? 'border-purple-500/50 hover:border-purple-500' : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-400'
+                    }`}
                   >
                     {/* Top Row: Ref + Status */}
                     <div className="flex items-start justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs text-amber-600 dark:text-amber-400 font-bold">
-                            {apt.bookingRef}
+                          <span className="font-mono text-xs text-purple-600 dark:text-purple-400 font-bold">
+                            #{apt.bookingRef}
                           </span>
                           <button
                             onClick={() => handleCopy(apt.bookingRef)}
@@ -413,7 +637,7 @@ export const CustomerPastAppointments: React.FC = () => {
                         </h3>
                       </div>
                       <div className="shrink-0">
-                        {getStatusBadge(status)}
+                        {getStatusBadge(status, apt.date)}
                       </div>
                     </div>
 
@@ -421,7 +645,7 @@ export const CustomerPastAppointments: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-                          <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
                           <span className="font-semibold">{apt.date}</span>
                         </div>
                         <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
@@ -458,32 +682,41 @@ export const CustomerPastAppointments: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Bottom Actions: Rate Visit, E-Pass & Rebook */}
+                    {/* Bottom Actions: Pass, Reschedule, Feedback & Rebook */}
                     <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <button
                           onClick={() => setSelectedPassAppointment(apt)}
-                          className="px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
+                          className="px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
                         >
-                          <Receipt className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Pass</span>
+                          <Receipt className="w-3.5 h-3.5" />
+                          <span>Pass &amp; QR</span>
+                        </button>
+
+                        <button
+                          onClick={() => printSalonReceipt(apt)}
+                          className="px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
+                          title="Print Receipt"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Print Receipt</span>
                         </button>
 
                         <button
                           onClick={() => handleOpenFeedback(apt)}
-                          className="px-3 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-600 dark:text-purple-400 text-xs font-bold inline-flex items-center gap-1.5 transition cursor-pointer"
-                          title="Submit real-time rating for this visit"
+                          className="px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
+                          title="Submit rating for this visit"
                         >
-                          <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                           <span>Rate Visit</span>
                         </button>
                       </div>
 
                       <button
                         onClick={() => handleRebook(apt)}
-                        className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                        className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition cursor-pointer"
                       >
-                        <RotateCw className="w-3.5 h-3.5 text-zinc-950" />
+                        <RotateCw className="w-3.5 h-3.5 text-white" />
                         <span>Rebook</span>
                       </button>
                     </div>
@@ -521,4 +754,3 @@ export const CustomerPastAppointments: React.FC = () => {
     </div>
   );
 };
-

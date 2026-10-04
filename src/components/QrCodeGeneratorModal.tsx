@@ -97,13 +97,18 @@ export const QrCodeGeneratorModal: React.FC<QrCodeGeneratorModalProps> = ({
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  // Synchronize when initialService prop changes
+  // Synchronize when modal opens or initialType/initialService props change
   useEffect(() => {
-    if (initialService) {
-      setSelectedServiceId(initialService.id);
-      setActiveType('service');
+    if (isOpen) {
+      if (initialType) {
+        setActiveType(initialType);
+      }
+      if (initialService) {
+        setSelectedServiceId(initialService.id);
+        setActiveType('service');
+      }
     }
-  }, [initialService]);
+  }, [isOpen, initialType, initialService]);
 
   // Apply color presets
   const applyPreset = (preset: 'lavender' | 'gold' | 'emerald' | 'dark' | 'classic') => {

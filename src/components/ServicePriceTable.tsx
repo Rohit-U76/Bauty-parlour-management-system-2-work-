@@ -30,7 +30,9 @@ export const ServicePriceTable: React.FC<ServicePriceTableProps> = ({
   onToggleBundleService,
   standalone = false
 }) => {
-  const { services, openBookingModal, appointments } = useSalon();
+  const { services, openBookingModal, appointments, settings } = useSalon();
+  const advancePct = settings.advancePercentage || 10;
+  const balancePct = 100 - advancePct;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedGender, setSelectedGender] = useState<'all' | 'women' | 'men' | 'bridal'>('all');
@@ -240,7 +242,7 @@ export const ServicePriceTable: React.FC<ServicePriceTableProps> = ({
         <div className="flex items-center gap-2">
           <Info className="w-4 h-4 text-amber-500 shrink-0" />
           <span>
-            <strong>10% Online Advance Deposit</strong> locks your appointment slot. Balance 90% is payable at the salon counter after service.
+            <strong>{advancePct}% Online Advance Deposit</strong> locks your appointment slot. Balance {balancePct}% is payable at the salon counter after service.
           </span>
         </div>
         <div className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
@@ -257,7 +259,7 @@ export const ServicePriceTable: React.FC<ServicePriceTableProps> = ({
                 <th className="py-3.5 px-4 font-semibold">Service &amp; Photo</th>
                 <th className="py-3.5 px-4 font-semibold">Price</th>
                 <th className="py-3.5 px-3 font-semibold text-center">Duration</th>
-                <th className="py-3.5 px-4 font-semibold text-right">10% Advance</th>
+                <th className="py-3.5 px-4 font-semibold text-right">{advancePct}% Advance</th>
                 <th className="py-3.5 px-4 font-semibold text-center">Action</th>
               </tr>
             </thead>
@@ -270,7 +272,7 @@ export const ServicePriceTable: React.FC<ServicePriceTableProps> = ({
                 </tr>
               ) : (
                 filteredServices.map((service) => {
-                  const advanceDisplay = `₹${Math.round(service.price * 0.1)}`;
+                  const advanceDisplay = `₹${Math.round((service.price * advancePct) / 100)}`;
 
                   return (
                     <tr 
@@ -350,13 +352,13 @@ export const ServicePriceTable: React.FC<ServicePriceTableProps> = ({
                         </div>
                       </td>
 
-                      {/* Advance Deposit (10%) */}
+                      {/* Advance Deposit (dynamic) */}
                       <td className="py-4 px-4 align-top text-right font-mono">
                         <div className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">
                           {advanceDisplay}
                         </div>
                         <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">
-                          (10% Deposit)
+                          ({advancePct}% Deposit)
                         </span>
                       </td>
 
@@ -457,7 +459,7 @@ export const ServicePriceTable: React.FC<ServicePriceTableProps> = ({
                       {service.priceDisplay || `₹${service.price.toLocaleString()}`}
                     </span>
                     <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold">
-                      (10% Adv: ₹{Math.round(service.price * 0.1)})
+                      ({advancePct}% Adv: ₹{Math.round((service.price * advancePct) / 100)})
                     </span>
                   </div>
                 </div>

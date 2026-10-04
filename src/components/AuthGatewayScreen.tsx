@@ -337,43 +337,6 @@ export const AuthGatewayScreen: React.FC = () => {
                   )}
                 </button>
 
-                {/* Quick Test Demo Pre-fills */}
-                <div className="pt-2">
-                  <div className="text-[11px] text-zinc-600 dark:text-zinc-400 font-semibold mb-2 flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3 text-purple-600 dark:text-amber-500" />
-                    <span>Instant 1-Click Test Accounts:</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => quickFill('rohit', 'password123', 'customer_login')}
-                      className="p-2.5 rounded-xl bg-purple-50/50 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-800 hover:border-purple-400 dark:hover:border-amber-500/50 text-left transition cursor-pointer"
-                    >
-                      <div className="text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-between">
-                        <span>Rohit Umdale</span>
-                        <Crown className="w-3 h-3 text-purple-600 dark:text-amber-400" />
-                      </div>
-                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
-                        user: rohit (500 pts)
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => quickFill('priya', 'password123', 'customer_login')}
-                      className="p-2.5 rounded-xl bg-purple-50/50 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-800 hover:border-purple-400 dark:hover:border-amber-500/50 text-left transition cursor-pointer"
-                    >
-                      <div className="text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-between">
-                        <span>Priya Sharma</span>
-                        <Star className="w-3 h-3 text-purple-600 dark:text-amber-400" />
-                      </div>
-                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
-                        user: priya (450 pts)
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
                 <div className="text-center pt-2">
                   <span className="text-xs text-zinc-600 dark:text-zinc-400">
                     Don't have an account yet?{' '}

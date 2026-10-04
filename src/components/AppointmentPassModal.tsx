@@ -30,6 +30,7 @@ import {
   downloadIcsCalendarFile
 } from '../utils/appointmentReminderUtils';
 import { useSalon } from '../context/SalonContext';
+import { printSalonReceipt, downloadReceiptFile } from '../utils/receiptPrinter';
 
 interface AppointmentPassModalProps {
   appointment: Appointment | null;
@@ -431,11 +432,21 @@ export const AppointmentPassModal: React.FC<AppointmentPassModalProps> = ({
               </button>
 
               <button
-                onClick={() => window.print()}
+                onClick={() => printSalonReceipt(appointment, qrDataUrl)}
                 className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium flex items-center gap-1.5 border border-zinc-700 cursor-pointer"
+                title="Print Receipt"
               >
-                <Printer className="w-3.5 h-3.5" />
+                <Printer className="w-3.5 h-3.5 text-purple-400" />
                 <span>Print</span>
+              </button>
+
+              <button
+                onClick={() => downloadReceiptFile(appointment, qrDataUrl)}
+                className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium flex items-center gap-1.5 border border-zinc-700 cursor-pointer"
+                title="Save Receipt as HTML/PDF"
+              >
+                <Download className="w-3.5 h-3.5 text-amber-400" />
+                <span>PDF Pass</span>
               </button>
             </div>
 

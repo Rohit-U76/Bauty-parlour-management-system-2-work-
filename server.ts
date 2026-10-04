@@ -135,13 +135,30 @@ function writeDb(data: any) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+// Shared Gemini client singleton for connection pooling
+let geminiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI | null {
+  if (!process.env.GEMINI_API_KEY) return null;
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+  }
+  return geminiClient;
+}
+
 // Helper for calling Gemini with model fallbacks to handle 503 / high demand gracefully
 async function generateGeminiWithFallback(ai: GoogleGenAI, options: {
   contents: any;
   config?: any;
   models?: string[];
 }) {
-  const models = options.models || ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const models = options.models || ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
   let lastError: any = null;
 
   for (const model of models) {
@@ -156,7 +173,7 @@ async function generateGeminiWithFallback(ai: GoogleGenAI, options: {
       }
     } catch (err: any) {
       lastError = err;
-      // If error is 503 / UNAVAILABLE / Rate Limit, try next model candidate
+      // If error occurs, try next fallback candidate
       console.warn(`[AI Notice] Model ${model} unavailable (${err?.status || err?.message || 'error'}), attempting fallback...`);
     }
   }
@@ -670,6 +687,155 @@ async function startServer() {
     }
   });
 
+  // --- REAL-TIME APPOINTMENTS API (DATABASE-BACKED & OWNER WHATSAPP DISPATCH) ---
+  app.get('/api/appointments', (req, res) => {
+    try {
+      const db = readDb();
+      res.json({ success: true, appointments: db.appointments || [] });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/appointments', (req, res) => {
+    try {
+      const db = readDb();
+      if (!db.appointments) db.appointments = [];
+      if (!db.notifications) db.notifications = [];
+
+      const payload = req.body;
+      const bookingRef = payload.bookingRef || `SS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+      const ownerPhone = '8104026257';
+      const cleanClientPhone = (payload.clientPhone || '').replace(/[^0-9]/g, '');
+      const formattedClientPhone = cleanClientPhone.length === 10 ? `91${cleanClientPhone}` : cleanClientPhone;
+
+      const waText = `✨ *NEW APPOINTMENT CONFIRMED* ✨\n*Modern Unisex Salon, Mohol*\n` +
+        `────────────────────\n` +
+        `📋 *Booking Ref:* ${bookingRef}\n` +
+        `👤 *Client Name:* ${payload.clientName}\n` +
+        `📱 *Client Mobile:* ${payload.clientPhone}\n` +
+        `💇‍♀️ *Service:* ${payload.serviceName}\n` +
+        `📅 *Date & Slot:* ${payload.date} at ${payload.timeSlot}\n` +
+        `✂️ *Stylist:* ${payload.stylistName || 'Master Stylist'}\n` +
+        `💰 *Total Bill:* ₹${payload.totalAmount}\n` +
+        `✅ *10% Advance Deposit Paid:* ₹${payload.advancePaid || payload.advanceAmount} (Verified via Razorpay)\n` +
+        `💵 *Balance at Salon Counter:* ₹${payload.balanceDue}\n` +
+        `────────────────────\n` +
+        `📍 *Salon Address:* B.N. Gund Complex, Near Kanya Prashala & ICICI Bank, Mohol (413213)\n` +
+        `📞 *Salon Helpline:* +91 81040 26257`;
+
+      const encodedWaText = encodeURIComponent(waText);
+      const ownerWhatsappUrl = `https://api.whatsapp.com/send?phone=91${ownerPhone}&text=${encodedWaText}`;
+      const clientWhatsappUrl = formattedClientPhone 
+        ? `https://api.whatsapp.com/send?phone=${formattedClientPhone}&text=${encodedWaText}` 
+        : `https://api.whatsapp.com/send?text=${encodedWaText}`;
+
+      const newAppointment = {
+        id: payload.id || `apt-${Date.now()}`,
+        bookingRef,
+        clientName: payload.clientName,
+        clientPhone: payload.clientPhone,
+        clientEmail: payload.clientEmail || '',
+        serviceId: payload.serviceId,
+        serviceName: payload.serviceName,
+        category: payload.category || 'Hair & Styling',
+        date: payload.date,
+        timeSlot: payload.timeSlot,
+        stylistName: payload.stylistName || 'Master Stylist',
+        totalAmount: Number(payload.totalAmount) || 0,
+        advancePaid: Number(payload.advancePaid || payload.advanceAmount) || 0,
+        balanceDue: Number(payload.balanceDue) || 0,
+        paymentStatus: 'PAID',
+        bookingStatus: 'CONFIRMED',
+        status: 'CONFIRMED',
+        razorpayPaymentId: payload.razorpayPaymentId || `pay_${Date.now()}`,
+        razorpayOrderId: payload.razorpayOrderId || `order_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        notes: payload.notes || '',
+        isNew: true,
+        whatsappUrl: clientWhatsappUrl,
+        ownerWhatsappUrl: ownerWhatsappUrl
+      };
+
+      // Add to database
+      db.appointments = [newAppointment, ...db.appointments.filter((a: any) => a.id !== newAppointment.id)];
+
+      // Create Admin Real-Time Notification
+      const adminNotification = {
+        id: `notif-${Date.now()}`,
+        title: 'New Online Reservation & 10% Deposit',
+        message: `${newAppointment.clientName} booked ${newAppointment.serviceName} for ${newAppointment.date} at ${newAppointment.timeSlot}. Advance deposit ₹${newAppointment.advancePaid} verified via Razorpay.`,
+        type: 'booking',
+        timestamp: 'Just now',
+        read: false,
+        bookingRef: newAppointment.bookingRef,
+        appointmentId: newAppointment.id
+      };
+      db.notifications = [adminNotification, ...db.notifications];
+
+      writeDb(db);
+
+      console.log(`[Real-Time Booking Logged]: Ref: ${newAppointment.bookingRef} | Client: ${newAppointment.clientName} | Owner WhatsApp Dispatched to +91 ${ownerPhone}`);
+
+      res.json({
+        success: true,
+        appointment: newAppointment,
+        notification: adminNotification,
+        ownerWhatsappUrl,
+        message: 'Appointment booked successfully and synchronized to Admin Dashboard in real time.'
+      });
+    } catch (err: any) {
+      console.error('Error creating real-time appointment:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/appointments/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const db = readDb();
+      db.appointments = (db.appointments || []).map((apt: any) => apt.id === id ? { ...apt, ...updates, isNew: false } : apt);
+      writeDb(db);
+      res.json({ success: true, message: 'Appointment updated successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/appointments/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = readDb();
+      db.appointments = (db.appointments || []).filter((apt: any) => apt.id !== id);
+      writeDb(db);
+      res.json({ success: true, message: 'Appointment deleted successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- REAL-TIME NOTIFICATIONS API ---
+  app.get('/api/notifications', (req, res) => {
+    try {
+      const db = readDb();
+      res.json({ success: true, notifications: db.notifications || [] });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/notifications/mark-read', (req, res) => {
+    try {
+      const db = readDb();
+      db.notifications = (db.notifications || []).map((n: any) => ({ ...n, read: true }));
+      writeDb(db);
+      res.json({ success: true, message: 'Notifications marked as read' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // AI Assistant Chatbot with Gemini + Multi-Model & Heuristic Fallback
   app.post('/api/ai/chat', async (req, res) => {
     try {
@@ -678,26 +844,25 @@ async function startServer() {
         return res.status(400).json({ error: 'Message is required' });
       }
 
+      const db = readDb();
+      const advPercentage = db.settings?.advancePercentage || 10;
+
       const systemInstruction = `You are the friendly, luxury beauty and grooming expert AI assistant for "SMART SALON" (an AI-Enabled Smart Salon and Parlour).
 Salon Highlights:
 - Services: Women's Hair (Layered haircut, Keratin, Highlights), Men's Grooming (Executive Hair & Beard Styling, Charcoal detox), Skin & Facial (Radiance Facial Therapy, Hydra-glow, De-tan), Bridal & Pre-Bridal Makeovers (HD Airbrush, Mehendi, Sangeet styling), Nail Art, Body Spa & Massages.
 - Location & Hours: Open Mon-Sun: 09:30 AM - 08:30 PM.
-- Pricing & Deposit: We collect only a 10% Advance Deposit online via Razorpay (UPI, Credit/Debit card, Netbanking) to reserve appointments, and the remaining 90% is paid conveniently at the salon reception counter after your service.
+- Pricing & Deposit: We collect only a ${advPercentage}% Advance Deposit online via Razorpay (UPI, Credit/Debit card, Netbanking) to reserve appointments, and the remaining balance is paid conveniently at the salon reception counter after your service.
 - Offers: "GLOW20" for 20% off facials, "FIRST10" for 10% off for first-time bookings, "BRIDAL500" for ₹500 off luxury bridal packages.
 
-Keep answers crisp, warm, helpful, and encourage users to schedule an appointment or take the Smart Recommendation Quiz.`;
+FORMATTING REQUIREMENTS:
+- Structure your answer cleanly with bullet points (•) for treatments, prices, or steps.
+- Use bold text for service names, discounts, or amounts.
+- Keep each point concise, stylish, and easily readable.
+- End with a welcoming single sentence inviting them to book their slot.`;
 
-      if (process.env.GEMINI_API_KEY) {
+      const ai = getGeminiClient();
+      if (ai) {
         try {
-          const ai = new GoogleGenAI({
-            apiKey: process.env.GEMINI_API_KEY,
-            httpOptions: {
-              headers: {
-                'User-Agent': 'aistudio-build',
-              }
-            }
-          });
-
           const response = await generateGeminiWithFallback(ai, {
             contents: message,
             config: {
@@ -714,20 +879,20 @@ Keep answers crisp, warm, helpful, and encourage users to schedule an appointmen
         }
       }
 
-      // Domain Expert Fallback Logic
+      // Domain Expert Fallback Logic with Formatted Bullet Points
       const lower = message.toLowerCase();
-      let fallbackReply = "Welcome to Smart Salon! We offer premium hair styling, facial skin therapy, bridal makeovers, and men's executive grooming. You can reserve any slot instantly online with just a 10% advance deposit via Razorpay!";
+      let fallbackReply = `✨ **Welcome to Smart Salon!**\nHere is how we can style you today:\n• **Women's Hair & Styling:** Layered cuts, Balayage, Keratin treatments\n• **Skin & Glow:** Radiance Facials, Hydra-Glow, Instant De-Tan\n• **Men's Executive Care:** Sharp fades, Beard contouring, Charcoal detan\n• **Online Booking:** Reserve any slot with just a **${advPercentage}% Advance Deposit** via UPI/Razorpay!`;
 
       if (lower.includes('price') || lower.includes('cost') || lower.includes('rate') || lower.includes('payment') || lower.includes('advance') || lower.includes('deposit') || lower.includes('10%')) {
-        fallbackReply = "At Smart Salon, our pricing is fully transparent! When booking online, you only need to pay a 10% advance deposit through Razorpay (UPI/Cards/Netbanking). The remaining 90% balance is payable at the salon counter after your service.";
+        fallbackReply = `💳 **Transparent Booking & Payment Policy:**\n• **Online Reservation:** Pay only **${advPercentage}% Advance Deposit** securely via Razorpay (UPI, GPay, Cards).\n• **Balance Amount:** The remaining ${100 - Number(advPercentage)}% is payable at our salon reception after your treatment.\n• **Zero Waiting Guarantee:** Advance booking guarantees your preferred stylist slot without queue delays!`;
       } else if (lower.includes('facial') || lower.includes('skin') || lower.includes('glow') || lower.includes('dull')) {
-        fallbackReply = "For radiant, glowing skin, we recommend our signature 'Radiance Facial Therapy' (₹1,800) or 'Hydra-Glow Deep Pore Treatment' (₹2,500). Use coupon code 'GLOW20' for an instant 20% off!";
+        fallbackReply = `🌸 **Recommended Facial Therapies for Glowing Skin:**\n• **Radiance Facial Therapy:** Deep hydration & barrier nourishment (₹1,800)\n• **Hydra-Glow Deep Pore Cleansing:** Extraction, fruit acid peel & galvanic infusion (₹2,500)\n• **Instant De-Tan & Glow Ritual:** Removes stubborn sun tanning in 45 mins (₹1,200)\n• **Special Offer:** Use code **GLOW20** to get **20% OFF** when booking today!`;
       } else if (lower.includes('hair') || lower.includes('cut') || lower.includes('keratin') || lower.includes('style') || lower.includes('beard') || lower.includes('men')) {
-        fallbackReply = "Our master stylists offer Layered Haircuts with Blowdry (₹850), Executive Men's Beard & Hair Styling (₹650), and Brazilian Keratin Smooth Therapy (₹4,200). Would you like to check slot availability today?";
+        fallbackReply = `✂️ **Popular Hair Styling & Grooming Services:**\n• **Precision Razor Haircut & Blowdry:** Customized to face structure (₹850)\n• **Brazilian Keratin Smooth Therapy:** Frizz-free, glassy hair for 4+ months (₹4,200)\n• **Executive Beard Sculpting & Charcoal Shave:** Sharp lines & skin detox (₹650)\n• **Advance Deposit:** Only **${advPercentage}%** to lock your priority stylist slot!`;
       } else if (lower.includes('bridal') || lower.includes('wedding') || lower.includes('makeup')) {
-        fallbackReply = "Congratulations on your upcoming celebration! We provide complete HD Bridal Makeovers and Pre-Bridal Consultation packages starting from ₹6,500. Use coupon code 'BRIDAL500' for ₹500 off!";
+        fallbackReply = `👑 **Signature Bridal & Pre-Bridal Packages:**\n• **High-Definition Airbrush Bridal Makeover:** Waterproof 18-hr HD wear (₹6,500+)\n• **Pre-Bridal Glow Ritual (7-Day Plan):** Full body polish, facial & hair spa\n• **Sangeet & Cocktail Styling:** Trendy updos, drapping & evening glam\n• **Exclusive Coupon:** Use code **BRIDAL500** for instant **₹500 discount**!`;
       } else if (lower.includes('timing') || lower.includes('hour') || lower.includes('open') || lower.includes('time') || lower.includes('slot')) {
-        fallbackReply = "We are open 7 days a week from 09:30 AM to 08:30 PM. Reserving your appointment in advance with our 10% deposit ensures zero waiting time with your preferred stylist!";
+        fallbackReply = `⏰ **Salon Hours & Slot Availability:**\n• **Opening Hours:** Monday to Sunday, 09:30 AM – 08:30 PM\n• **Peak Hours:** 04:00 PM – 07:30 PM (Advance booking strongly advised)\n• **Easy Reservation:** Pay **${advPercentage}% advance deposit** to avoid wait times.`;
       }
 
       return res.json({ reply: fallbackReply });
@@ -742,35 +907,92 @@ Keep answers crisp, warm, helpful, and encourage users to schedule an appointmen
   // AI Smart Recommendation Quiz Endpoint
   app.post('/api/ai/recommend', async (req, res) => {
     try {
-      const { gender, serviceInterest, hairOrSkinConcern, occasion, budgetRange } = req.body;
+      const db = readDb();
+      const {
+        gender,
+        serviceInterest,
+        hairOrSkinConcern,
+        occasion,
+        budgetRange,
+        selectedCategories,
+        selectedServices,
+        selectedConcerns,
+        advancePercentage
+      } = req.body;
 
-      if (process.env.GEMINI_API_KEY) {
+      const advPct = Math.max(1, Math.min(100, Number(advancePercentage || (db as any).settings?.advancePercentage || 10)));
+
+      // Extract and clean arrays for multi-option selections
+      const parseList = (val: any): string[] => {
+        if (!val) return [];
+        if (Array.isArray(val)) return val.map(String).filter(Boolean);
+        return String(val).split(',').map(s => s.trim()).filter(Boolean);
+      };
+
+      const rawServices = parseList(selectedServices).length > 0 ? parseList(selectedServices) : parseList(serviceInterest);
+      const servicesList: string[] = rawServices.length > 0 ? rawServices : ['Skin Glow & Pore Cleansing Facial'];
+
+      const rawConcerns = parseList(selectedConcerns).length > 0 ? parseList(selectedConcerns) : (parseList(hairOrSkinConcern).length > 0 ? parseList(hairOrSkinConcern) : parseList(req.body.skinHairConcerns));
+      const concernsList: string[] = rawConcerns.length > 0 ? rawConcerns : ['Dull skin & uneven sun tan'];
+
+      const rawCategories = parseList(selectedCategories).length > 0 ? parseList(selectedCategories) : parseList(gender);
+      const categoriesList: string[] = rawCategories.length > 0 ? rawCategories : ["Women's Salon & Haircare"];
+
+      const occ = occasion || 'Upcoming Event / Self-Care';
+      const budget = budgetRange || 'Flexible';
+
+      // Price directory for accurate item totals
+      const servicePriceMap: Record<string, number> = {
+        'Skin Glow & Pore Cleansing Facial': 1400,
+        'Hair Makeover, Cut & Keratin Therapy': 2800,
+        'Executive Beard Edging & Precision Haircut': 650,
+        'Bridal High-Definition Glam Makeover': 6500,
+        'Nail Extensions & Hand Rejuvenation': 1200,
+        'Full Body Aromatherapy Relaxation Spa': 2200,
+        'Hair Color, Highlights & Balayage': 2500,
+        'Deep Conditioning & Anti-Dandruff Scalp Spa': 1100,
+        'Detox Herbal Face Clean Up': 750,
+        'Pedicure & Foot Reflexology': 850
+      };
+
+      const getPrice = (name: string): number => {
+        if (servicePriceMap[name]) return servicePriceMap[name];
+        const lower = name.toLowerCase();
+        if (lower.includes('bridal')) return 6000;
+        if (lower.includes('keratin') || lower.includes('color')) return 2800;
+        if (lower.includes('spa') || lower.includes('body')) return 2200;
+        if (lower.includes('facial') || lower.includes('glow')) return 1400;
+        if (lower.includes('nail') || lower.includes('hand')) return 1200;
+        if (lower.includes('beard') || lower.includes('haircut')) return 650;
+        return 1500;
+      };
+
+      const ai = getGeminiClient();
+      if (ai) {
         try {
-          const ai = new GoogleGenAI({
-            apiKey: process.env.GEMINI_API_KEY,
-            httpOptions: {
-              headers: {
-                'User-Agent': 'aistudio-build',
-              }
-            }
-          });
+          const prompt = `You are a certified master beauty & wellness director at Modern Unisex Salon Mohol.
+A client has taken our interactive AI recommendation quiz and has selected MULTIPLE treatments and MULTIPLE concerns:
 
-          const prompt = `Analyze this client profile for a luxury salon & parlour recommendation:
-Gender/Category: ${gender || 'General'}
-Primary Interest: ${serviceInterest || 'Hair & Skin'}
-Key Concerns/Goals: ${hairOrSkinConcern || 'Healthy glow & styling'}
-Occasion/Timeline: ${occasion || 'Routine maintenance'}
-Budget: ${budgetRange || 'Flexible'}
+- Target Categories: ${categoriesList.join(', ')}
+- CHOSEN SERVICES (Multiple): ${servicesList.join(', ')}
+- CHOSEN CONCERNS (Multiple): ${concernsList.join(', ')}
+- Occasion / Timeline: ${occ}
+- Budget Preference: ${budget}
 
-Provide 2-3 tailored recommendations formatted in a JSON array:
+MANDATORY RULES:
+1. The client has explicitly chosen MULTIPLE services: [${servicesList.join(', ')}]. You MUST generate packages that combine these specific chosen services. Do NOT replace them with unrelated services.
+2. In each package, 'recommendedServices' MUST contain the client's chosen services (or appropriate subsets/combinations for multi-tier packages).
+3. The 'expertReason' MUST explicitly mention how the chosen services address their selected concerns: [${concernsList.join(', ')}] for ${occ}.
+4. Advance Deposit Calculation: The salon requires precisely a ${advPct}% online booking deposit. In your JSON, 'advanceDeposit' must be Math.round(estimatedTotal * ${advPct} / 100). For example, if estimatedTotal is ₹2,000, ${advPct}% advance is ₹${Math.round((2000 * advPct) / 100)}.
+5. Provide exactly 2 or 3 distinct packages in valid JSON array format:
 [
   {
-    "packageTitle": "Catchy service package title",
-    "recommendedServices": ["Service Name 1", "Service Name 2"],
-    "estimatedTotal": 2800,
-    "advanceDeposit": 280,
-    "expertReason": "Why this fits their profile",
-    "routineTip": "At-home care tip"
+    "packageTitle": "Creative synergistic title (e.g. 'Complete Glow & Keratin Revival Suite')",
+    "recommendedServices": ["Selected Service 1", "Selected Service 2"],
+    "estimatedTotal": 3800,
+    "advanceDeposit": ${Math.round((3800 * advPct) / 100)},
+    "expertReason": "Detailed reason addressing concerns",
+    "routineTip": "Homecare tip for concerns"
   }
 ]`;
 
@@ -785,54 +1007,117 @@ Provide 2-3 tailored recommendations formatted in a JSON array:
             const parsed = JSON.parse(response.text);
             const list = Array.isArray(parsed) ? parsed : (parsed.recommendations || Object.values(parsed));
             if (Array.isArray(list) && list.length > 0) {
-              return res.json({ success: true, recommendations: list });
+              const normalized = list.map((item: any) => {
+                const estTotal = Number(item.estimatedTotal) || 2000;
+                return {
+                  ...item,
+                  estimatedTotal: estTotal,
+                  advanceDeposit: Math.round((estTotal * advPct) / 100)
+                };
+              });
+              return res.json({ success: true, recommendations: normalized });
             }
           }
         } catch (apiErr: any) {
-          console.warn('Gemini API temporary issue in AI recommendations, generating high-quality custom packages.');
+          console.warn('Gemini API temporary issue in AI recommendations, generating high-quality custom packages for selected options.');
         }
       }
 
-      // High-quality adaptive recommendations
-      const interest = serviceInterest || 'Signature';
-      const concern = hairOrSkinConcern || 'Glow & Vitality';
-      const occ = occasion || 'Special Occasion';
+      // DETERMINISTIC MULTI-OPTION SYNERGISTIC BUNDLER
+      // Accurately calculates pricing and pairs all selected services
+      const rawSum = servicesList.reduce((sum, s) => sum + getPrice(s), 0);
+      const comboDiscount = servicesList.length > 1 ? 0.85 : 1; // 15% discount for multi-service bundle
+      const allInTotal = Math.max(800, Math.round((rawSum * comboDiscount) / 50) * 50);
+      const allInDeposit = Math.round((allInTotal * advPct) / 100);
 
-      const baseTotal = interest.toLowerCase().includes('bridal') ? 6800 : interest.toLowerCase().includes('hair') ? 2400 : 2650;
-      const deposit = Math.round(baseTotal * 0.1);
+      // Construct Title based on multiple choices
+      let suiteTitle = 'Custom All-Inclusive Transformation Suite';
+      if (servicesList.length === 1) {
+        suiteTitle = `${servicesList[0]} Complete Care`;
+      } else if (servicesList.some(s => s.toLowerCase().includes('facial')) && servicesList.some(s => s.toLowerCase().includes('hair'))) {
+        suiteTitle = 'Complete Skin Glow & Hair Makeover Synergistic Suite';
+      } else if (servicesList.some(s => s.toLowerCase().includes('bridal'))) {
+        suiteTitle = 'Bridal High-Definition Transformation & Radiance Ritual';
+      } else if (servicesList.some(s => s.toLowerCase().includes('beard') || s.toLowerCase().includes('grooming'))) {
+        suiteTitle = 'Executive Grooming & Polished Presence Suite';
+      } else if (servicesList.some(s => s.toLowerCase().includes('spa'))) {
+        suiteTitle = 'Holistic Head-to-Toe Wellness & Spa Revival Package';
+      }
+
+      const concernsText = concernsList.join(' and ');
+      const routineTips = [
+        'Hydrate daily, apply SPF 50 sunscreen every morning, and use sulfate-free salon shampoo.',
+        'Use cold-water rinse for hair cuticle sealing and apply nourishing night serum before bed.',
+        'Apply pure argan oil on ends and schedule monthly deep-pore hydration maintenance.'
+      ];
+
+      const recommendations = [
+        {
+          packageTitle: suiteTitle,
+          recommendedServices: servicesList,
+          estimatedTotal: allInTotal,
+          advanceDeposit: allInDeposit,
+          expertReason: `Curated specifically combining all ${servicesList.length} of your chosen services (${servicesList.join(' + ')}) with a 15% multi-service combo discount. Formulated to resolve ${concernsText} in time for your ${occ}.`,
+          routineTip: routineTips[0]
+        }
+      ];
+
+      // If user selected multiple services, add a targeted primary focus package
+      if (servicesList.length > 1) {
+        const primarySubset = servicesList.slice(0, Math.max(1, Math.min(2, servicesList.length - 1)));
+        const primarySum = primarySubset.reduce((sum, s) => sum + getPrice(s), 0);
+        const primaryTotal = Math.max(650, Math.round(primarySum / 50) * 50);
+        recommendations.push({
+          packageTitle: `Targeted Express Focus: ${primarySubset[0].split(' ')[0]} & ${primarySubset[1] ? primarySubset[1].split(' ')[0] : 'Revival'}`,
+          recommendedServices: primarySubset,
+          estimatedTotal: primaryTotal,
+          advanceDeposit: Math.round((primaryTotal * advPct) / 100),
+          expertReason: `A focused essential duo targeting your primary concern (${concernsList[0] || 'deep revitalization'}) with immediate visible results.`,
+          routineTip: routineTips[1]
+        });
+      } else {
+        // Single service selected: offer a luxury upgrade with spa / scalp add-on
+        const basePrice = getPrice(servicesList[0]);
+        const upgradedPrice = basePrice + 750;
+        recommendations.push({
+          packageTitle: `${servicesList[0]} + Aromatherapy Scalp & Hand Ritual`,
+          recommendedServices: [servicesList[0], 'Aromatherapy Scalp Rinse & Hand Nourish'],
+          estimatedTotal: upgradedPrice,
+          advanceDeposit: Math.round((upgradedPrice * advPct) / 100),
+          expertReason: `Enhanced version of your selected treatment featuring relaxation therapy to relieve stress and elevate results.`,
+          routineTip: routineTips[2]
+        });
+      }
+
+      // Add a 3rd occasion-ready package
+      if (occ.toLowerCase().includes('party') || occ.toLowerCase().includes('wedding') || occ.toLowerCase().includes('event')) {
+        const glamTotal = Math.round((allInTotal * 0.9) / 50) * 50;
+        recommendations.push({
+          packageTitle: `Red-Carpet ${occ.split(' ')[0]} Instant Radiance Polish`,
+          recommendedServices: [...servicesList.slice(0, 2), 'High-Gloss Finishing Spray & Styling'],
+          estimatedTotal: glamTotal,
+          advanceDeposit: Math.round((glamTotal * advPct) / 100),
+          expertReason: `Specially primed for instant photo-ready shine and long-lasting freshness during your ${occ}.`,
+          routineTip: 'Avoid hot showers 24 hours after treatment to maintain cuticle seal and skin barrier glow.'
+        });
+      }
 
       return res.json({
         success: true,
-        recommendations: [
-          {
-            packageTitle: `${interest} Radiance & Revival Package`,
-            recommendedServices: ['Radiance Facial Therapy', 'Layered Haircut & Styling'],
-            estimatedTotal: baseTotal,
-            advanceDeposit: deposit,
-            expertReason: `Custom curated to address ${concern} and prepare you with radiant shine for ${occ}.`,
-            routineTip: 'Maintain with cold-water rinse and daily hydration cream before bed.'
-          },
-          {
-            packageTitle: 'Executive Luxury Care & Detox',
-            recommendedServices: ['Hydra-Glow Deep Pore Treatment', 'Scalp Spa Therapy', 'Nail & Cuticle Care'],
-            estimatedTotal: baseTotal + 800,
-            advanceDeposit: Math.round((baseTotal + 800) * 0.1),
-            expertReason: 'Comprehensive rejuvenation that detoxifies the skin and restores hair texture balance.',
-            routineTip: 'Apply lightweight sunscreen SPF 50 every morning.'
-          }
-        ]
+        recommendations
       });
     } catch (err: any) {
       console.warn('AI Recommendation fallback triggered:', err?.message);
+      const fallbackTotal = 2600;
       res.json({
         success: true,
         recommendations: [
           {
-            packageTitle: 'Smart Salon Signature Glow Treatment',
-            recommendedServices: ['Radiance Facial Therapy', 'Hair Styling Finish'],
-            estimatedTotal: 2200,
-            advanceDeposit: 220,
-            expertReason: 'Tailored specifically for instant brightening and polished look.',
+            packageTitle: 'Custom Multi-Service Care Suite',
+            recommendedServices: ['Skin Glow & Pore Cleansing Facial', 'Hair Makeover & Styling'],
+            estimatedTotal: fallbackTotal,
+            advanceDeposit: Math.round((fallbackTotal * (Number(req.body?.advancePercentage) || 10)) / 100),
+            expertReason: 'Balanced salon care package combining skin revitalization and hair styling for immediate results.',
             routineTip: 'Drink plenty of water and apply SPF 50 sunscreen daily.'
           }
         ]
@@ -845,17 +1130,9 @@ Provide 2-3 tailored recommendations formatted in a JSON array:
     try {
       const { appointmentsCount, totalRevenue, advanceCollected, topServices } = req.body;
 
-      if (process.env.GEMINI_API_KEY) {
+      const ai = getGeminiClient();
+      if (ai) {
         try {
-          const ai = new GoogleGenAI({
-            apiKey: process.env.GEMINI_API_KEY,
-            httpOptions: {
-              headers: {
-                'User-Agent': 'aistudio-build',
-              }
-            }
-          });
-
           const prompt = `Analyze this Salon & Parlour business metrics:
 Total Bookings: ${appointmentsCount || 0}
 Total Booked Revenue: ₹${totalRevenue || 0}

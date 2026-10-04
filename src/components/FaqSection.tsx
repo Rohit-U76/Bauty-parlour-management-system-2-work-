@@ -23,7 +23,7 @@ interface FaqItem {
 }
 
 export const FaqSection: React.FC = () => {
-  const { openBookingModal, toggleAiWidget, settings } = useSalon();
+  const { openBookingModal, toggleAiChat, settings } = useSalon();
 
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [openId, setOpenId] = useState<string | null>('faq-policy-1');
@@ -213,7 +213,7 @@ export const FaqSection: React.FC = () => {
             </p>
             <button
               type="button"
-              onClick={() => toggleAiWidget()}
+              onClick={() => toggleAiChat()}
               className="mt-4 px-4 py-2 rounded-xl bg-yellow-500 text-black font-bold text-xs inline-flex items-center gap-1.5 shadow-md hover:bg-yellow-400 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -285,7 +285,7 @@ export const FaqSection: React.FC = () => {
         <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
-            onClick={() => toggleAiWidget()}
+            onClick={() => toggleAiChat()}
             className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 font-semibold text-xs border border-purple-600 dark:border-zinc-700 transition-colors shadow-sm cursor-pointer"
           >
             Chat with AI

@@ -20,13 +20,16 @@ import {
   Flame,
   Zap,
   AlertCircle,
-  MessageSquare
+  MessageSquare,
+  QrCode as QrCodeIcon
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { useSalon } from '../context/SalonContext';
 import { RazorpayModal } from './RazorpayModal';
 import { ServiceItem, Appointment, PriceTierVariant } from '../types';
 import { ModernSalonLogo } from './ModernSalonLogo';
-import { SALON_TIME_SLOTS, getSlotAvailability, getDayAvailabilitySummary } from '../utils/availability';
+import { SALON_TIME_SLOTS, getSlotAvailability, getDayAvailabilitySummary, isSlotAvailableForDate } from '../utils/availability';
+import { printSalonReceipt, downloadReceiptFile } from '../utils/receiptPrinter';
 
 export const BookingModal: React.FC = () => {
   const {
@@ -54,6 +57,7 @@ export const BookingModal: React.FC = () => {
   const [clientPhone, setClientPhone] = useState<string>('');
   const [clientEmail, setClientEmail] = useState<string>('');
   const [specialNotes, setSpecialNotes] = useState<string>('');
+  const [formError, setFormError] = useState<string>('');
   
   // Coupon
   const [couponCode, setCouponCode] = useState<string>('');
@@ -63,6 +67,38 @@ export const BookingModal: React.FC = () => {
   // Payment modal state
   const [showRazorpayModal, setShowRazorpayModal] = useState<boolean>(false);
   const [confirmedBooking, setConfirmedBooking] = useState<Appointment | null>(null);
+  const [bookingQrUrl, setBookingQrUrl] = useState<string>('');
+
+  // Automatically generate verifiable check-in QR code on confirmed booking
+  useEffect(() => {
+    if (confirmedBooking) {
+      const qrPayload = JSON.stringify({
+        ref: confirmedBooking.bookingRef,
+        client: confirmedBooking.clientName,
+        phone: confirmedBooking.clientPhone,
+        service: confirmedBooking.serviceName,
+        date: confirmedBooking.date,
+        time: confirmedBooking.timeSlot,
+        stylist: confirmedBooking.stylistName,
+        advancePaid: confirmedBooking.advancePaid,
+        balanceDue: confirmedBooking.balanceDue,
+        total: confirmedBooking.totalAmount
+      });
+
+      QRCode.toDataURL(qrPayload, {
+        width: 256,
+        margin: 1.5,
+        color: {
+          dark: '#1e1b4b',
+          light: '#ffffff'
+        }
+      }).then((url) => {
+        setBookingQrUrl(url);
+      }).catch((err) => {
+        console.error('Error generating QR code:', err);
+      });
+    }
+  }, [confirmedBooking]);
 
   // Stylists list - "Self Employed" default
   const stylists = [
@@ -134,6 +170,24 @@ export const BookingModal: React.FC = () => {
     }
   }, [isBookingModalOpen, selectedServiceForBooking, currentUser]);
 
+  // Enforce 7:00 PM evening constraint: If today and past 7:00 PM, ensure slot is strictly after 7:00 PM
+  useEffect(() => {
+    if (!selectedDate) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (selectedDate === todayStr) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      if (currentMinutes >= 19 * 60) {
+        if (!isSlotAvailableForDate(selectedTimeSlot, selectedDate)) {
+          setSelectedTimeSlot('07:30 PM');
+        }
+      } else if (!isSlotAvailableForDate(selectedTimeSlot, selectedDate)) {
+        const firstAvail = SALON_TIME_SLOTS.find(s => isSlotAvailableForDate(s, selectedDate));
+        if (firstAvail) setSelectedTimeSlot(firstAvail);
+      }
+    }
+  }, [selectedDate, selectedTimeSlot]);
+
   const handleSelectService = (srv: ServiceItem) => {
     setSelectedService(srv);
     if (srv.tierOptions && srv.tierOptions.length > 0) {
@@ -189,8 +243,13 @@ export const BookingModal: React.FC = () => {
   };
 
   const handleProceedToRazorpay = () => {
+    setFormError('');
     if (!clientName.trim() || !clientPhone.trim()) {
-      alert('Please provide your name and mobile number for appointment confirmation and 24h reminder notification.');
+      setFormError('Please provide your full name and 10-digit mobile number to confirm your booking pass.');
+      return;
+    }
+    if (!isSlotAvailableForDate(selectedTimeSlot, selectedDate)) {
+      setFormError('The selected time slot is closed for today. Appointments before 7:00 PM cannot be booked. Please select an available slot after 7:00 PM.');
       return;
     }
     setShowRazorpayModal(true);
@@ -232,21 +291,21 @@ export const BookingModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-[#141418] border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden text-zinc-100 my-auto max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 dark:bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-[#141418] border border-purple-200/80 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden text-zinc-900 dark:text-zinc-100 my-auto max-h-[92vh] flex flex-col">
         
         {/* Modal Top Header */}
-        <div className="bg-[#0e0e11] border-b border-zinc-800 px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between shrink-0">
+        <div className="bg-purple-50/60 dark:bg-[#0e0e11] border-b border-purple-200/80 dark:border-zinc-800 px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <ModernSalonLogo size="sm" showTagline={false} />
-            <div className="truncate border-l border-zinc-800 pl-3">
-              <h3 className="font-bold text-sm sm:text-base text-zinc-100 truncate">
+            <div className="truncate border-l border-purple-200 dark:border-zinc-800 pl-3">
+              <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 truncate">
                 {step === 4 ? 'Appointment Confirmation Pass' : 'Schedule Appointment'}
               </h3>
-              <p className="text-[11px] text-zinc-400 truncate">
+              <p className="text-[11px] text-zinc-600 dark:text-zinc-400 truncate">
                 {step === 4 
-                  ? '10% Advance Deposit Verified • Digital Pass Ready'
-                  : '10% Online Deposit via UPI / Razorpay • 90% Balance at Counter'
+                  ? `${advancePercentage}% Advance Deposit Verified • Digital Pass Ready`
+                  : `${advancePercentage}% Online Deposit via UPI / Razorpay • ${100 - advancePercentage}% Balance at Counter`
                 }
               </p>
             </div>
@@ -254,7 +313,7 @@ export const BookingModal: React.FC = () => {
 
           <button
             onClick={closeBookingModal}
-            className="p-1.5 sm:p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition shrink-0 ml-2"
+            className="p-1.5 sm:p-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-purple-100 dark:hover:bg-zinc-800 transition shrink-0 ml-2 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -262,64 +321,64 @@ export const BookingModal: React.FC = () => {
 
         {/* Step Indicator (Steps 1 to 3) */}
         {step < 4 && (
-          <div className="bg-[#101014] border-b border-zinc-800 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs shrink-0">
-            <div className={`flex items-center gap-1.5 ${step >= 1 ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 1 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold' : 'bg-zinc-800 text-zinc-500'}`}>1</span>
+          <div className="bg-purple-50/30 dark:bg-[#101014] border-b border-purple-100 dark:border-zinc-800 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs shrink-0">
+            <div className={`flex items-center gap-1.5 ${step >= 1 ? 'text-purple-700 dark:text-amber-400 font-bold' : 'text-zinc-400 dark:text-zinc-500'}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 1 ? 'bg-purple-600 text-white dark:bg-amber-500/20 dark:text-amber-400 border border-purple-600 dark:border-amber-500/40 font-bold' : 'bg-purple-100 dark:bg-zinc-800 text-zinc-500'}`}>1</span>
               <span>Select Service</span>
             </div>
-            <span className="text-zinc-700">→</span>
-            <div className={`flex items-center gap-1.5 ${step >= 2 ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 2 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold' : 'bg-zinc-800 text-zinc-500'}`}>2</span>
+            <span className="text-zinc-300 dark:text-zinc-700">→</span>
+            <div className={`flex items-center gap-1.5 ${step >= 2 ? 'text-purple-700 dark:text-amber-400 font-bold' : 'text-zinc-400 dark:text-zinc-500'}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 2 ? 'bg-purple-600 text-white dark:bg-amber-500/20 dark:text-amber-400 border border-purple-600 dark:border-amber-500/40 font-bold' : 'bg-purple-100 dark:bg-zinc-800 text-zinc-500'}`}>2</span>
               <span>Date &amp; Slot</span>
             </div>
-            <span className="text-zinc-700">→</span>
-            <div className={`flex items-center gap-1.5 ${step >= 3 ? 'text-amber-400 font-bold' : 'text-zinc-500'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 3 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold' : 'bg-zinc-800 text-zinc-500'}`}>3</span>
-              <span>10% Advance Deposit</span>
+            <span className="text-zinc-300 dark:text-zinc-700">→</span>
+            <div className={`flex items-center gap-1.5 ${step >= 3 ? 'text-purple-700 dark:text-amber-400 font-bold' : 'text-zinc-400 dark:text-zinc-500'}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 3 ? 'bg-purple-600 text-white dark:bg-amber-500/20 dark:text-amber-400 border border-purple-600 dark:border-amber-500/40 font-bold' : 'bg-purple-100 dark:bg-zinc-800 text-zinc-500'}`}>3</span>
+              <span>{advancePercentage}% Advance Deposit</span>
             </div>
           </div>
         )}
 
         {/* Modal Body with smooth scrolling */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 text-left">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 text-left bg-white dark:bg-[#141418]">
           {/* STEP 1: Service & Tier Variant Selection */}
           {step === 1 && (
             <div className="space-y-5">
               {/* Highlight if a Custom / Preset Bundle is selected */}
               {selectedService && (!services.some(s => s.id === selectedService.id) || selectedService.id.startsWith('bundle-') || selectedService.id.startsWith('preset-')) && (
-                <div className="p-4 rounded-2xl border border-amber-500/50 bg-amber-500/10 shadow-md space-y-2.5">
+                <div className="p-4 rounded-2xl border border-purple-300 dark:border-amber-500/50 bg-purple-50/70 dark:bg-amber-500/10 shadow-md space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
-                      <Sparkles className="w-4 h-4 text-amber-400" />
+                    <div className="flex items-center gap-2 text-xs font-bold text-purple-700 dark:text-amber-400">
+                      <Sparkles className="w-4 h-4 text-purple-600 dark:text-amber-500" />
                       <span>Special Discounted Bundle Selected</span>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full bg-amber-500 text-zinc-950 text-[10px] font-extrabold">
+                    <span className="px-2 py-0.5 rounded-full bg-purple-600 dark:bg-amber-500 text-white dark:text-zinc-950 text-[10px] font-extrabold">
                       Active Bundle
                     </span>
                   </div>
-                  <div className="text-sm font-bold text-white">{selectedService.name}</div>
-                  <p className="text-xs text-zinc-300 leading-relaxed">{selectedService.description}</p>
+                  <div className="text-sm font-bold text-zinc-900 dark:text-white">{selectedService.name}</div>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">{selectedService.description}</p>
                   
                   {selectedService.benefits && selectedService.benefits.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
                       {selectedService.benefits.map((b, i) => (
-                        <div key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-300">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <div key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-700 dark:text-zinc-300">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                           <span className="truncate">{b}</span>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between text-xs font-mono">
-                    <span className="text-zinc-400">Total Bundle Price: <strong className="text-amber-400 text-sm">₹{selectedService.price}</strong></span>
-                    <span className="text-emerald-400 font-bold">10% Advance Deposit: ₹{selectedService.advanceDeposit}</span>
+                  <div className="pt-2 border-t border-purple-200 dark:border-amber-500/20 flex items-center justify-between text-xs font-mono">
+                    <span className="text-zinc-600 dark:text-zinc-400">Total Bundle Price: <strong className="text-purple-700 dark:text-amber-400 text-sm">₹{selectedService.price}</strong></span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">{advancePercentage}% Advance Deposit: ₹{Math.round((selectedService.price * advancePercentage) / 100)}</span>
                   </div>
                 </div>
               )}
 
               <div>
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-400 uppercase tracking-wider block mb-2">
                   1. Select Treatment / Service
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
@@ -329,25 +388,25 @@ export const BookingModal: React.FC = () => {
                       onClick={() => handleSelectService(srv)}
                       className={`p-3 rounded-2xl border cursor-pointer transition flex items-start gap-3 ${
                         selectedService?.id === srv.id
-                          ? 'border-amber-500 bg-amber-500/15 shadow-sm'
-                          : 'border-zinc-800 bg-[#181820]/70 hover:border-zinc-700'
+                          ? 'border-purple-600 bg-purple-50 text-purple-950 dark:border-amber-500 dark:bg-amber-500/15 shadow-sm ring-1 ring-purple-600/40 dark:ring-amber-500/40'
+                          : 'border-purple-100 dark:border-zinc-800 bg-white dark:bg-[#181820]/70 hover:border-purple-300 dark:hover:border-zinc-700'
                       }`}
                     >
                       <img
                         src={srv.imageUrl}
                         alt={srv.name}
-                        className="w-12 h-12 rounded-xl object-cover border border-zinc-800 shrink-0"
+                        className="w-12 h-12 rounded-xl object-cover border border-purple-100 dark:border-zinc-800 shrink-0"
                         referrerPolicy="no-referrer"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-sm text-zinc-100 truncate">{srv.name}</div>
-                        <div className="text-[11px] text-zinc-400">{srv.durationMinutes} mins • {srv.category}</div>
+                        <div className="font-bold text-sm text-zinc-900 dark:text-zinc-100 truncate">{srv.name}</div>
+                        <div className="text-[11px] text-zinc-600 dark:text-zinc-400">{srv.durationMinutes} mins • {srv.category}</div>
                         <div className="mt-1 flex items-center justify-between">
-                          <span className="font-extrabold text-amber-400 text-xs font-mono">
+                          <span className="font-extrabold text-purple-700 dark:text-amber-400 text-xs font-mono">
                             {srv.priceDisplay || `₹${srv.price}`}
                           </span>
-                          <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
-                            10% Adv: ₹{Math.round(srv.price * 0.1)}
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20 font-bold">
+                            {advancePercentage}% Adv: ₹{Math.round((srv.price * advancePercentage) / 100)}
                           </span>
                         </div>
                       </div>
@@ -358,9 +417,9 @@ export const BookingModal: React.FC = () => {
 
               {/* Pricing Tier Variation Picker (if selected service has multiple tiers) */}
               {selectedService?.tierOptions && selectedService.tierOptions.length > 1 && (
-                <div className="p-3.5 rounded-2xl bg-[#0e0e11] border border-zinc-800 space-y-2">
-                  <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5 text-red-500" />
+                <div className="p-3.5 rounded-2xl bg-purple-50/50 dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 space-y-2">
+                  <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400" />
                     <span>Select Specific Option / Length / Tier for {selectedService.name}:</span>
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -372,15 +431,15 @@ export const BookingModal: React.FC = () => {
                           onClick={() => setSelectedTier(tier)}
                           className={`p-2.5 rounded-xl border cursor-pointer transition flex items-center justify-between text-xs ${
                             isTierActive
-                              ? 'border-red-500 bg-red-500/20 text-white font-bold shadow-sm ring-1 ring-red-500'
-                              : 'border-zinc-800 bg-[#181820] text-zinc-400 hover:border-zinc-700'
+                              ? 'border-purple-600 dark:border-amber-500 bg-purple-50 dark:bg-amber-500/20 text-purple-950 dark:text-white font-bold shadow-sm ring-1 ring-purple-600 dark:ring-amber-500'
+                              : 'border-purple-100 dark:border-zinc-800 bg-white dark:bg-[#181820] text-zinc-800 dark:text-zinc-400 hover:border-purple-300 dark:hover:border-zinc-700'
                           }`}
                         >
                           <span className="truncate pr-2">{tier.label}</span>
                           <div className="text-right shrink-0">
-                            <div className="font-mono text-red-400 font-bold">₹{tier.price}</div>
-                            <div className="text-[10px] text-emerald-400 font-mono">
-                              Adv: ₹{Math.round(tier.price * 0.1)}
+                            <div className="font-mono text-purple-700 dark:text-amber-400 font-bold">₹{tier.price}</div>
+                            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
+                              Adv: ₹{Math.round((tier.price * advancePercentage) / 100)}
                             </div>
                           </div>
                         </div>
@@ -392,7 +451,7 @@ export const BookingModal: React.FC = () => {
 
               {/* Stylist Selection */}
               <div>
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-400 uppercase tracking-wider block mb-2">
                   2. Select Master Stylist / Grooming Artist
                 </label>
                 <div className="grid grid-cols-1 gap-2">
@@ -401,8 +460,8 @@ export const BookingModal: React.FC = () => {
                       key={st}
                       className={`p-3 rounded-2xl border cursor-pointer transition flex items-center justify-between text-xs font-medium ${
                         selectedStylist === st
-                          ? 'border-red-500 bg-red-500/15 text-white font-bold'
-                          : 'border-zinc-800 bg-[#181820]/70 text-zinc-400 hover:border-zinc-700'
+                          ? 'border-purple-600 dark:border-amber-500 bg-purple-50 dark:bg-amber-500/15 text-purple-950 dark:text-white font-bold'
+                          : 'border-purple-100 dark:border-zinc-800 bg-white dark:bg-[#181820]/70 text-zinc-800 dark:text-zinc-400 hover:border-purple-300 dark:hover:border-zinc-700'
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
@@ -411,11 +470,11 @@ export const BookingModal: React.FC = () => {
                           name="stylist"
                           checked={selectedStylist === st}
                           onChange={() => setSelectedStylist(st)}
-                          className="accent-red-600"
+                          className="accent-purple-600 dark:accent-amber-500"
                         />
                         <span>{st}</span>
                       </div>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
                         Available
                       </span>
                     </label>
@@ -429,26 +488,26 @@ export const BookingModal: React.FC = () => {
           {step === 2 && (
             <div className="space-y-5">
               {/* Selected summary */}
-              <div className="p-3.5 rounded-2xl bg-[#0e0e11] border border-zinc-800 flex items-center justify-between">
+              <div className="p-3.5 rounded-2xl bg-purple-50/60 dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] uppercase font-bold text-zinc-400">Selected Treatment</div>
-                  <div className="font-bold text-sm text-zinc-100">
+                  <div className="text-[10px] uppercase font-bold text-zinc-600 dark:text-zinc-400">Selected Treatment</div>
+                  <div className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
                     {selectedService?.name} {selectedTier ? `(${selectedTier.label})` : ''}
                   </div>
-                  <div className="text-xs text-zinc-400 font-mono">
+                  <div className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
                     Duration: ~{activeDuration} mins • Price: ₹{activeBasePrice}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] text-emerald-400 font-bold">10% Deposit</div>
-                  <div className="text-sm font-bold text-red-400 font-mono">
+                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">{advancePercentage}% Deposit</div>
+                  <div className="text-sm font-bold text-purple-700 dark:text-amber-400 font-mono">
                     ₹{advanceDeposit}
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-400 uppercase tracking-wider block mb-2">
                   Select Appointment Date
                 </label>
                 <input
@@ -456,20 +515,40 @@ export const BookingModal: React.FC = () => {
                   min={new Date().toISOString().split('T')[0]}
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-[#0e0e11] border border-zinc-800 text-sm text-white focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                  className="w-full px-4 py-2.5 rounded-2xl bg-white dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-amber-500/40"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                  <label className="text-xs font-bold text-zinc-700 dark:text-zinc-400 uppercase tracking-wider">
                     Select Time Slot (Mohol Salon Hours: 9:00 AM - 9:00 PM)
                   </label>
-                  <span className="text-[11px] text-amber-400 font-medium flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-amber-400" />
+                  <span className="text-[11px] text-purple-700 dark:text-amber-400 font-medium flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-amber-500" />
                     <span>Real-time chair capacity</span>
                   </span>
                 </div>
+
+                {/* Evening 7:00 PM Constraint Alert */}
+                {(() => {
+                  const todayStr = new Date().toISOString().split('T')[0];
+                  const now = new Date();
+                  const isToday = selectedDate === todayStr;
+                  const isPastSevenPm = isToday && (now.getHours() * 60 + now.getMinutes() >= 19 * 60);
+                  if (isPastSevenPm) {
+                    return (
+                      <div className="mb-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300">
+                        <Clock className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <div>
+                          <strong className="block font-bold">Evening Schedule Active (Past 7:00 PM)</strong>
+                          <span className="text-[11px] opacity-90">Appointments before 7:00 PM are closed for today. Please select an available slot after 7:00 PM below.</span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {SALON_TIME_SLOTS.map((slot) => {
@@ -486,18 +565,18 @@ export const BookingModal: React.FC = () => {
                         onClick={() => setSelectedTimeSlot(slot)}
                         className={`p-2.5 rounded-xl border text-left transition relative flex flex-col justify-between cursor-pointer ${
                           isSoldOut
-                            ? 'border-zinc-800 bg-[#121216] opacity-50 cursor-not-allowed text-zinc-500'
+                            ? 'border-purple-100 dark:border-zinc-800 bg-zinc-100/80 dark:bg-[#121216] opacity-50 cursor-not-allowed text-zinc-400 dark:text-zinc-500'
                             : isSelected
-                            ? 'border-red-500 bg-red-600/90 text-white shadow-md ring-2 ring-red-500/40'
+                            ? 'border-purple-600 dark:border-amber-500 bg-purple-600 dark:bg-amber-500 text-white dark:text-zinc-950 shadow-md ring-2 ring-purple-600/40 dark:ring-amber-500/40 font-bold'
                             : isFast
-                            ? 'border-amber-500/50 bg-amber-500/10 text-zinc-200 hover:border-amber-400'
-                            : 'border-zinc-800 bg-[#181820] text-zinc-300 hover:border-zinc-700'
+                            ? 'border-amber-400 bg-amber-50 dark:bg-amber-500/10 text-zinc-900 dark:text-zinc-200 hover:border-amber-500'
+                            : 'border-purple-100 dark:border-zinc-800 bg-white dark:bg-[#181820] text-zinc-900 dark:text-zinc-300 hover:border-purple-300 dark:hover:border-zinc-700'
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-mono font-bold">{slot}</span>
                           {isSoldOut ? (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
                               Full
                             </span>
                           ) : isFast ? (
@@ -506,14 +585,14 @@ export const BookingModal: React.FC = () => {
                               <span>Fast</span>
                             </span>
                           ) : (
-                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-bold">
                               Open
                             </span>
                           )}
                         </div>
 
-                        <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
-                          <span className={isSelected ? 'text-white/80' : isFast ? 'text-amber-300/90' : 'text-zinc-400'}>
+                        <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-600 dark:text-zinc-400">
+                          <span className={isSelected ? 'text-white dark:text-zinc-950 font-bold' : isFast ? 'text-amber-700 dark:text-amber-300/90 font-medium' : 'text-zinc-600 dark:text-zinc-400'}>
                             {slotInfo.urgencyText}
                           </span>
                         </div>
@@ -527,8 +606,8 @@ export const BookingModal: React.FC = () => {
                   const activeSlotInfo = getSlotAvailability(appointments, selectedDate, selectedTimeSlot);
                   if (activeSlotInfo.isFillingFast && activeSlotInfo.status !== 'SOLD_OUT') {
                     return (
-                      <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center gap-2">
-                        <Flame className="w-4 h-4 text-amber-400 shrink-0 fill-amber-400" />
+                      <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                        <Flame className="w-4 h-4 text-amber-500 shrink-0 fill-amber-500" />
                         <span>
                           <strong>{selectedTimeSlot} is Filling Fast!</strong> {activeSlotInfo.pendingCount > 0 ? `${activeSlotInfo.pendingCount} pending customer hold(s) active.` : 'High demand slot.'} Complete {advancePercentage}% advance deposit to lock your station.
                         </span>
@@ -546,56 +625,56 @@ export const BookingModal: React.FC = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-zinc-300 block mb-1">
+                  <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
                     Your Full Name *
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+                    <User className="w-4 h-4 text-zinc-400 dark:text-zinc-500 absolute left-3 top-3" />
                     <input
                       type="text"
                       placeholder="e.g. Pooja Kadam"
                       value={clientName}
                       onChange={(e) => setClientName(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#0e0e11] border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-amber-500/40"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-zinc-300 block mb-1">
+                  <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
                     Mobile Number (For 24h Reminder) *
                   </label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+                    <Phone className="w-4 h-4 text-zinc-400 dark:text-zinc-500 absolute left-3 top-3" />
                     <input
                       type="tel"
                       placeholder="e.g. 8104026257"
                       value={clientPhone}
                       onChange={(e) => setClientPhone(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#0e0e11] border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-amber-500/40"
                     />
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-zinc-300 block mb-1">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
                   Email Address (Optional for Digital Pass Receipt)
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+                  <Mail className="w-4 h-4 text-zinc-400 dark:text-zinc-500 absolute left-3 top-3" />
                   <input
                     type="email"
                     placeholder="e.g. yourname@gmail.com"
                     value={clientEmail}
                     onChange={(e) => setClientEmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#0e0e11] border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-amber-500/40"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-zinc-300 block mb-1">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
                   Special Notes or Allergies
                 </label>
                 <textarea
@@ -603,23 +682,23 @@ export const BookingModal: React.FC = () => {
                   placeholder="Any hair/scalp allergies, skin sensitivity, or specific style preferences..."
                   value={specialNotes}
                   onChange={(e) => setSpecialNotes(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-[#0e0e11] border border-zinc-800 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                  className="w-full p-2.5 rounded-xl bg-white dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-amber-500/40"
                 />
               </div>
 
               {/* Coupon Code Section */}
-              <div className="p-3 rounded-2xl bg-[#0e0e11] border border-zinc-800 space-y-2">
-                <div className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-                  <Tag className="w-3.5 h-3.5 text-amber-500" />
+              <div className="p-3 rounded-2xl bg-purple-50/50 dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 space-y-2">
+                <div className="text-xs font-bold text-zinc-900 dark:text-zinc-300 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-purple-600 dark:text-amber-500" />
                   <span>Have a Promo / Coupon Code?</span>
                 </div>
                 
                 {appliedCoupon ? (
-                  <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs">
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs">
                     <span>Coupon <strong>{appliedCoupon.code}</strong> Applied (-₹{appliedCoupon.discount})</span>
                     <button
                       onClick={handleRemoveCoupon}
-                      className="text-amber-400 hover:text-amber-300 font-bold"
+                      className="text-purple-700 dark:text-amber-400 hover:underline font-bold cursor-pointer"
                     >
                       Remove
                     </button>
@@ -631,42 +710,49 @@ export const BookingModal: React.FC = () => {
                       placeholder="e.g. MODERN20, MOHOL10"
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                      className="flex-1 px-3 py-1.5 rounded-xl bg-[#141418] border border-zinc-800 text-xs text-white font-mono uppercase focus:outline-none focus:border-amber-500"
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-white dark:bg-[#141418] border border-purple-200/80 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono uppercase focus:outline-none focus:border-purple-500 dark:focus:border-amber-500"
                     />
                     <button
                       type="button"
                       onClick={handleApplyCoupon}
-                      className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-zinc-950 font-bold text-xs shadow-sm cursor-pointer"
+                      className="px-4 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-gradient-to-r dark:from-amber-500 dark:to-yellow-400 dark:hover:from-amber-400 dark:hover:to-yellow-300 text-white dark:text-zinc-950 font-bold text-xs shadow-sm cursor-pointer"
                     >
                       Apply
                     </button>
                   </div>
                 )}
-                {couponError && <p className="text-[11px] text-amber-400">{couponError}</p>}
+                {couponError && <p className="text-[11px] text-amber-600 dark:text-amber-400">{couponError}</p>}
               </div>
 
+              {formError && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               {/* Billing Summary Box */}
-              <div className="p-4 rounded-2xl bg-[#0e0e11] border border-zinc-800 text-white space-y-2.5">
-                <div className="flex justify-between text-xs text-zinc-400">
+              <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 text-zinc-900 dark:text-white space-y-2.5">
+                <div className="flex justify-between text-xs text-zinc-600 dark:text-zinc-400">
                   <span>Treatment Total:</span>
-                  <span className="font-mono">₹{activeBasePrice}</span>
+                  <span className="font-mono font-bold">₹{activeBasePrice}</span>
                 </div>
                 {appliedCoupon && (
-                  <div className="flex justify-between text-xs text-emerald-400">
+                  <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                     <span>Discount ({appliedCoupon.code}):</span>
                     <span className="font-mono">-₹{discountAmount}</span>
                   </div>
                 )}
-                <div className="border-t border-zinc-800 pt-2 flex justify-between font-bold text-sm">
+                <div className="border-t border-purple-200 dark:border-zinc-800 pt-2 flex justify-between font-bold text-sm">
                   <span>Net Service Amount:</span>
-                  <span className="font-mono text-amber-400">₹{netTotal}</span>
+                  <span className="font-mono text-purple-700 dark:text-amber-400">₹{netTotal}</span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-purple-100/70 dark:bg-amber-500/10 border border-purple-200 dark:border-amber-500/30 flex items-center justify-between">
                   <div className="text-xs">
-                    <div className="font-bold text-amber-300">{advancePercentage}% Online Advance Deposit Payable Now</div>
-                    <div className="text-[10px] text-zinc-400">Remaining {100 - advancePercentage}% (₹{balanceAtSalon}) balance payable at salon</div>
+                    <div className="font-bold text-purple-900 dark:text-amber-300">{advancePercentage}% Online Advance Deposit Payable Now</div>
+                    <div className="text-[10px] text-zinc-600 dark:text-zinc-400">Remaining {100 - advancePercentage}% (₹{balanceAtSalon}) balance payable at salon</div>
                   </div>
-                  <div className="text-base font-extrabold text-amber-400 font-mono">
+                  <div className="text-base font-extrabold text-purple-700 dark:text-amber-400 font-mono">
                     ₹{advanceDeposit}
                   </div>
                 </div>
@@ -677,87 +763,122 @@ export const BookingModal: React.FC = () => {
           {/* STEP 4: Confirmation Pass (Receipt) */}
           {step === 4 && confirmedBooking && (
             <div className="space-y-5 text-center">
-              <div className="w-14 h-14 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
+              <div className="w-14 h-14 bg-emerald-500/20 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
 
               <div className="space-y-1">
-                <h3 className="text-xl font-extrabold text-white">
+                <h3 className="text-xl font-extrabold text-zinc-900 dark:text-white">
                   Appointment Confirmed!
                 </h3>
-                <p className="text-xs text-zinc-400">
-                  Your slot has been secured with a 10% online advance deposit.
+                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                  Your slot has been secured with a {advancePercentage}% online advance deposit.
                 </p>
               </div>
 
               {/* Digital Pass Card */}
-              <div className="bg-[#0e0e11] border border-zinc-800 rounded-3xl p-5 text-left space-y-4 shadow-sm">
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="bg-purple-50/40 dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 rounded-3xl p-5 text-left space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-purple-200 dark:border-zinc-800 pb-3">
                   <div>
-                    <div className="text-[10px] font-mono text-zinc-400 uppercase">Booking Reference</div>
-                    <div className="font-mono font-bold text-sm text-amber-400">
+                    <div className="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 uppercase">Booking Reference</div>
+                    <div className="font-mono font-bold text-sm text-purple-700 dark:text-amber-400">
                       {confirmedBooking.bookingRef}
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                     DEPOSIT VERIFIED
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-zinc-400 block text-[10px]">Client Name</span>
-                    <strong className="text-white">{confirmedBooking.clientName}</strong>
+                    <span className="text-zinc-600 dark:text-zinc-400 block text-[10px]">Client Name</span>
+                    <strong className="text-zinc-900 dark:text-white">{confirmedBooking.clientName}</strong>
                   </div>
                   <div>
-                    <span className="text-zinc-400 block text-[10px]">Contact Mobile</span>
-                    <strong className="text-white">{confirmedBooking.clientPhone}</strong>
+                    <span className="text-zinc-600 dark:text-zinc-400 block text-[10px]">Contact Mobile</span>
+                    <strong className="text-zinc-900 dark:text-white">{confirmedBooking.clientPhone}</strong>
                   </div>
                   <div>
-                    <span className="text-zinc-400 block text-[10px]">Date &amp; Time</span>
-                    <strong className="text-white">{confirmedBooking.date} at {confirmedBooking.timeSlot}</strong>
+                    <span className="text-zinc-600 dark:text-zinc-400 block text-[10px]">Date &amp; Time</span>
+                    <strong className="text-zinc-900 dark:text-white">{confirmedBooking.date} at {confirmedBooking.timeSlot}</strong>
                   </div>
                   <div>
-                    <span className="text-zinc-400 block text-[10px]">Stylist</span>
-                    <strong className="text-white">{confirmedBooking.stylistName}</strong>
+                    <span className="text-zinc-600 dark:text-zinc-400 block text-[10px]">Stylist</span>
+                    <strong className="text-zinc-900 dark:text-white">{confirmedBooking.stylistName}</strong>
                   </div>
                 </div>
 
-                <div className="p-3 rounded-2xl bg-[#141418] border border-zinc-800 flex items-center justify-between text-xs font-mono">
+                <div className="p-3 rounded-2xl bg-white dark:bg-[#141418] border border-purple-200/80 dark:border-zinc-800 flex items-center justify-between text-xs font-mono">
                   <div>
-                    <span className="text-zinc-400 block text-[10px]">Advance Paid</span>
-                    <span className="font-bold text-emerald-400">₹{confirmedBooking.advancePaid}</span>
+                    <span className="text-zinc-600 dark:text-zinc-400 block text-[10px]">Advance Paid</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{confirmedBooking.advancePaid}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-zinc-400 block text-[10px]">Balance Due at Salon</span>
-                    <span className="font-bold text-white">₹{confirmedBooking.balanceDue}</span>
+                    <span className="text-zinc-600 dark:text-zinc-400 block text-[10px]">Balance Due at Salon</span>
+                    <span className="font-bold text-zinc-900 dark:text-white">₹{confirmedBooking.balanceDue}</span>
                   </div>
                 </div>
 
-                <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                {/* Verifiable Booking QR Code */}
+                {bookingQrUrl && (
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-[#141418] border border-purple-200/80 dark:border-zinc-800 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                    <div className="p-2 rounded-xl bg-white shadow-sm border border-zinc-200 shrink-0">
+                      <img
+                        src={bookingQrUrl}
+                        alt={`QR Pass for ${confirmedBooking.bookingRef}`}
+                        className="w-28 h-28 object-contain rounded-lg"
+                      />
+                    </div>
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-bold text-[10px] border border-purple-200 dark:border-purple-800/60">
+                        <QrCodeIcon className="w-3 h-3" />
+                        <span>Instant Check-In QR Pass</span>
+                      </div>
+                      <h5 className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                        Show this QR code at salon reception desk
+                      </h5>
+                      <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                        The front desk will verify your advance deposit and check you in immediately without waiting.
+                      </p>
+                      <div className="pt-1 flex items-center justify-center sm:justify-start gap-2">
+                        <a
+                          href={bookingQrUrl}
+                          download={`ModernSalon-${confirmedBooking.bookingRef}-QR.png`}
+                          className="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-[11px] font-semibold inline-flex items-center gap-1 transition"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>Download QR</span>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-[11px] text-zinc-700 dark:text-zinc-400 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-purple-600 dark:text-amber-500 shrink-0" />
                   <span>Modern Unisex Salon, B.N. Gund Complex, Near ICICI Bank, Mohol</span>
                 </div>
               </div>
 
               {/* WhatsApp Automated Notification Status Card */}
-              <div className="p-4 rounded-3xl bg-emerald-950/40 border border-emerald-500/40 text-left space-y-3">
+              <div className="p-4 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/40 text-left space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="relative flex h-3 w-3">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                     </span>
-                    <span className="text-xs font-bold text-emerald-400">
+                    <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400">
                       Automated WhatsApp Notification Enabled
                     </span>
                   </div>
-                  <span className="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30">
                     DISPATCHED
                   </span>
                 </div>
-                <p className="text-xs text-zinc-300 leading-relaxed">
-                  Booking verification pass and appointment details have been automatically queued to the salon owner WhatsApp (<strong className="text-emerald-400 font-mono">+91 81040 26257</strong>). You can also click below to chat directly or save your digital pass.
+                <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                  Booking verification pass and appointment details have been automatically queued to the salon owner WhatsApp (<strong className="text-emerald-700 dark:text-emerald-400 font-mono">+91 81040 26257</strong>). You can also click below to chat directly or save your digital pass.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <a
@@ -774,9 +895,9 @@ export const BookingModal: React.FC = () => {
                       href={confirmedBooking.whatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="py-2 px-3 rounded-xl bg-[#18181f] hover:bg-zinc-800 text-zinc-200 border border-zinc-700 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                      className="py-2 px-3 rounded-xl bg-white dark:bg-[#18181f] hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-purple-200 dark:border-zinc-700 font-bold text-xs flex items-center justify-center gap-1.5 transition"
                     >
-                      <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <Share2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       <span>Save / Share on WhatsApp</span>
                     </a>
                   )}
@@ -787,19 +908,27 @@ export const BookingModal: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  className="flex-1 py-2.5 rounded-xl border border-zinc-800 hover:bg-zinc-800 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  onClick={() => printSalonReceipt(confirmedBooking, bookingQrUrl)}
+                  className="flex-1 py-2.5 rounded-xl border border-purple-200 dark:border-zinc-800 hover:bg-purple-50 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Printer className="w-3.5 h-3.5" />
+                  <Printer className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400" />
                   <span>Print Receipt</span>
                 </button>
                 <button
                   type="button"
+                  onClick={() => downloadReceiptFile(confirmedBooking, bookingQrUrl)}
+                  className="flex-1 py-2.5 rounded-xl border border-purple-200 dark:border-zinc-800 hover:bg-purple-50 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400" />
+                  <span>Save PDF Receipt</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => resetBookingForm(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-purple-50 dark:bg-amber-500/15 border border-purple-200 dark:border-amber-500/40 text-purple-700 dark:text-amber-400 hover:bg-purple-100 dark:hover:bg-amber-500/25 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Book Another Appointment</span>
+                  <span>Book Another</span>
                 </button>
                 <button
                   type="button"
@@ -807,7 +936,7 @@ export const BookingModal: React.FC = () => {
                     resetBookingForm(null);
                     closeBookingModal();
                   }}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-zinc-950 text-xs font-extrabold transition shadow-md shadow-amber-500/20 cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-gradient-to-r dark:from-amber-500 dark:to-yellow-400 dark:hover:from-amber-400 dark:hover:to-yellow-300 text-white dark:text-zinc-950 text-xs font-extrabold transition shadow-md cursor-pointer"
                 >
                   Done &amp; Close
                 </button>
@@ -818,12 +947,12 @@ export const BookingModal: React.FC = () => {
 
         {/* Modal Footer Controls (Steps 1 to 3) */}
         {step < 4 && (
-          <div className="bg-[#0e0e11] border-t border-zinc-800 px-4 sm:px-6 py-3.5 flex items-center justify-between shrink-0">
+          <div className="bg-purple-50/60 dark:bg-[#0e0e11] border-t border-purple-200/80 dark:border-zinc-800 px-4 sm:px-6 py-3.5 flex items-center justify-between shrink-0">
             {step > 1 ? (
               <button
                 type="button"
                 onClick={() => setStep(step - 1)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-purple-100 dark:hover:bg-zinc-800 transition cursor-pointer"
               >
                 Back
               </button>
@@ -835,7 +964,7 @@ export const BookingModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setStep(step + 1)}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-zinc-950 font-extrabold text-xs inline-flex items-center gap-1.5 transition shadow-lg shadow-amber-500/20 active:scale-95 border border-amber-400/40 cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-gradient-to-r dark:from-amber-500 dark:via-yellow-400 dark:to-amber-500 dark:hover:from-amber-400 dark:hover:to-yellow-300 text-white dark:text-zinc-950 font-extrabold text-xs inline-flex items-center gap-1.5 transition shadow-lg active:scale-95 cursor-pointer"
               >
                 <span>Continue</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -844,7 +973,7 @@ export const BookingModal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleProceedToRazorpay}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-zinc-950 font-extrabold text-xs inline-flex items-center gap-1.5 transition shadow-xl shadow-amber-500/25 active:scale-95 border border-amber-400/40 cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-gradient-to-r dark:from-amber-500 dark:via-yellow-400 dark:to-amber-500 dark:hover:from-amber-400 dark:hover:to-yellow-300 text-white dark:text-zinc-950 font-extrabold text-xs inline-flex items-center gap-1.5 transition shadow-xl active:scale-95 cursor-pointer"
               >
                 <span>Pay ₹{advanceDeposit} Advance with Razorpay</span>
                 <ChevronRight className="w-3.5 h-3.5" />

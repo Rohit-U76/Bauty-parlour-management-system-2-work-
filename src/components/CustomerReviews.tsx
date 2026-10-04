@@ -17,7 +17,8 @@ import {
   User,
   MapPin,
   Search,
-  Check
+  Check,
+  Pin
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { Review, ServiceItem } from '../types';
@@ -33,15 +34,22 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
   limit,
   showTitle = true
 }) => {
-  const { reviews, addReview, services, openBookingModal, settings } = useSalon();
+  const { reviews, addReview, updateReview, services, openBookingModal, settings, currentUser } = useSalon();
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   // Filter & Search states
   const [selectedCategory, setSelectedCategory] = useState<string>(initialFilter);
   const [minRating, setMinRating] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isWriteModalOpen, setIsWriteModalOpen] = useState<boolean>(false);
-  const [helpfulLikes, setHelpfulLikes] = useState<Record<string, number>>({});
-  const [userLikedReviews, setUserLikedReviews] = useState<Record<string, boolean>>({});
+  const [userLikedReviews, setUserLikedReviews] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('modern_salon_user_liked_reviews');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // New review form state
@@ -107,7 +115,16 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
     });
   }, [reviews, selectedCategory, minRating, searchQuery]);
 
-  const displayReviews = limit ? filteredReviews.slice(0, limit) : filteredReviews;
+  // Sort reviews so pinned/featured reviews appear first
+  const sortedReviews = useMemo(() => {
+    return [...filteredReviews].sort((a, b) => {
+      if (a.featured && !b.featured) return -1;
+      if (!a.featured && b.featured) return 1;
+      return 0;
+    });
+  }, [filteredReviews]);
+
+  const displayReviews = limit ? sortedReviews.slice(0, limit) : sortedReviews;
 
   // Rating Statistics calculation
   const stats = useMemo(() => {
@@ -130,16 +147,39 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
   }, [reviews]);
 
   const handleHelpful = (id: string) => {
-    const isLiked = userLikedReviews[id];
-    setUserLikedReviews(prev => ({ ...prev, [id]: !isLiked }));
-    setHelpfulLikes(prev => ({
-      ...prev,
-      [id]: (prev[id] || 0) + (isLiked ? -1 : 1)
-    }));
+    const rev = reviews.find(r => r.id === id);
+    if (!rev) return;
+
+    const isLiked = !!userLikedReviews[id];
+    const currentCount = typeof rev.helpfulCount === 'number' ? rev.helpfulCount : 0;
+    const newCount = isLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
+
+    const nextLiked = { ...userLikedReviews, [id]: !isLiked };
+    setUserLikedReviews(nextLiked);
+    try {
+      localStorage.setItem('modern_salon_user_liked_reviews', JSON.stringify(nextLiked));
+    } catch {}
+
+    updateReview(id, { helpfulCount: newCount });
 
     if (!isLiked) {
       showToast('Marked review as helpful!');
+    } else {
+      showToast('Removed helpful mark');
     }
+  };
+
+  const handleTogglePin = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!isAdmin) {
+      showToast('🔒 Only salon administrators can pin reviews to the featured showcase.');
+      return;
+    }
+    const rev = reviews.find(r => r.id === id);
+    if (!rev) return;
+    const newFeatured = !rev.featured;
+    updateReview(id, { featured: newFeatured });
+    showToast(newFeatured ? '📌 Pinned as Featured Review!' : 'Removed from Featured Reviews');
   };
 
   const showToast = (msg: string) => {
@@ -384,25 +424,55 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
           </div>
         ) : (
           displayReviews.map((rev) => {
-            const isLiked = userLikedReviews[rev.id] || false;
-            const extraLikes = helpfulLikes[rev.id] || 0;
-            const totalHelpful = 8 + (rev.rating === 5 ? 12 : 4) + extraLikes;
+            const isLiked = !!userLikedReviews[rev.id];
+            const helpfulCount = typeof rev.helpfulCount === 'number' ? rev.helpfulCount : 0;
 
             return (
               <div
                 key={rev.id}
-                className="rounded-3xl bg-[#131317] border border-zinc-800/90 hover:border-yellow-500/40 p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-xl transition-all duration-300 group relative overflow-hidden"
+                className={`rounded-3xl bg-white dark:bg-[#131317] border p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-sm dark:shadow-xl transition-all duration-300 group relative overflow-hidden ${
+                  rev.featured
+                    ? 'border-amber-400 dark:border-yellow-500/60 ring-1 ring-amber-400/30'
+                    : 'border-purple-200/80 dark:border-zinc-800/90 hover:border-purple-300 dark:hover:border-yellow-500/40'
+                }`}
               >
                 {/* Decorative top quote mark */}
-                <div className="absolute top-4 right-4 text-zinc-800 group-hover:text-yellow-500/10 transition-colors pointer-events-none">
+                <div className="absolute top-4 right-4 text-purple-100 dark:text-zinc-800 group-hover:text-purple-200 dark:group-hover:text-yellow-500/10 transition-colors pointer-events-none">
                   <Quote className="w-10 h-10" />
                 </div>
 
                 <div className="space-y-3 relative z-10">
+                  {/* Pinned Showcase Tag & Pin Action (Admin only) */}
+                  <div className="flex items-center justify-between gap-2">
+                    {rev.featured ? (
+                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-yellow-500/20 text-amber-800 dark:text-yellow-400 border border-amber-300 dark:border-yellow-500/40 text-[10px] font-bold">
+                        <Sparkles className="w-3 h-3 text-amber-500 fill-amber-400" />
+                        <span>Pinned to Featured</span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-zinc-400">Client Review</span>
+                    )}
+
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => handleTogglePin(rev.id, e)}
+                        title={rev.featured ? "Unpin review (Admin)" : "Pin review to Featured (Admin)"}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                          rev.featured
+                            ? 'bg-amber-500/20 text-amber-600 dark:text-yellow-400 border border-amber-400/40'
+                            : 'text-zinc-400 hover:text-amber-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                        }`}
+                      >
+                        <Pin className={`w-3 h-3 ${rev.featured ? 'fill-amber-400 text-amber-500 rotate-45' : ''}`} />
+                        <span>{rev.featured ? 'Pinned (Admin)' : 'Pin'}</span>
+                      </button>
+                    )}
+                  </div>
+
                   {/* Top Client info header */}
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full overflow-hidden border border-yellow-500/30 bg-zinc-800 shrink-0">
+                      <div className="w-10 h-10 rounded-full overflow-hidden border border-purple-300 dark:border-yellow-500/30 bg-purple-50 dark:bg-zinc-800 shrink-0">
                         <img
                           src={rev.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=240&q=80'}
                           alt={rev.clientName}
@@ -411,36 +481,36 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
                         />
                       </div>
                       <div>
-                        <div className="font-bold text-xs sm:text-sm text-zinc-100 group-hover:text-yellow-400 transition-colors flex items-center gap-1.5">
+                        <div className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 group-hover:text-purple-700 dark:group-hover:text-yellow-400 transition-colors flex items-center gap-1.5">
                           <span>{rev.clientName}</span>
                           {rev.verifiedBooking && (
-                            <span className="inline-flex items-center text-emerald-400 text-[10px]" title="Verified Appointment Booking">
+                            <span className="inline-flex items-center text-emerald-600 dark:text-emerald-400 text-[10px]" title="Verified Appointment Booking">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-zinc-400 flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-zinc-500" />
+                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-zinc-400 dark:text-zinc-500" />
                           <span>{rev.date}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Star Rating Badge */}
-                    <div className="flex items-center gap-0.5 px-2 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-bold shrink-0">
-                      <Star className="w-3.5 h-3.5 fill-yellow-400" />
+                    <div className="flex items-center gap-0.5 px-2 py-1 rounded-lg bg-amber-50 dark:bg-yellow-500/10 border border-amber-200 dark:border-yellow-500/20 text-amber-600 dark:text-yellow-400 text-xs font-bold shrink-0">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 dark:fill-yellow-400" />
                       <span>{rev.rating}.0</span>
                     </div>
                   </div>
 
                   {/* Service Tag & Quick Book Button */}
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-800/60">
-                    <span className="inline-block px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-zinc-900 border border-zinc-800 text-yellow-400 truncate max-w-[200px]">
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-purple-100 dark:border-zinc-800/60">
+                    <span className="inline-block px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-purple-50 dark:bg-zinc-900 border border-purple-200 dark:border-zinc-800 text-purple-700 dark:text-yellow-400 truncate max-w-[200px]">
                       {rev.serviceName}
                     </span>
                     <button
                       onClick={() => handleBookService(rev.serviceName)}
-                      className="text-[10px] font-bold text-zinc-400 hover:text-yellow-400 flex items-center gap-0.5 transition-colors cursor-pointer"
+                      className="text-[10px] font-bold text-purple-600 dark:text-zinc-400 hover:text-purple-800 dark:hover:text-yellow-400 flex items-center gap-0.5 transition-colors cursor-pointer"
                     >
                       <span>Book Service</span>
                       <ArrowRight className="w-3 h-3" />
@@ -448,28 +518,28 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
                   </div>
 
                   {/* Testimonial Quote */}
-                  <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed italic pt-1">
+                  <p className="text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed italic pt-1">
                     "{rev.comment}"
                   </p>
                 </div>
 
                 {/* Footer with Verified badge & Helpful button */}
-                <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs relative z-10">
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
+                <div className="pt-3 border-t border-purple-100 dark:border-zinc-800/80 flex items-center justify-between text-xs relative z-10">
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Verified 10% Deposit Visit</span>
+                    <span>Verified {settings.advancePercentage || 10}% Deposit Visit</span>
                   </div>
 
                   <button
                     onClick={() => handleHelpful(rev.id)}
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] transition-all cursor-pointer ${
                       isLiked
-                        ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 font-bold'
-                        : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                        ? 'bg-purple-100 dark:bg-yellow-500/20 text-purple-800 dark:text-yellow-400 border border-purple-300 dark:border-yellow-500/40 font-bold'
+                        : 'bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-700'
                     }`}
                   >
-                    <ThumbsUp className="w-3 h-3" />
-                    <span>Helpful ({totalHelpful})</span>
+                    <ThumbsUp className={`w-3 h-3 ${isLiked ? 'text-purple-700 dark:text-yellow-400 fill-purple-700 dark:fill-yellow-400' : ''}`} />
+                    <span>Helpful ({helpfulCount})</span>
                   </button>
                 </div>
               </div>

@@ -14,7 +14,8 @@ import {
   InquiryStatus,
   ThemeMode,
   User,
-  UserRole
+  UserRole,
+  StaffMember
 } from '../types';
 import {
   INITIAL_SERVICES,
@@ -27,7 +28,8 @@ import {
   INITIAL_NOTIFICATIONS,
   INITIAL_SETTINGS,
   INITIAL_USERS,
-  SALON_TERMS_AND_POLICIES
+  SALON_TERMS_AND_POLICIES,
+  initialStaffMembers
 } from '../data/initialData';
 
 interface BookingPayload {
@@ -69,6 +71,7 @@ interface SalonContextType {
   isBookingModalOpen: boolean;
   isQuizModalOpen: boolean;
   isAiChatOpen: boolean;
+  isProfileModalOpen: boolean;
 
   // Auth State
   currentUser: User | null;
@@ -85,6 +88,8 @@ interface SalonContextType {
   logout: () => void;
   openAuthModal: (initialTab?: 'customer' | 'admin', mode?: 'login' | 'register') => void;
   closeAuthModal: () => void;
+  openProfileModal: () => void;
+  closeProfileModal: () => void;
   toggleTheme: () => void;
   setTheme: (mode: ThemeMode) => void;
   setIsAdminMode: (val: boolean) => void;
@@ -95,11 +100,15 @@ interface SalonContextType {
   openQuizModal: () => void;
   closeQuizModal: () => void;
   toggleAiChat: () => void;
+  toggleAiWidget: () => void;
   closeAiChat: () => void;
+  updateCurrentUser: (updates: Partial<User>) => void;
 
   // Booking & Razorpay
   createAppointment: (payload: BookingPayload) => Promise<Appointment>;
   updateAppointmentStatus: (id: string, status: AppointmentStatus) => void;
+  rescheduleAppointment: (id: string, newDate: string, newTimeSlot: string) => Promise<{ success: boolean; message: string }>;
+  cancelAppointment: (id: string, reason?: string) => Promise<{ success: boolean; message: string }>;
   deleteAppointment: (id: string) => void;
 
   // Service Management
@@ -140,6 +149,13 @@ interface SalonContextType {
 
   // Settings
   updateSettings: (newSettings: Partial<SalonSettings>) => void;
+
+  // Staff Management
+  staffMembers: StaffMember[];
+  staff: StaffMember[];
+  addStaffMember: (member: Omit<StaffMember, 'id'>) => void;
+  updateStaffMember: (id: string, updates: Partial<StaffMember>) => void;
+  deleteStaffMember: (id: string) => void;
 
   // Stats Calculations
   totalRevenue: number;
@@ -202,6 +218,19 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [policies, setPolicies] = useState<SalonPolicyItem[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_policies`);
     return saved ? JSON.parse(saved) : SALON_TERMS_AND_POLICIES;
+  });
+
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>(() => {
+    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_staff_members`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error('Failed to parse saved staff members', e);
+      }
+    }
+    return initialStaffMembers;
   });
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
@@ -280,6 +309,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [isBookingModalOpen, setIsBookingModalOpen] = useState<boolean>(false);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState<boolean>(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState<boolean>(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
 
   // Sync to localStorage
   useEffect(() => {
@@ -321,14 +351,48 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
       })
       .catch(() => {});
+
+    // Real-Time Database Sync: Fetch initial appointments & notifications
+    const syncRealTimeAppointments = () => {
+      fetch('/api/appointments')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.appointments)) {
+            setAppointments(prev => {
+              // Merge db appointments with any existing local ones by unique ID
+              const existingIds = new Set(data.appointments.map((a: any) => a.id));
+              const localOnly = prev.filter(a => !existingIds.has(a.id));
+              return [...data.appointments, ...localOnly];
+            });
+          }
+        })
+        .catch(() => {});
+
+      fetch('/api/notifications')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.notifications)) {
+            setNotifications(prev => {
+              const existingIds = new Set(data.notifications.map((n: any) => n.id));
+              const localOnly = prev.filter(n => !existingIds.has(n.id));
+              return [...data.notifications, ...localOnly];
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
+    syncRealTimeAppointments();
+    const interval = setInterval(syncRealTimeAppointments, 6000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Check URL parameters for direct promo QR links (e.g. ?service=... or ?book=true)
+  // Check URL parameters for direct promo QR links (e.g. ?service=... or ?book=true or ?action=book)
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const serviceParam = params.get('service');
-      const bookParam = params.get('book');
+      const serviceParam = params.get('service') || params.get('serviceId');
+      const bookParam = params.get('book') || (params.get('action') === 'book' ? 'true' : null) || params.get('booking');
       const navParam = params.get('tab') || params.get('page');
 
       if (navParam && ['home', 'services', 'gallery', 'offers', 'reviews', 'terms', 'about', 'contact'].includes(navParam)) {
@@ -346,7 +410,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         } else {
           setIsBookingModalOpen(true);
         }
-      } else if (bookParam === 'true') {
+      } else if (bookParam === 'true' || bookParam === '1') {
         setIsBookingModalOpen(true);
       }
     } catch {
@@ -381,6 +445,10 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_policies`, JSON.stringify(policies));
   }, [policies]);
+
+  useEffect(() => {
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_staff_members`, JSON.stringify(staffMembers));
+  }, [staffMembers]);
 
   useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_notifs`, JSON.stringify(notifications));
@@ -669,6 +737,27 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  const updateCurrentUser = (updates: Partial<User>) => {
+    if (!currentUser) return;
+    const updatedUser: User = { ...currentUser, ...updates };
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(updatedUser));
+    
+    // Also update in customer directory if fields match
+    setCustomers(prev => prev.map(c => {
+      if (c.phone === updatedUser.phone || (updatedUser.email && c.email === updatedUser.email)) {
+        return {
+          ...c,
+          name: updatedUser.name || c.name,
+          phone: updatedUser.phone || c.phone,
+          email: updatedUser.email || c.email
+        };
+      }
+      return c;
+    }));
+  };
+
   // Modal open/close helpers
   const openBookingModal = (service?: ServiceItem) => {
     if (service) {
@@ -686,6 +775,9 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const openQuizModal = () => setIsQuizModalOpen(true);
   const closeQuizModal = () => setIsQuizModalOpen(false);
+
+  const openProfileModal = () => setIsProfileModalOpen(true);
+  const closeProfileModal = () => setIsProfileModalOpen(false);
 
   const toggleAiChat = () => setIsAiChatOpen(!isAiChatOpen);
   const closeAiChat = () => setIsAiChatOpen(false);
@@ -720,6 +812,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const newAppointment: Appointment = {
       id: `apt-${Date.now()}`,
+      userId: currentUser?.id,
       bookingRef,
       clientName: payload.clientName,
       clientPhone: payload.clientPhone,
@@ -744,6 +837,17 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       whatsappUrl: clientWhatsappUrl,
       ownerWhatsappUrl: ownerWhatsappUrl
     };
+
+    // Persist real-time appointment and notify admin suite & WhatsApp in database
+    try {
+      fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newAppointment)
+      }).catch(err => console.log('Appointment background sync notice:', err));
+    } catch {
+      // Fallback safe
+    }
 
     // Trigger Automated WhatsApp dispatch to server API
     try {
@@ -816,6 +920,81 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const updateAppointmentStatus = (id: string, status: AppointmentStatus) => {
     setAppointments(prev => prev.map(apt => apt.id === id ? { ...apt, bookingStatus: status, status: status, isNew: false } : apt));
+  };
+
+  const rescheduleAppointment = async (id: string, newDate: string, newTimeSlot: string): Promise<{ success: boolean; message: string }> => {
+    const target = appointments.find(a => a.id === id);
+    if (!target) return { success: false, message: 'Appointment not found.' };
+
+    const updatedAppointments = appointments.map(apt => {
+      if (apt.id === id) {
+        return {
+          ...apt,
+          date: newDate,
+          timeSlot: newTimeSlot,
+          bookingStatus: 'CONFIRMED' as AppointmentStatus,
+          status: 'CONFIRMED' as AppointmentStatus,
+          isNew: false
+        };
+      }
+      return apt;
+    });
+
+    setAppointments(updatedAppointments);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_appointments`, JSON.stringify(updatedAppointments));
+
+    // Add alert notification for salon desk
+    const notif: NotificationItem = {
+      id: `notif-resched-${Date.now()}`,
+      title: 'Slot Rescheduled by Client',
+      message: `${target.clientName} moved ${target.serviceName} (#${target.bookingRef}) to ${newDate} at ${newTimeSlot}. Deposit preserved.`,
+      type: 'booking',
+      timestamp: 'Just now',
+      read: false
+    };
+    setNotifications(prev => [notif, ...prev]);
+
+    return {
+      success: true,
+      message: `Your booking #${target.bookingRef} has been successfully rescheduled to ${newDate} at ${newTimeSlot}!`
+    };
+  };
+
+  const cancelAppointment = async (id: string, reason?: string): Promise<{ success: boolean; message: string }> => {
+    const target = appointments.find(a => a.id === id);
+    if (!target) return { success: false, message: 'Appointment not found.' };
+
+    const updatedAppointments = appointments.map(apt => {
+      if (apt.id === id) {
+        return {
+          ...apt,
+          bookingStatus: 'CANCELLED' as AppointmentStatus,
+          status: 'CANCELLED' as AppointmentStatus,
+          notes: reason ? `${apt.notes || ''} [Cancelled by client: ${reason}]` : (apt.notes || ''),
+          isNew: false
+        };
+      }
+      return apt;
+    });
+
+    setAppointments(updatedAppointments);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_appointments`, JSON.stringify(updatedAppointments));
+
+    // Add notification
+    const notif: NotificationItem = {
+      id: `notif-cancel-${Date.now()}`,
+      title: 'Booking Cancelled',
+      message: `${target.clientName} cancelled booking #${target.bookingRef} (${target.serviceName}).`,
+      type: 'booking',
+      timestamp: 'Just now',
+      read: false
+    };
+    setNotifications(prev => [notif, ...prev]);
+
+    return {
+      success: true,
+      message: `Booking #${target.bookingRef} has been cancelled.`
+    };
   };
 
   const deleteAppointment = (id: string) => {
@@ -1058,6 +1237,33 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }).catch(err => console.error('Failed to sync settings to API:', err));
   };
 
+  // Staff CRUD
+  const addStaffMember = (member: Omit<StaffMember, 'id'>) => {
+    const newMember: StaffMember = {
+      ...member,
+      id: `staff-${Date.now()}`
+    };
+    setStaffMembers(prev => [newMember, ...prev]);
+
+    const newNotif: NotificationItem = {
+      id: `notif-${Date.now()}`,
+      title: 'Staff Member Added',
+      message: `${member.name} (${member.role}) was added to salon staff.`,
+      type: 'booking',
+      timestamp: 'Just now',
+      read: false
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  };
+
+  const updateStaffMember = (id: string, updates: Partial<StaffMember>) => {
+    setStaffMembers(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+  };
+
+  const deleteStaffMember = (id: string) => {
+    setStaffMembers(prev => prev.filter(m => m.id !== id));
+  };
+
   // Financial & Operational Stat calculations
   const totalRevenue = appointments.reduce((sum, apt) => {
     if (apt.bookingStatus !== 'CANCELLED') {
@@ -1101,6 +1307,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         isBookingModalOpen,
         isQuizModalOpen,
         isAiChatOpen,
+        isProfileModalOpen,
         currentUser,
         users,
         isGuestMode,
@@ -1113,6 +1320,8 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         logout,
         openAuthModal,
         closeAuthModal,
+        openProfileModal,
+        closeProfileModal,
         setIsAdminMode,
         setActiveNavTab,
         setAdminTab,
@@ -1121,9 +1330,13 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         openQuizModal,
         closeQuizModal,
         toggleAiChat,
+        toggleAiWidget: toggleAiChat,
         closeAiChat,
+        updateCurrentUser,
         createAppointment,
         updateAppointmentStatus,
+        rescheduleAppointment,
+        cancelAppointment,
         deleteAppointment,
         addService,
         updateService,
@@ -1148,6 +1361,11 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         markNotificationAsRead,
         markAllNotificationsRead,
         updateSettings,
+        staffMembers,
+        staff: staffMembers,
+        addStaffMember,
+        updateStaffMember,
+        deleteStaffMember,
         totalRevenue,
         totalBookingsCount,
         confirmedBookingsCount,

@@ -10,21 +10,29 @@ import {
   Search,
   Filter,
   User,
-  Scissors
+  Scissors,
+  Pin
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { Review } from '../types';
 
 export const CustomerReviewsPage: React.FC = () => {
-  const { reviews, addReview, services, openBookingModal } = useSalon();
+  const { reviews, addReview, updateReview, services, openBookingModal, currentUser } = useSalon();
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   // Filters & State
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [minRating, setMinRating] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isWriteModalOpen, setIsWriteModalOpen] = useState<boolean>(false);
-  const [helpfulLikes, setHelpfulLikes] = useState<Record<string, number>>({});
-  const [userLikedReviews, setUserLikedReviews] = useState<Record<string, boolean>>({});
+  const [userLikedReviews, setUserLikedReviews] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('modern_salon_user_liked_reviews');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Review Form
@@ -38,6 +46,7 @@ export const CustomerReviewsPage: React.FC = () => {
 
   const categories = [
     'All',
+    'Featured (Pinned)',
     'Facials & Skin',
     'Bridal & Makeup',
     'Hair Treatments',
@@ -52,8 +61,9 @@ export const CustomerReviewsPage: React.FC = () => {
     : '4.9';
 
   const filteredReviews = useMemo(() => {
-    return reviews.filter(rev => {
-      if (selectedCategory !== 'All') {
+    const list = reviews.filter(rev => {
+      if (selectedCategory === 'Featured (Pinned)' && !rev.featured) return false;
+      if (selectedCategory !== 'All' && selectedCategory !== 'Featured (Pinned)') {
         const sName = rev.serviceName.toLowerCase();
         if (selectedCategory === 'Facials & Skin' && !sName.includes('facial') && !sName.includes('skin') && !sName.includes('glow')) return false;
         if (selectedCategory === 'Bridal & Makeup' && !sName.includes('make up') && !sName.includes('makeup') && !sName.includes('bridal')) return false;
@@ -74,15 +84,49 @@ export const CustomerReviewsPage: React.FC = () => {
 
       return true;
     });
+
+    // Pinned/Featured reviews appear first, then sorted by date
+    return list.sort((a, b) => {
+      if (a.featured && !b.featured) return -1;
+      if (!a.featured && b.featured) return 1;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
   }, [reviews, selectedCategory, minRating, searchQuery]);
 
+  // Toggle helpful like (increments by 1 or decrements back to 0)
   const handleLikeReview = (reviewId: string) => {
-    if (userLikedReviews[reviewId]) return;
-    setUserLikedReviews(prev => ({ ...prev, [reviewId]: true }));
-    setHelpfulLikes(prev => ({
-      ...prev,
-      [reviewId]: (prev[reviewId] || 0) + 1
-    }));
+    const rev = reviews.find(r => r.id === reviewId);
+    if (!rev) return;
+
+    const isLiked = !!userLikedReviews[reviewId];
+    const currentCount = typeof rev.helpfulCount === 'number' ? rev.helpfulCount : 0;
+    const newCount = isLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
+
+    const nextLiked = { ...userLikedReviews, [reviewId]: !isLiked };
+    setUserLikedReviews(nextLiked);
+    try {
+      localStorage.setItem('modern_salon_user_liked_reviews', JSON.stringify(nextLiked));
+    } catch {}
+
+    updateReview(reviewId, { helpfulCount: newCount });
+    setToastMessage(isLiked ? 'Removed helpful feedback' : 'Marked review as helpful!');
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Toggle pin to featured
+  const handleTogglePinFeatured = (reviewId: string) => {
+    if (!isAdmin) {
+      setToastMessage('Only salon administrators can pin or unpin reviews.');
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+    const rev = reviews.find(r => r.id === reviewId);
+    if (!rev) return;
+
+    const newFeatured = !rev.featured;
+    updateReview(reviewId, { featured: newFeatured });
+    setToastMessage(newFeatured ? '📌 Pinned as Featured Review!' : 'Unpinned from Featured Reviews');
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleSubmitReview = (e: React.FormEvent) => {
@@ -100,7 +144,9 @@ export const CustomerReviewsPage: React.FC = () => {
       date: todayStr,
       serviceName: formData.serviceName,
       comment: formData.comment.trim(),
-      verifiedBooking: true
+      verifiedBooking: true,
+      helpfulCount: 0,
+      featured: false
     };
 
     addReview(newRev);
@@ -204,51 +250,92 @@ export const CustomerReviewsPage: React.FC = () => {
 
       {/* Reviews Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-        {filteredReviews.map(rev => (
-          <div
-            key={rev.id}
-            className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between space-y-4"
-          >
-            <div className="space-y-2.5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">{rev.clientName}</h3>
-                  <div className="text-xs text-amber-600 dark:text-amber-400 font-semibold">{rev.serviceName}</div>
+        {filteredReviews.map(rev => {
+          const isLiked = !!userLikedReviews[rev.id];
+          const count = typeof rev.helpfulCount === 'number' ? rev.helpfulCount : 0;
+          const isFeatured = !!rev.featured;
+
+          return (
+            <div
+              key={rev.id}
+              className={`p-5 rounded-2xl bg-white dark:bg-zinc-900 shadow-sm flex flex-col justify-between space-y-4 transition-all relative ${
+                isFeatured
+                  ? 'border-2 border-amber-400 dark:border-amber-500/80 bg-gradient-to-b from-amber-500/5 via-white dark:via-zinc-900 to-white dark:to-zinc-900 ring-2 ring-amber-400/20'
+                  : 'border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+              }`}
+            >
+              <div className="space-y-2.5">
+                {/* Featured Pinned Badge & Action */}
+                <div className="flex items-center justify-between gap-2">
+                  {isFeatured ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-500 text-zinc-950 shadow-sm">
+                      <Pin className="w-3 h-3 fill-zinc-950 rotate-45" />
+                      <span>Featured Pinned Review</span>
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium">Verified Customer Review</span>
+                  )}
+
+                  {/* Pin / Unpin Action: Only Admin is allowed to pin/unpin reviews */}
+                  {isAdmin ? (
+                    <button
+                      onClick={() => handleTogglePinFeatured(rev.id)}
+                      title={isFeatured ? "Unpin from Featured Reviews (Admin Only)" : "Pin as Featured Review (Admin Only)"}
+                      className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                        isFeatured
+                          ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/40'
+                          : 'text-zinc-600 dark:text-zinc-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      <Pin className={`w-3 h-3 ${isFeatured ? 'fill-amber-500 text-amber-600 rotate-45' : 'text-zinc-600'}`} />
+                      <span>{isFeatured ? 'Pinned (Admin)' : 'Pin Review'}</span>
+                    </button>
+                  ) : null}
                 </div>
-                <div className="flex items-center gap-0.5 text-amber-500">
-                  {Array.from({ length: rev.rating }).map((_, idx) => (
-                    <Star key={idx} className="w-3.5 h-3.5 fill-amber-500" />
-                  ))}
+
+                <div className="flex items-start justify-between gap-2 pt-1">
+                  <div>
+                    <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">{rev.clientName}</h3>
+                    <div className="text-xs text-amber-600 dark:text-amber-400 font-semibold">{rev.serviceName}</div>
+                  </div>
+                  <div className="flex items-center gap-0.5 text-amber-500 shrink-0">
+                    {Array.from({ length: rev.rating }).map((_, idx) => (
+                      <Star key={idx} className="w-3.5 h-3.5 fill-amber-500" />
+                    ))}
+                  </div>
                 </div>
+
+                <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                  "{rev.comment}"
+                </p>
               </div>
 
-              <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                "{rev.comment}"
-              </p>
-            </div>
+              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-400 gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] truncate">Verified Visit</span>
+                  <span>•</span>
+                  <span className="text-[11px] shrink-0">{rev.date}</span>
+                </div>
 
-            <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-400">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">Verified Visit</span>
-                <span>•</span>
-                <span className="text-[11px]">{rev.date}</span>
+                {/* Helpful Like Button: click increments +1, clicking again decrements back to 0 */}
+                <button
+                  id={`review-helpful-btn-${rev.id}`}
+                  onClick={() => handleLikeReview(rev.id)}
+                  title={isLiked ? "Click to remove your helpful feedback" : "Click if you found this review helpful"}
+                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer shrink-0 ${
+                    isLiked
+                      ? 'bg-amber-50 dark:bg-amber-500/15 border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-400 font-bold shadow-xs'
+                      : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  }`}
+                >
+                  <ThumbsUp className={`w-3.5 h-3.5 ${isLiked ? 'fill-amber-500 text-amber-600' : ''}`} />
+                  <span>Helpful ({count})</span>
+                </button>
               </div>
-
-              <button
-                onClick={() => handleLikeReview(rev.id)}
-                className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition ${
-                  userLikedReviews[rev.id]
-                    ? 'text-amber-600 dark:text-amber-400 font-bold'
-                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
-                }`}
-              >
-                <ThumbsUp className="w-3.5 h-3.5" />
-                <span>{(helpfulLikes[rev.id] || 0) + 1}</span>
-              </button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {filteredReviews.length === 0 && (

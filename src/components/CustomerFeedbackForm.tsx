@@ -78,7 +78,6 @@ export const CustomerFeedbackForm: React.FC<CustomerFeedbackFormProps> = ({
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [copiedCoupon, setCopiedCoupon] = useState(false);
 
   const availableTags = [
     'Spotless Hygiene',
@@ -158,12 +157,6 @@ export const CustomerFeedbackForm: React.FC<CustomerFeedbackFormProps> = ({
     }, 400);
   };
 
-  const handleCopyCoupon = () => {
-    navigator.clipboard?.writeText('THANKS10');
-    setCopiedCoupon(true);
-    setTimeout(() => setCopiedCoupon(false), 2000);
-  };
-
   if (isSubmitted) {
     return (
       <div className="p-6 sm:p-8 rounded-3xl bg-zinc-900 border border-emerald-500/40 text-center space-y-5 shadow-2xl animate-in zoom-in-95 duration-300">
@@ -179,35 +172,19 @@ export const CustomerFeedbackForm: React.FC<CustomerFeedbackFormProps> = ({
             Thank You, {clientName}!
           </h3>
           <p className="text-xs sm:text-sm text-zinc-300 max-w-md mx-auto leading-relaxed">
-            Your {rating}-Star rating for <strong className="text-amber-400">{selectedService}</strong> has been published to our live feed and pushed directly to the salon owner's suite.
+            Your {rating}-Star rating for <strong className="text-amber-400">{selectedService}</strong> has been verified and published to our customer reviews feed and forwarded to the salon owner's suite in real time.
           </p>
         </div>
 
-        {/* Reward Voucher Box */}
-        <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/10 border border-amber-500/30 max-w-md mx-auto text-left space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-extrabold text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" /> Special Thank-You Reward
-            </span>
-            <span className="text-xs font-mono font-bold bg-amber-500 text-zinc-950 px-2 py-0.5 rounded">
-              10% OFF
-            </span>
+        {/* Clean Salon Care Note */}
+        <div className="p-4 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 max-w-md mx-auto text-left space-y-1.5 text-xs text-zinc-300">
+          <div className="font-bold text-amber-400 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Modern Unisex Salon • 5-Star Promise</span>
           </div>
-          <p className="text-xs text-zinc-300">
-            Use promo code <strong className="text-amber-300 font-mono">THANKS10</strong> during your next online booking to save 10% on any salon service in Mohol.
+          <p className="text-zinc-400 leading-relaxed">
+            We value your honest feedback and look forward to welcoming you back to our salon at B.N. Gund Complex, Mohol.
           </p>
-          <div className="flex items-center justify-between gap-2 pt-2 border-t border-amber-500/20">
-            <span className="font-mono text-sm font-bold text-amber-400 bg-zinc-950 px-3 py-1 rounded-lg border border-amber-500/40">
-              THANKS10
-            </span>
-            <button
-              onClick={handleCopyCoupon}
-              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-xs flex items-center gap-1 transition"
-            >
-              {copiedCoupon ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedCoupon ? 'Copied!' : 'Copy Code'}</span>
-            </button>
-          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">

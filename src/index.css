@@ -117,10 +117,9 @@ html.light .bg-zinc-800\/20 {
   background-color: #f5edfd !important;
 }
 
-/* Text Hierarchy in Light Mode: Crisp Black for High Contrast */
+/* Text Hierarchy in Light Mode: Crisp Black for High Contrast (making grey text into black as requested) */
 html.light .text-zinc-100,
 html.light .text-zinc-200,
-html.light .text-white,
 html.light .text-zinc-300,
 html.light .text-zinc-400,
 html.light .text-zinc-500,
@@ -162,6 +161,18 @@ html:not(.dark) .text-slate-600,
 [data-theme="light"] .text-slate-500,
 [data-theme="light"] .text-slate-600 {
   color: #000000 !important;
+}
+
+/* Explicitly preserve crisp white text on buttons and colored pills */
+html.light .text-white,
+html.light button.text-white,
+html.light .bg-purple-600,
+html.light .bg-purple-700,
+html.light .bg-purple-600 *,
+html.light .bg-purple-700 *,
+html.light .bg-emerald-600,
+html.light .bg-emerald-600 * {
+  color: #ffffff !important;
 }
 
 /* Borders in Light Mode */
@@ -421,3 +432,27 @@ html.dark ::selection {
   background-color: #d97706;
   color: #ffffff;
 }
+
+/* Print Receipt Stylesheet */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  nav,
+  header,
+  footer,
+  #ai-assistant-widget,
+  #appointment-reminder-toast,
+  #restore-appointment-reminder-btn,
+  .no-print,
+  button,
+  .fixed:not(#appointment-pass-modal):not(#booking-modal) {
+    display: none !important;
+  }
+  .print-clean {
+    box-shadow: none !important;
+    border: 1px solid #e4e4e7 !important;
+  }
+}
+

@@ -42,6 +42,7 @@ export type PaymentStatus = 'PAID' | 'PENDING' | 'REFUNDED';
 
 export interface Appointment {
   id: string;
+  userId?: string;
   bookingRef: string;
   clientName: string;
   clientPhone: string;
@@ -122,6 +123,7 @@ export interface Review {
   featured?: boolean;
   sentiment?: 'positive' | 'neutral' | 'critical';
   status?: 'published' | 'under_review' | 'resolved';
+  helpfulCount?: number;
 }
 
 export interface OfferCoupon {
@@ -208,6 +210,39 @@ export interface User {
   totalVisits?: number;
   memberSince?: string;
   preferredServices?: string[];
+  gender?: 'Female' | 'Male' | 'Non-binary' | 'Prefer not to say' | string;
+  birthDate?: string;
+  anniversaryDate?: string;
+  preferredStylist?: string;
+  skinOrHairType?: string;
+  specialNotes?: string;
+  address?: string;
+  city?: string;
+  emergencyContact?: string;
+  allergies?: string;
+  preferredSlot?: string;
+  favoriteCategory?: string;
+  whatsappNotifications?: boolean;
+  emailNotifications?: boolean;
 }
 
 export type ThemeMode = 'dark' | 'light';
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  role: string;
+  department: 'Hair Care' | 'Skin & Facial' | 'Bridal & Makeup' | 'Men Grooming' | 'Spa & Wellness';
+  experience: string;
+  phone?: string;
+  email?: string;
+  specialties: string[];
+  certifications?: string[];
+  rating: number;
+  reviewsCount: number;
+  totalClients: number;
+  shiftHours: string;
+  status: 'Active' | 'Available Today' | 'On Leave';
+  bio: string;
+  image: string;
+}

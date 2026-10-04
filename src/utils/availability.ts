@@ -58,6 +58,46 @@ export function normalizeTimeSlot(slotStr: string): string {
 }
 
 /**
+ * Parse time string like "07:30 PM" into total minutes from midnight (0 - 1439)
+ */
+export function parseSlotTimeToMinutes(slotStr: string): number {
+  if (!slotStr) return 0;
+  const match = slotStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return 0;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && hours < 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+}
+
+/**
+ * Validates slot availability based on date and salon time constraints.
+ * Specific rule: If current time is 7:00 PM (19:00 = 1140 mins) or later on today's date,
+ * only show/allow appointments after 7:00 PM (e.g. 07:30 PM, 08:15 PM).
+ */
+export function isSlotAvailableForDate(slotStr: string, dateStr: string): boolean {
+  if (!slotStr || !dateStr) return false;
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (dateStr < todayStr) return false;
+  if (dateStr > todayStr) return true; // Future dates are fully bookable
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const slotMinutes = parseSlotTimeToMinutes(slotStr);
+  const SEVEN_PM_MINUTES = 19 * 60; // 19:00 = 1140 minutes
+
+  // If current time is 7:00 PM or later, only allow slots strictly after 7:00 PM
+  if (currentMinutes >= SEVEN_PM_MINUTES) {
+    return slotMinutes > SEVEN_PM_MINUTES && slotMinutes > currentMinutes;
+  }
+
+  // Otherwise, only allow slots that are still in the future today
+  return slotMinutes > currentMinutes;
+}
+
+/**
  * Calculates slot availability and 'Filling Fast' metrics for a specific date and time slot
  */
 export function getSlotAvailability(
@@ -67,27 +107,39 @@ export function getSlotAvailability(
   capacity: number = MAX_PARALLEL_CHAIRS
 ): SlotAvailabilityInfo {
   const normSlot = normalizeTimeSlot(timeSlot);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isToday = date === todayStr;
 
   // Filter active appointments (Pending or Confirmed)
   const slotBookings = appointments.filter(apt => {
     const isSameDate = apt.date === date;
     const isSameSlot = normalizeTimeSlot(apt.timeSlot) === normSlot;
-    const isActive = apt.bookingStatus === 'PENDING' || apt.bookingStatus === 'CONFIRMED';
+    const isActive = apt.bookingStatus === 'PENDING' || apt.bookingStatus === 'CONFIRMED' || apt.status === 'CONFIRMED';
     return isSameDate && isSameSlot && isActive;
   });
 
   const pendingCount = slotBookings.filter(a => a.bookingStatus === 'PENDING').length;
-  const confirmedCount = slotBookings.filter(a => a.bookingStatus === 'CONFIRMED').length;
+  const confirmedCount = slotBookings.filter(a => a.bookingStatus === 'CONFIRMED' || a.status === 'CONFIRMED').length;
   const bookedCount = slotBookings.length;
-  const remainingSeats = Math.max(0, capacity - bookedCount);
+  let remainingSeats = Math.max(0, capacity - bookedCount);
   const occupancyPercent = Math.min(100, Math.round((bookedCount / capacity) * 100));
+
+  // Check 7:00 PM constraint & current time for today
+  const slotTimeAllowed = isSlotAvailableForDate(timeSlot, date);
 
   let status: SlotAvailabilityInfo['status'] = 'AVAILABLE';
   let isFillingFast = false;
   let statusLabel = 'Available';
   let urgencyText = `${remainingSeats} chairs open`;
 
-  if (remainingSeats === 0) {
+  if (!slotTimeAllowed && isToday) {
+    status = 'SOLD_OUT';
+    statusLabel = 'Time Closed';
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    urgencyText = currentMinutes >= 19 * 60 ? 'Past 7:00 PM' : 'Slot time passed';
+    remainingSeats = 0;
+  } else if (remainingSeats === 0) {
     status = 'SOLD_OUT';
     statusLabel = 'Sold Out';
     urgencyText = 'Fully booked';

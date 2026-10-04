@@ -14,24 +14,24 @@ export const ModernSalonLogo: React.FC<ModernSalonLogoProps> = ({
   inverted = false
 }) => {
   const iconSizes = {
-    sm: 'w-8 h-8',
-    md: 'w-11 h-11',
-    lg: 'w-14 h-14',
-    xl: 'w-20 h-20'
+    sm: 'w-7 h-7 sm:w-8 sm:h-8',
+    md: 'w-9 h-9 sm:w-11 sm:h-11',
+    lg: 'w-12 h-12 sm:w-14 sm:h-14',
+    xl: 'w-16 h-16 sm:w-20 sm:h-20'
   };
 
   const titleSizes = {
-    sm: 'text-sm tracking-wider',
-    md: 'text-base sm:text-lg tracking-wider font-extrabold',
-    lg: 'text-2xl sm:text-3xl tracking-widest font-extrabold',
-    xl: 'text-3xl sm:text-4xl tracking-widest font-extrabold'
+    sm: 'text-xs sm:text-sm tracking-wider',
+    md: 'text-xs sm:text-base lg:text-lg tracking-wider font-extrabold',
+    lg: 'text-lg sm:text-2xl lg:text-3xl tracking-widest font-extrabold',
+    xl: 'text-2xl sm:text-3xl lg:text-4xl tracking-widest font-extrabold'
   };
 
   const taglineSizes = {
-    sm: 'text-[8px] tracking-widest',
-    md: 'text-[9px] sm:text-[10px] tracking-[0.18em]',
-    lg: 'text-xs tracking-[0.2em]',
-    xl: 'text-sm tracking-[0.25em]'
+    sm: 'text-[7px] sm:text-[8px] tracking-widest',
+    md: 'text-[8px] sm:text-[9px] lg:text-[10px] tracking-[0.18em]',
+    lg: 'text-[10px] sm:text-xs tracking-[0.2em]',
+    xl: 'text-xs sm:text-sm tracking-[0.25em]'
   };
 
   return (
@@ -128,7 +128,7 @@ export const ModernSalonLogo: React.FC<ModernSalonLogoProps> = ({
 
         {/* Crisp Slogan Underline & Text */}
         {showTagline && (
-          <div className="mt-0.5 space-y-0.5">
+          <div className="hidden sm:block mt-0.5 space-y-0.5">
             <div className="h-[1.5px] w-full bg-gradient-to-r from-red-500 via-amber-500 to-amber-400 rounded-full" />
             <p className={`font-mono font-bold uppercase text-slate-700 dark:text-zinc-300 ${taglineSizes[size]}`}>
               WE'LL STYLE, YOU'LL SMILE • MOHOL

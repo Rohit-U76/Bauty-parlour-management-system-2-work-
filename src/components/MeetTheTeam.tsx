@@ -37,140 +37,43 @@ export interface TeamMember {
 }
 
 export const MeetTheTeam: React.FC = () => {
-  const { openBookingModal } = useSalon();
+  const { openBookingModal, staffMembers } = useSalon();
 
   const [activeDept, setActiveDept] = useState<string>('All');
   const [selectedStylistModal, setSelectedStylistModal] = useState<TeamMember | null>(null);
 
-  const team: TeamMember[] = [
-    {
-      id: 'stylist-1',
-      name: 'Vikram Mehta',
-      role: 'Creative Director & Master Hair Stylist',
-      department: 'Hair Care',
-      experience: '14+ Years',
-      specialties: ['French Balayage', 'Precision Razor Cuts', 'Olaplex Bond Rebuilding', 'Keratin Smoothing'],
-      certifications: ['Toni & Guy Advanced London', "L'Oréal Professionnel Master Colorist"],
-      rating: 4.98,
-      reviewsCount: 382,
-      totalClients: 4200,
-      shiftHours: '10:00 AM - 07:30 PM',
-      availability: {
-        status: 'Available Today',
-        slotsLeft: 3,
-        nextAvailableSlot: 'Today, 02:45 PM'
-      },
-      bio: 'Vikram has styled runway models and high-profile clientele across Mumbai and Pune. Specializing in bespoke haircuts customized to bone structure and natural hair flow.',
-      image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80'
-    },
-    {
-      id: 'stylist-2',
-      name: 'Kavita Patel',
-      role: 'Senior Aesthetician & Skin Therapist',
-      department: 'Skin & Facial',
-      experience: '10+ Years',
-      specialties: ['Hydra-Facial Therapy', 'Dermaplaning & Extraction', 'Korean Glass Skin Facials', 'Anti-Aging Peels'],
-      certifications: ['CIDESCO International Aesthetician', 'Dermalogica Certified Expert'],
-      rating: 4.96,
-      reviewsCount: 410,
-      totalClients: 3600,
-      shiftHours: '09:30 AM - 06:30 PM',
-      availability: {
-        status: 'Limited Slots',
-        slotsLeft: 1,
-        nextAvailableSlot: 'Today, 04:30 PM'
-      },
-      bio: 'Kavita brings clinical expertise to holistic skincare therapies. Her customized facial protocols deliver immediate radiance while protecting the dermal barrier.',
-      image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80'
-    },
-    {
-      id: 'stylist-3',
-      name: 'Sunita Roy',
-      role: 'Bridal Makeover Director',
-      department: 'Bridal & Makeup',
-      experience: '12+ Years',
-      specialties: ['HD Airbrush Makeup', 'Traditional Bridal Draping', 'Editorial Glam', 'Pre-Bridal Glow Rituals'],
-      certifications: ['Kryolan Professional Makeup Master', 'Mario Dedivanovic Masterclass'],
-      rating: 4.99,
-      reviewsCount: 520,
-      totalClients: 1850,
-      shiftHours: '09:00 AM - 08:00 PM',
-      availability: {
-        status: 'Available Today',
-        slotsLeft: 2,
-        nextAvailableSlot: 'Today, 05:00 PM'
-      },
-      bio: 'Having directed over 1,200 bridal transformations, Sunita is celebrated for creating weightless, waterproof, and photogenic bridal looks that last all night.',
-      image: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=600&q=80'
-    },
-    {
-      id: 'stylist-4',
-      name: 'Sameer Khan',
-      role: 'Executive Men Grooming Specialist',
-      department: 'Men Grooming',
-      experience: '9+ Years',
-      specialties: ['Skin Fade Tapers', 'Hot Towel Charcoal Shaves', 'Beard Contour Sculpting', 'Scalp Rejuvenation'],
-      certifications: ['Wahl Master Barber Academy', 'Truefitt & Hill Certified'],
-      rating: 4.94,
-      reviewsCount: 310,
-      totalClients: 2900,
-      shiftHours: '10:30 AM - 08:30 PM',
-      availability: {
-        status: 'Available Today',
-        slotsLeft: 4,
-        nextAvailableSlot: 'Today, 01:30 PM'
-      },
-      bio: 'Sameer combines classic barber craftsmanship with contemporary sharp styling for executive haircuts, clean beard alignments, and stress-relieving head massages.',
-      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80'
-    },
-    {
-      id: 'stylist-5',
-      name: 'Rhea Fernandes',
-      role: 'Senior Colorist & Texture Specialist',
-      department: 'Hair Care',
-      experience: '8+ Years',
-      specialties: ['Ash & Honey Highlights', 'Cysteine & Botox Smoothing', 'Root Melt & Shadow Tones', 'Curly Hair Care'],
-      certifications: ['Schwarzkopf Royal Colorist', 'Brazilian Blowout Certified'],
-      rating: 4.92,
-      reviewsCount: 245,
-      totalClients: 2100,
-      shiftHours: '11:00 AM - 08:00 PM',
-      availability: {
-        status: 'Booked Today',
-        slotsLeft: 0,
-        nextAvailableSlot: 'Tomorrow, 11:00 AM'
-      },
-      bio: 'Passionate about custom tone mapping and damage-free color formulation that enhances individual skin undertones with high shine.',
-      image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80'
-    },
-    {
-      id: 'stylist-6',
-      name: 'Aarti Kulkarni',
-      role: 'Holistic Spa & Body Therapist',
-      department: 'Spa & Wellness',
-      experience: '11+ Years',
-      specialties: ['Deep Tissue Massage', 'Aromatherapy Reflexology', 'Ayurvedic Herb Wraps', 'Hot Stone Therapy'],
-      certifications: ['Ayush Ministry Certified Therapist', 'Thai Spa Academy Bangkok'],
-      rating: 4.97,
-      reviewsCount: 290,
-      totalClients: 2400,
-      shiftHours: '10:00 AM - 07:00 PM',
-      availability: {
-        status: 'Available Today',
-        slotsLeft: 2,
-        nextAvailableSlot: 'Today, 03:30 PM'
-      },
-      bio: 'Aarti crafts tranquil therapy sessions using organic essential oils and targeted acupressure to dissolve muscle tension and restore full-body equilibrium.',
-      image: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=600&q=80'
+  const team: TeamMember[] = useMemo(() => {
+    if (staffMembers && staffMembers.length > 0) {
+      return staffMembers.map(m => ({
+        id: m.id,
+        name: m.name,
+        role: m.role,
+        department: m.department,
+        experience: m.experience || '5+ Years',
+        specialties: m.specialties || ['Signature Styling'],
+        certifications: m.certifications || ['Professional Certified'],
+        rating: m.rating || 4.95,
+        reviewsCount: m.reviewsCount || 120,
+        totalClients: m.totalClients || 1500,
+        shiftHours: m.shiftHours || '10:00 AM - 07:30 PM',
+        availability: {
+          status: m.status === 'On Leave' ? ('Booked Today' as const) : m.status === 'Available Today' ? ('Available Today' as const) : ('Limited Slots' as const),
+          slotsLeft: m.status === 'On Leave' ? 0 : 3,
+          nextAvailableSlot: m.status === 'On Leave' ? 'Tomorrow, 11:00 AM' : 'Today, 02:45 PM'
+        },
+        bio: m.bio || 'Dedicated beauty and styling professional providing personalized salon care.',
+        image: m.image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80'
+      }));
     }
-  ];
+    return [];
+  }, [staffMembers]);
 
   const departments = ['All', 'Hair Care', 'Skin & Facial', 'Bridal & Makeup', 'Men Grooming', 'Spa & Wellness'];
 
   const filteredTeam = useMemo(() => {
     if (activeDept === 'All') return team;
     return team.filter((member) => member.department === activeDept);
-  }, [activeDept]);
+  }, [activeDept, team]);
 
   const handleBookWithMember = (member: TeamMember) => {
     openBookingModal();

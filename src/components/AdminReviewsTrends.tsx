@@ -635,15 +635,17 @@ export const AdminReviewsTrends: React.FC = () => {
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => handleToggleFeatured(rev)}
-                      className={`p-2 rounded-xl border transition cursor-pointer ${
+                      className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold inline-flex items-center gap-1.5 transition cursor-pointer ${
                         rev.featured
-                          ? 'bg-yellow-500 text-black border-yellow-400'
-                          : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-yellow-400 hover:border-zinc-700'
+                          ? 'bg-yellow-500 text-black border-yellow-400 shadow-md shadow-yellow-500/20'
+                          : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:border-yellow-500/50 hover:text-yellow-400'
                       }`}
-                      title={rev.featured ? 'Unpin from Featured' : 'Pin to Featured Showcase'}
+                      title={rev.featured ? 'Click to unpin from featured showcase' : 'Click to pin to client portal showcase'}
                     >
-                      <Sparkles className="w-4 h-4" />
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{rev.featured ? 'Pinned Featured' : 'Pin to Feature'}</span>
                     </button>
 
                     <button

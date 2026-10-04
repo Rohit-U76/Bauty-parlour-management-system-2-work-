@@ -65,7 +65,7 @@ export const CustomerHome: React.FC = () => {
   return (
     <div className="space-y-10 sm:space-y-16 pb-28 lg:pb-16">
       {/* HERO SECTION */}
-      <section className="pt-2 sm:pt-6 pb-6 sm:pb-10 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <section id="section-home-hero" className="pt-2 sm:pt-6 pb-6 sm:pb-10 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
           
           {/* Left Hero Content */}
@@ -103,10 +103,13 @@ export const CustomerHome: React.FC = () => {
               <button
                 id="hero-schedule-btn"
                 onClick={() => openBookingModal()}
-                className="px-6 py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-600/25 transition-all cursor-pointer"
+                className="px-6 py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-500 dark:hover:bg-purple-600 dark:text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-600/25 active:scale-98 transition-all cursor-pointer"
               >
                 <Calendar className="w-4 h-4 text-white" />
-                <span>Book Appointment ({settings.advancePercentage || 10}% Advance)</span>
+                <span>Book Appointment</span>
+                <span className="text-[11px] font-semibold bg-white/20 px-2 py-0.5 rounded-md">
+                  {settings.advancePercentage || 10}% Advance
+                </span>
               </button>
 
               <button
@@ -147,28 +150,28 @@ export const CustomerHome: React.FC = () => {
                 alt="Modern Salon interior Mohol"
                 className="w-full h-[320px] sm:h-[400px] object-cover group-hover:scale-105 transition-all duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-purple-950/70 via-black/20 to-transparent dark:from-black/85 dark:via-black/30 dark:to-transparent"></div>
 
               {/* Style Quiz Prompt Card */}
               <div className="absolute bottom-4 left-4 right-4">
                 <button
                   onClick={openQuizModal}
-                  className="w-full p-3.5 rounded-2xl bg-zinc-900/95 backdrop-blur-md border border-zinc-700 text-left shadow-xl flex items-center justify-between group/pill transition-all cursor-pointer"
+                  className="w-full p-3.5 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-purple-200/90 dark:border-zinc-700 text-left shadow-xl flex items-center justify-between group/pill transition-all cursor-pointer hover:border-purple-300 dark:hover:border-zinc-600 active:scale-[0.99]"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-amber-500/20 border border-purple-200 dark:border-amber-500/40 flex items-center justify-center text-purple-700 dark:text-amber-400 shrink-0">
                       <Wand2 className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="font-bold text-sm text-zinc-100 group-hover/pill:text-amber-400 transition-colors">
+                      <div className="font-bold text-sm text-zinc-900 dark:text-zinc-100 group-hover/pill:text-purple-700 dark:group-hover/pill:text-amber-400 transition-colors">
                         Need style advice?
                       </div>
-                      <div className="text-xs text-zinc-400">
+                      <div className="text-xs text-zinc-600 dark:text-zinc-400">
                         Take our 30-second Style &amp; Skin Quiz
                       </div>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-amber-400 shrink-0" />
+                  <ChevronRight className="w-5 h-5 text-purple-600 dark:text-amber-400 shrink-0" />
                 </button>
               </div>
             </div>
@@ -222,7 +225,7 @@ export const CustomerHome: React.FC = () => {
       </section>
 
       {/* ALL SERVICES CATEGORIES EXPLORER (Specially tailored for mobile browsing) */}
-      <section className="px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-4 text-left">
+      <section id="section-home-categories" className="px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-4 text-left pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
@@ -279,7 +282,7 @@ export const CustomerHome: React.FC = () => {
       </section>
 
       {/* MULTI-SERVICE BUNDLE & SAVE BANNER */}
-      <section className="px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto text-left">
+      <section id="section-home-bundle" className="px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto text-left">
         <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-amber-600/15 border border-amber-500/30 shadow-md flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
           <div className="space-y-2.5 max-w-xl">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold border border-amber-500/30">
@@ -311,7 +314,7 @@ export const CustomerHome: React.FC = () => {
       </section>
 
       {/* POPULAR SERVICES SECTION */}
-      <section className="px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 text-left">
+      <section id="section-home-popular-services" className="px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 text-left pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <div className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
@@ -426,7 +429,7 @@ export const CustomerHome: React.FC = () => {
       </section>
 
       {/* GALLERY PREVIEW */}
-      <section className="px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 text-left">
+      <section id="section-home-gallery" className="px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 text-left pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
         <div className="flex items-end justify-between">
           <div>
             <div className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
@@ -474,10 +477,12 @@ export const CustomerHome: React.FC = () => {
       </section>
 
       {/* REVIEWS SECTION */}
-      <CustomerReviews />
+      <section id="section-home-reviews" className="pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
+        <CustomerReviews />
+      </section>
 
       {/* LOCATION & HOURS BANNER */}
-      <section className="px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <section id="section-home-location" className="px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
         <div className="p-6 sm:p-8 rounded-3xl bg-zinc-900 text-white border border-zinc-800 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
