@@ -52,6 +52,19 @@ export const AdminSmsEmailHubModal: React.FC<AdminSmsEmailHubModalProps> = ({
   const [emailSubject, setEmailSubject] = useState('Modern Unisex Salon - Appointment Confirmation & Digital Pass');
   const [emailViewMode, setEmailViewMode] = useState<'preview' | 'code'>('preview');
 
+  // Keep synced with selected appointment when opened or changed
+  React.useEffect(() => {
+    if (initialAppointment) {
+      setSelectedAppointmentId(initialAppointment.id);
+      setCustomPhone(initialAppointment.clientPhone || '');
+      setCustomEmail(initialAppointment.clientEmail || '');
+    } else if (appointments.length > 0 && !selectedAppointmentId) {
+      setSelectedAppointmentId(appointments[0].id);
+      setCustomPhone(appointments[0].clientPhone || '');
+      setCustomEmail(appointments[0].clientEmail || '');
+    }
+  }, [initialAppointment, isOpen]);
+
   // Bulk state
   const [bulkTarget, setBulkTarget] = useState<'today' | 'tomorrow' | 'all_clients'>('today');
   const [bulkSentCount, setBulkSentCount] = useState<number | null>(null);
@@ -225,7 +238,7 @@ export const AdminSmsEmailHubModal: React.FC<AdminSmsEmailHubModalProps> = ({
   const handleSendSms = async () => {
     const phone = customPhone || currentApp?.clientPhone;
     if (!phone) {
-      alert('Please enter or select a recipient phone number.');
+      setStatusMessage('Please enter or select a recipient phone number.');
       return;
     }
 
@@ -307,7 +320,11 @@ export const AdminSmsEmailHubModal: React.FC<AdminSmsEmailHubModalProps> = ({
     const phone = clean.length === 10 ? `91${clean}` : clean;
     const msg = currentPreviewMessage;
     const waUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, '_blank');
+    try {
+      window.open(waUrl, '_blank');
+    } catch {
+      window.location.href = waUrl;
+    }
     
     setLogs(prev => [
       {
@@ -326,7 +343,7 @@ export const AdminSmsEmailHubModal: React.FC<AdminSmsEmailHubModalProps> = ({
   const handleSendEmail = async () => {
     const email = customEmail || currentApp?.clientEmail;
     if (!email) {
-      alert('Please enter or select a recipient email.');
+      setStatusMessage('Please enter or select a recipient email address.');
       return;
     }
 

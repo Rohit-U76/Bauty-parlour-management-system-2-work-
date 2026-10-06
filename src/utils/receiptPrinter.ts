@@ -225,52 +225,88 @@ export async function generateReceiptHtml(appointment: Appointment): Promise<str
 }
 
 /**
- * Opens an isolated invisible iframe to trigger the browser's native Print / Save as PDF dialog.
- * Works seamlessly within sandboxed iframes without relying on popup-blocked window.open.
+ * Triggers printing of the official receipt using an isolated printable DOM container.
+ * Seamlessly isolates the receipt for paper and PDF printing, with immediate download fallback.
  */
-export async function printSalonReceipt(appointment: Appointment): Promise<void> {
+export async function printSalonReceipt(appointment: Appointment): Promise<boolean> {
   try {
     const html = await generateReceiptHtml(appointment);
 
-    // Create hidden iframe
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.visibility = 'hidden';
+    // 1. Clean up any existing print containers
+    const existingContainer = document.getElementById('salon-receipt-print-container');
+    if (existingContainer) existingContainer.remove();
+    const existingStyle = document.getElementById('salon-receipt-print-style');
+    if (existingStyle) existingStyle.remove();
 
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (doc) {
-      doc.open();
-      doc.write(html);
-      doc.close();
-
-      setTimeout(() => {
-        try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-        } catch (err) {
-          console.error('Iframe print error:', err);
-          window.print();
-        } finally {
-          setTimeout(() => {
-            if (document.body.contains(iframe)) {
-              document.body.removeChild(iframe);
-            }
-          }, 3000);
+    // 2. Inject dedicated print stylesheet
+    const printStyle = document.createElement('style');
+    printStyle.id = 'salon-receipt-print-style';
+    printStyle.textContent = `
+      @media screen {
+        #salon-receipt-print-container {
+          display: none !important;
         }
-      }, 400);
-    } else {
+      }
+      @media print {
+        html, body {
+          background: #ffffff !important;
+          color: #000000 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        body > *:not(#salon-receipt-print-container) {
+          display: none !important;
+        }
+        #salon-receipt-print-container {
+          display: block !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+          background: #ffffff !important;
+          color: #18181b !important;
+          z-index: 99999999 !important;
+          margin: 0 !important;
+          padding: 10mm !important;
+        }
+        #salon-receipt-print-container * {
+          visibility: visible !important;
+        }
+      }
+    `;
+    document.head.appendChild(printStyle);
+
+    // 3. Inject receipt DOM container
+    const printContainer = document.createElement('div');
+    printContainer.id = 'salon-receipt-print-container';
+    printContainer.innerHTML = html;
+    document.body.appendChild(printContainer);
+
+    // 4. Trigger print
+    let printSucceeded = false;
+    try {
       window.print();
+      printSucceeded = true;
+    } catch (e) {
+      console.warn('Native window.print failed, initiating direct download fallback:', e);
+      await downloadReceiptFile(appointment);
     }
+
+    // 5. Cleanup DOM after print dialog closes
+    setTimeout(() => {
+      if (document.body.contains(printContainer)) {
+        document.body.removeChild(printContainer);
+      }
+      if (document.head.contains(printStyle)) {
+        document.head.removeChild(printStyle);
+      }
+    }, 3000);
+
+    return printSucceeded;
   } catch (error) {
-    console.error('Print receipt failed:', error);
-    window.print();
+    console.error('Print receipt failed, saving HTML receipt instead:', error);
+    await downloadReceiptFile(appointment);
+    return false;
   }
 }
 

@@ -920,7 +920,63 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const updateAppointmentStatus = (id: string, status: AppointmentStatus) => {
-    setAppointments(prev => prev.map(apt => apt.id === id ? { ...apt, bookingStatus: status, status: status, isNew: false } : apt));
+    const target = appointments.find(apt => apt.id === id);
+
+    setAppointments(prev => {
+      const updated = prev.map(apt => apt.id === id ? { ...apt, bookingStatus: status, status: status, isNew: false } : apt);
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_appointments`, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (target) {
+      if (status === 'COMPLETED') {
+        // Sync with CRM Customer record
+        setCustomers(prev => prev.map(c => {
+          const matchPhone = c.phone && target.clientPhone && c.phone.replace(/\D/g, '') === target.clientPhone.replace(/\D/g, '');
+          const matchEmail = c.email && target.clientEmail && c.email.toLowerCase() === target.clientEmail.toLowerCase();
+          if (matchPhone || matchEmail || c.name === target.clientName) {
+            return {
+              ...c,
+              totalVisits: (c.totalVisits || 0) + 1,
+              totalSpent: (c.totalSpent || 0) + (target.totalAmount || 0),
+              lastVisit: target.date
+            };
+          }
+          return c;
+        }));
+
+        // Notification
+        const notif: NotificationItem = {
+          id: `notif-comp-${Date.now()}`,
+          title: 'Appointment Completed',
+          message: `${target.clientName} completed visit for ${target.serviceName} (#${target.bookingRef}).`,
+          type: 'booking',
+          timestamp: 'Just now',
+          read: false
+        };
+        setNotifications(prev => [notif, ...prev]);
+      } else if (status === 'CANCELLED') {
+        const notif: NotificationItem = {
+          id: `notif-canc-${Date.now()}`,
+          title: 'Appointment Cancelled',
+          message: `Booking #${target.bookingRef} (${target.clientName}) marked as cancelled.`,
+          type: 'booking',
+          timestamp: 'Just now',
+          read: false
+        };
+        setNotifications(prev => [notif, ...prev]);
+      }
+    }
+
+    try {
+      fetch(`/api/appointments/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingStatus: status, status: status, isNew: false })
+      }).catch(err => console.log('Appointment status update background notice:', err));
+    } catch {
+      // Fallback
+    }
   };
 
   const rescheduleAppointment = async (id: string, newDate: string, newTimeSlot: string): Promise<{ success: boolean; message: string }> => {
@@ -999,7 +1055,33 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const deleteAppointment = (id: string) => {
-    setAppointments(prev => prev.filter(apt => apt.id !== id));
+    const target = appointments.find(apt => apt.id === id);
+
+    setAppointments(prev => {
+      const updated = prev.filter(apt => apt.id !== id);
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_appointments`, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (target) {
+      const notif: NotificationItem = {
+        id: `notif-del-${Date.now()}`,
+        title: 'Appointment Record Removed',
+        message: `Booking #${target.bookingRef} for ${target.clientName} was deleted from database.`,
+        type: 'booking',
+        timestamp: 'Just now',
+        read: false
+      };
+      setNotifications(prev => [notif, ...prev]);
+    }
+
+    try {
+      fetch(`/api/appointments/${id}`, {
+        method: 'DELETE'
+      }).catch(err => console.log('Appointment deletion background notice:', err));
+    } catch {
+      // Fallback
+    }
   };
 
   // Service CRUD

@@ -50,7 +50,9 @@ import {
   Lock,
   Zap,
   EyeOff,
-  AlertCircle
+  AlertCircle,
+  Receipt,
+  Printer
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { ServiceItem, Appointment, GalleryItem, OfferCoupon, AppointmentStatus, StaffMember } from '../types';
@@ -58,6 +60,7 @@ import { AdminCharts } from '../components/AdminCharts';
 import { AdminReviewsTrends } from '../components/AdminReviewsTrends';
 import { AdminSmsEmailHubModal } from '../components/AdminSmsEmailHubModal';
 import { AdminTermsPolicies } from '../components/AdminTermsPolicies';
+import { ReceiptModal } from '../components/ReceiptModal';
 
 export const AdminSuite: React.FC = () => {
   const {
@@ -82,6 +85,7 @@ export const AdminSuite: React.FC = () => {
     addOffer,
     deleteOffer,
     updateAppointmentStatus,
+    deleteAppointment,
     setIsAdminMode,
     theme,
     setTheme,

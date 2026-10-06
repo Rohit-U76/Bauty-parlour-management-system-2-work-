@@ -28,6 +28,7 @@ import { ServiceItem, Appointment, PriceTierVariant } from '../types';
 import { ModernSalonLogo } from './ModernSalonLogo';
 import { SALON_TIME_SLOTS, getSlotAvailability, getDayAvailabilitySummary, isSlotAvailableForDate } from '../utils/availability';
 import { printSalonReceipt, downloadReceiptFile } from '../utils/receiptPrinter';
+import { ReceiptModal } from './ReceiptModal';
 
 export const BookingModal: React.FC = () => {
   const {
@@ -65,6 +66,7 @@ export const BookingModal: React.FC = () => {
   // Payment modal state
   const [showRazorpayModal, setShowRazorpayModal] = useState<boolean>(false);
   const [confirmedBooking, setConfirmedBooking] = useState<Appointment | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
 
   // Stylists list - "Self Employed" default
   const stylists = [
@@ -839,7 +841,17 @@ export const BookingModal: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => printSalonReceipt(confirmedBooking)}
+                  onClick={() => setShowReceiptModal(true)}
+                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-zinc-950 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>View Official Receipt</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await printSalonReceipt(confirmedBooking);
+                  }}
                   className="flex-1 py-2.5 rounded-xl border border-purple-200 dark:border-zinc-800 hover:bg-purple-50 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400" />
@@ -856,7 +868,7 @@ export const BookingModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => resetBookingForm(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-purple-50 dark:bg-amber-500/15 border border-purple-200 dark:border-amber-500/40 text-purple-700 dark:text-amber-400 hover:bg-purple-100 dark:hover:bg-amber-500/25 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="py-2.5 px-3 rounded-xl bg-purple-50 dark:bg-amber-500/15 border border-purple-200 dark:border-amber-500/40 text-purple-700 dark:text-amber-400 hover:bg-purple-100 dark:hover:bg-amber-500/25 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Book Another</span>
@@ -867,7 +879,7 @@ export const BookingModal: React.FC = () => {
                     resetBookingForm(null);
                     closeBookingModal();
                   }}
-                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-gradient-to-r dark:from-amber-500 dark:to-yellow-400 dark:hover:from-amber-400 dark:hover:to-yellow-300 text-white dark:text-zinc-950 text-xs font-extrabold transition shadow-md cursor-pointer"
+                  className="py-2.5 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
                 >
                   Done &amp; Close
                 </button>
@@ -927,6 +939,15 @@ export const BookingModal: React.FC = () => {
           clientName={clientName}
           clientEmail={clientEmail || `${clientName.toLowerCase().replace(/\s+/g, '')}@example.com`}
           clientPhone={clientPhone}
+        />
+      )}
+
+      {/* Official Printable Receipt Preview Modal */}
+      {confirmedBooking && (
+        <ReceiptModal
+          isOpen={showReceiptModal}
+          onClose={() => setShowReceiptModal(false)}
+          appointment={confirmedBooking}
         />
       )}
     </div>
