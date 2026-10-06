@@ -40,20 +40,41 @@ export const Navbar: React.FC = () => {
     settings,
     reviews,
     currentUser,
-    logout
+    logout,
+    userVisitsCount
   } = useSalon();
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [selectedPassAppointment, setSelectedPassAppointment] = useState<Appointment | null>(null);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
-  // Compute 24-hr and upcoming reminders
+  // Compute 24-hr and upcoming reminders scoped strictly for current user
   const upcomingReminders = useMemo(() => {
-    return appointments.filter(apt => {
+    const list = currentUser?.role === 'ADMIN'
+      ? appointments
+      : appointments.filter(apt => {
+          if (!currentUser) return false;
+          if (apt.userId) return apt.userId === currentUser.id;
+          const userPhoneClean = (currentUser.phone || '').replace(/\D/g, '').slice(-10);
+          const userEmailClean = (currentUser.email || '').trim().toLowerCase();
+          const userNameClean = (currentUser.name || '').trim().toLowerCase();
+          if (userPhoneClean && userPhoneClean.length === 10) {
+            const aptPhoneClean = (apt.clientPhone || '').replace(/\D/g, '').slice(-10);
+            const aptEmailClean = (apt.clientEmail || '').trim().toLowerCase();
+            const aptNameClean = (apt.clientName || '').trim().toLowerCase();
+            if (aptPhoneClean === userPhoneClean) {
+              if (aptEmailClean && userEmailClean && aptEmailClean === userEmailClean) return true;
+              if (aptNameClean && userNameClean && aptNameClean === userNameClean) return true;
+            }
+          }
+          return false;
+        });
+
+    return list.filter(apt => {
       const info = getAppointmentReminderInfo(apt);
       return info.isUpcoming24h;
     });
-  }, [appointments]);
+  }, [appointments, currentUser]);
 
   const handleNav = (tab: string) => {
     setActiveNavTab(tab);
@@ -211,7 +232,7 @@ export const Navbar: React.FC = () => {
                                 className="w-full py-1.5 px-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white dark:bg-amber-500 dark:hover:bg-amber-400 dark:text-zinc-950 text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-sm transition cursor-pointer"
                               >
                                 <Eye className="w-3.5 h-3.5" />
-                                <span>View Check-In Pass &amp; QR</span>
+                                <span>View Check-In Pass &amp; Details</span>
                               </button>
                             </div>
                           </div>
@@ -337,11 +358,11 @@ export const Navbar: React.FC = () => {
             >
               <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span>My Visits</span>
-              {appointments.length > 0 && (
+              {userVisitsCount > 0 && (
                 <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
                   activeNavTab === 'appointments' ? 'bg-white/20 text-white' : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
                 }`}>
-                  {appointments.length}
+                  {userVisitsCount}
                 </span>
               )}
             </button>
@@ -472,7 +493,7 @@ export const Navbar: React.FC = () => {
               }`}
             >
               <span>Visits</span>
-              {appointments.length > 0 && (
+              {userVisitsCount > 0 && (
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
               )}
             </button>

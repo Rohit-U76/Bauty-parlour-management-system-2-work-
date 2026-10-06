@@ -41,7 +41,7 @@ function initDb() {
           password: 'password123',
           memberTier: 'VIP Member',
           loyaltyPoints: 450,
-          totalVisits: 14,
+          totalVisits: 0,
           memberSince: '2023',
           preferredServices: ['HD Party Make Up', 'Cheryla’s Facial', 'Hair Spa']
         },
@@ -55,7 +55,7 @@ function initDb() {
           password: 'password123',
           memberTier: 'Standard',
           loyaltyPoints: 180,
-          totalVisits: 6,
+          totalVisits: 0,
           memberSince: '2024',
           preferredServices: ["Men's Fade & Beard Sculpt", 'Face Clean Up']
         },
@@ -69,7 +69,7 @@ function initDb() {
           password: 'password123',
           memberTier: 'VIP Member',
           loyaltyPoints: 500,
-          totalVisits: 8,
+          totalVisits: 0,
           memberSince: '2023',
           preferredServices: ['3D/4D HD Bridal & Grooming', "Men's Fade & Beard Sculpt", "L'Oréal Hair Spa"]
         }
@@ -616,8 +616,8 @@ async function startServer() {
     }
   });
 
-  // Razorpay Advance Deposit Order Creation
-  app.post('/api/payment/create-order', (req, res) => {
+  // Razorpay Advance Deposit Order Creation (Supports Real Razorpay Live/Test API & Sandbox)
+  app.post('/api/payment/create-order', async (req, res) => {
     try {
       const { totalAmount, customerName, customerPhone, customerEmail, serviceNames } = req.body;
       const parsedTotal = parseFloat(totalAmount) || 0;
@@ -625,13 +625,55 @@ async function startServer() {
         return res.status(400).json({ error: 'Invalid total amount for booking.' });
       }
 
-      // Dynamic advance deposit calculation from settings / request
       const db = readDb();
       const advancePercentage = req.body.advancePercentage ? Number(req.body.advancePercentage) : (Number(db.settings?.advancePercentage) || 10);
       const advanceAmount = Math.max(1, Math.round((parsedTotal * advancePercentage) / 100));
       const remainingAmount = parsedTotal - advanceAmount;
-      const orderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       const receiptId = `rcpt_${Date.now().toString().slice(-6)}`;
+      let orderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      let isLiveOrder = false;
+
+      const keyId = process.env.RAZORPAY_KEY_ID || db.settings?.razorpayKeyId || 'rzp_test_modern_salon_mohol';
+      const keySecret = process.env.RAZORPAY_KEY_SECRET || db.settings?.razorpayKeySecret || '';
+
+      // If valid merchant credentials are configured, create real order on Razorpay API
+      if (keyId && keySecret && !keyId.includes('demo') && !keyId.includes('placeholder')) {
+        try {
+          const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+          const rzpResponse = await fetch('https://api.razorpay.com/v1/orders', {
+            method: 'POST',
+            headers: {
+              'Authorization': authHeader,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              amount: advanceAmount * 100, // in paise
+              currency: 'INR',
+              receipt: receiptId,
+              notes: {
+                salon: 'Modern Unisex Salon Mohol',
+                clientName: customerName || 'Valued Client',
+                clientPhone: customerPhone || '',
+                service: (serviceNames && serviceNames[0]) || 'Salon Service'
+              }
+            })
+          });
+
+          if (rzpResponse.ok) {
+            const rzpData = await rzpResponse.json();
+            if (rzpData.id) {
+              orderId = rzpData.id;
+              isLiveOrder = true;
+              console.log(`[Razorpay Real Order Created]: ${orderId} (₹${advanceAmount})`);
+            }
+          } else {
+            const errBody = await rzpResponse.text();
+            console.log('[Razorpay API Response notice]:', errBody);
+          }
+        } catch (apiErr) {
+          console.log('[Razorpay API connection notice]:', apiErr);
+        }
+      }
 
       res.json({
         success: true,
@@ -643,7 +685,8 @@ async function startServer() {
         advanceAmount,
         remainingAmount,
         amountInPaise: advanceAmount * 100,
-        razorpayKeyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_smart_salon_demo',
+        razorpayKeyId: keyId,
+        isLiveOrder,
         customer: {
           name: customerName || 'Guest Client',
           phone: customerPhone || '',
@@ -651,7 +694,7 @@ async function startServer() {
         },
         services: serviceNames || [],
         notes: {
-          description: `${advancePercentage}% Advance Booking Deposit for Smart Salon`,
+          description: `${advancePercentage}% Advance Booking Deposit for Modern Unisex Salon`,
           policy: `Non-refundable within 2 hours of slot time. Balance ₹${remainingAmount} payable at salon reception.`
         }
       });
@@ -667,6 +710,28 @@ async function startServer() {
       const { razorpayOrderId, razorpayPaymentId, razorpaySignature, advanceAmount, totalAmount } = req.body;
       const paymentId = razorpayPaymentId || `pay_${Math.random().toString(36).substring(2, 10)}`;
       const bookingRef = `SS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      const db = readDb();
+      const keySecret = process.env.RAZORPAY_KEY_SECRET || db.settings?.razorpayKeySecret;
+      let signatureValid = true;
+
+      // HMAC SHA256 Signature verification if secret is configured and signature passed
+      if (keySecret && razorpaySignature && razorpayOrderId && razorpayPaymentId) {
+        try {
+          const crypto = require('crypto');
+          const expectedSig = crypto
+            .createHmac('sha256', keySecret)
+            .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+            .digest('hex');
+          signatureValid = (expectedSig === razorpaySignature);
+        } catch (sigErr) {
+          console.error('Signature verification error:', sigErr);
+        }
+      }
+
+      if (!signatureValid) {
+        return res.status(400).json({ success: false, error: 'Invalid payment signature. Verification failed.' });
+      }
 
       res.json({
         success: true,
@@ -684,6 +749,47 @@ async function startServer() {
     } catch (err: any) {
       console.error('Error verifying payment:', err);
       res.status(500).json({ error: 'Payment verification failed' });
+    }
+  });
+
+  // Razorpay Gateway API Key / Live Connection Test
+  app.post('/api/payment/test-connection', async (req, res) => {
+    try {
+      const db = readDb();
+      const { razorpayKeyId, razorpayKeySecret } = req.body;
+      const keyId = razorpayKeyId || process.env.RAZORPAY_KEY_ID || db.settings?.razorpayKeyId;
+      const keySecret = razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || db.settings?.razorpayKeySecret;
+
+      if (!keyId) {
+        return res.status(400).json({ success: false, message: 'Please provide a Razorpay Key ID (rzp_live_... or rzp_test_...).' });
+      }
+
+      if (!keySecret) {
+        return res.status(400).json({ success: false, message: 'Please provide the corresponding Razorpay Key Secret.' });
+      }
+
+      const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+      const rzpRes = await fetch('https://api.razorpay.com/v1/payments?count=1', {
+        headers: { 'Authorization': authHeader }
+      });
+
+      if (rzpRes.ok) {
+        const mode = keyId.startsWith('rzp_live') ? 'LIVE PRODUCTION' : 'TEST SANDBOX';
+        return res.json({
+          success: true,
+          mode,
+          message: `Razorpay connection verified successfully! Gateway is active in ${mode} mode.`
+        });
+      } else {
+        const errJson = await rzpRes.json().catch(() => ({}));
+        return res.status(400).json({
+          success: false,
+          message: errJson.error?.description || 'Razorpay authentication failed. Please check your Key ID and Key Secret.'
+        });
+      }
+    } catch (err: any) {
+      console.error('Error testing Razorpay connection:', err);
+      res.status(500).json({ success: false, message: 'Failed to test Razorpay connection: ' + err.message });
     }
   });
 
@@ -732,6 +838,7 @@ async function startServer() {
 
       const newAppointment = {
         id: payload.id || `apt-${Date.now()}`,
+        userId: payload.userId || '',
         bookingRef,
         clientName: payload.clientName,
         clientPhone: payload.clientPhone,

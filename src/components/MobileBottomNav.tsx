@@ -13,7 +13,7 @@ export const MobileBottomNav: React.FC = () => {
     activeNavTab, 
     setActiveNavTab, 
     openBookingModal, 
-    appointments, 
+    userVisitsCount, 
     currentUser,
     openProfileModal
   } = useSalon();
@@ -86,9 +86,9 @@ export const MobileBottomNav: React.FC = () => {
         >
           <div className="relative">
             <Calendar className={`w-5 h-5 mb-0.5 ${activeNavTab === 'appointments' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-            {appointments.length > 0 && (
+            {userVisitsCount > 0 && (
               <span className="absolute -top-1 -right-2 px-1 py-0.2 rounded-full bg-emerald-500 text-zinc-950 font-extrabold text-[9px]">
-                {appointments.length}
+                {userVisitsCount}
               </span>
             )}
           </div>

@@ -116,9 +116,9 @@ export const FaqSection: React.FC = () => {
     {
       id: 'faq-member-3',
       category: 'Membership & VIP',
-      question: 'What is the Digital QR Booking Pass and how do I use it?',
-      answer: 'Upon paying the 10% deposit, a digital pass with a QR code and reference number (e.g. SS-2026-XXXX) is generated. Simply show this digital pass on your phone upon arriving at our Mohol salon for express priority check-in.',
-      highlight: 'Contactless express check-in with your digital pass & QR code.'
+      question: 'What is the Digital Booking Pass and Confirmation and how do I use it?',
+      answer: 'Upon paying the 10% deposit, a digital booking confirmation pass with your unique reference number (e.g. SS-2026-XXXX) is generated and sent via WhatsApp. Simply give your name or booking reference upon arriving at our Mohol salon for express priority check-in.',
+      highlight: 'Express priority check-in with your booking reference & digital confirmation.'
     },
 
     // ==================== 4. PAYMENTS & BOOKING ====================

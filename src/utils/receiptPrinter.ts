@@ -1,31 +1,10 @@
 import { Appointment } from '../types';
-import QRCode from 'qrcode';
 
 /**
  * Generates an official, clean salon printable receipt HTML document.
  * Formatted cleanly for thermal & standard A4 / Letter PDF print.
  */
-export async function generateReceiptHtml(appointment: Appointment, customQrUrl?: string): Promise<string> {
-  let qrCodeData = customQrUrl;
-  if (!qrCodeData) {
-    try {
-      const payload = JSON.stringify({
-        ref: appointment.bookingRef,
-        client: appointment.clientName,
-        phone: appointment.clientPhone,
-        service: appointment.serviceName,
-        date: appointment.date,
-        time: appointment.timeSlot,
-        advance: appointment.advancePaid,
-        balance: appointment.balanceDue,
-        total: appointment.totalAmount
-      });
-      qrCodeData = await QRCode.toDataURL(payload, { width: 180, margin: 1 });
-    } catch {
-      qrCodeData = '';
-    }
-  }
-
+export async function generateReceiptHtml(appointment: Appointment): Promise<string> {
   const advancePaid = appointment.advancePaid || Math.round((appointment.totalAmount || 0) * 0.1);
   const balanceDue = appointment.balanceDue !== undefined 
     ? appointment.balanceDue 
@@ -140,22 +119,6 @@ export async function generateReceiptHtml(appointment: Appointment, customQrUrl?
           font-weight: 800;
           color: #581c87;
         }
-        .qr-section {
-          text-align: center;
-          margin-top: 20px;
-          padding-top: 16px;
-          border-top: 1px dashed #e4e4e7;
-        }
-        .qr-section img {
-          width: 130px;
-          height: 130px;
-          margin: 0 auto 6px auto;
-          display: block;
-        }
-        .qr-label {
-          font-size: 11px;
-          color: #71717a;
-        }
         .terms-box {
           margin-top: 16px;
           padding: 12px;
@@ -244,13 +207,6 @@ export async function generateReceiptHtml(appointment: Appointment, customQrUrl?
           </div>
         </div>
 
-        ${qrCodeData ? `
-        <div class="qr-section">
-          <img src="${qrCodeData}" alt="Booking Verification Pass QR" />
-          <div class="qr-label">Scan at Salon Desk for Contactless Check-in Verification</div>
-        </div>
-        ` : ''}
-
         <div class="terms-box">
           <strong>Important Salon Policies:</strong><br/>
           • Prior appointment recommended; chairs allocated with zero wait time.<br/>
@@ -272,9 +228,9 @@ export async function generateReceiptHtml(appointment: Appointment, customQrUrl?
  * Opens an isolated invisible iframe to trigger the browser's native Print / Save as PDF dialog.
  * Works seamlessly within sandboxed iframes without relying on popup-blocked window.open.
  */
-export async function printSalonReceipt(appointment: Appointment, customQrUrl?: string): Promise<void> {
+export async function printSalonReceipt(appointment: Appointment): Promise<void> {
   try {
-    const html = await generateReceiptHtml(appointment, customQrUrl);
+    const html = await generateReceiptHtml(appointment);
 
     // Create hidden iframe
     const iframe = document.createElement('iframe');
@@ -321,8 +277,8 @@ export async function printSalonReceipt(appointment: Appointment, customQrUrl?: 
 /**
  * Triggers a direct download of the official HTML receipt that can be saved as PDF or printed anytime.
  */
-export async function downloadReceiptFile(appointment: Appointment, customQrUrl?: string): Promise<void> {
-  const html = await generateReceiptHtml(appointment, customQrUrl);
+export async function downloadReceiptFile(appointment: Appointment): Promise<void> {
+  const html = await generateReceiptHtml(appointment);
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

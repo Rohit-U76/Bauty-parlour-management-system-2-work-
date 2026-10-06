@@ -69,14 +69,23 @@ export const CustomerPastAppointments: React.FC = () => {
 
     const userPhoneClean = (currentUser.phone || '').replace(/\D/g, '').slice(-10);
     const userId = currentUser.id;
+    const userEmailClean = (currentUser.email || '').trim().toLowerCase();
+    const userNameClean = (currentUser.name || '').trim().toLowerCase();
 
     return appointments.filter(apt => {
       // 1. Strict match by persistent userId
-      if (apt.userId && apt.userId === userId) return true;
-      // 2. Strict phone match only if appointment has no assigned userId and phone is 10 digits
-      if (!apt.userId && userPhoneClean && userPhoneClean.length === 10) {
+      if (apt.userId) {
+        return apt.userId === userId;
+      }
+      // 2. Strict phone & identity match only if appointment was created without userId
+      if (userPhoneClean && userPhoneClean.length === 10) {
         const aptPhoneClean = (apt.clientPhone || '').replace(/\D/g, '').slice(-10);
-        if (aptPhoneClean === userPhoneClean) return true;
+        const aptEmailClean = (apt.clientEmail || '').trim().toLowerCase();
+        const aptNameClean = (apt.clientName || '').trim().toLowerCase();
+        if (aptPhoneClean === userPhoneClean) {
+          if (aptEmailClean && userEmailClean && aptEmailClean === userEmailClean) return true;
+          if (aptNameClean && userNameClean && aptNameClean === userNameClean) return true;
+        }
       }
       return false;
     });
@@ -218,7 +227,7 @@ export const CustomerPastAppointments: React.FC = () => {
             Client Appointments &amp; Profile Portal
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
-            Manage your upcoming and past bookings, easily reschedule slots with preserved 10% advance deposit, access digital check-in passes, and keep your client styling profile updated.
+            Manage your upcoming and past bookings, easily reschedule slots with preserved 10% advance deposit, access digital booking passes, and keep your client styling profile updated.
           </p>
         </div>
 
@@ -255,7 +264,7 @@ export const CustomerPastAppointments: React.FC = () => {
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-extrabold text-[10px] uppercase tracking-wider flex items-center gap-1">
                   <Crown className="w-3 h-3" />
-                  <span>{currentUser.memberTier || 'VIP Member'}</span>
+                  <span>{currentUser.memberTier || 'New Client'}</span>
                 </span>
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -398,7 +407,7 @@ export const CustomerPastAppointments: React.FC = () => {
                   <button
                     onClick={() => setSelectedPassAppointment(apt)}
                     className="py-2 px-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
-                    title="View Digital Pass and QR"
+                    title="View Digital Pass & Details"
                   >
                     <Receipt className="w-3.5 h-3.5" />
                     <span>View Pass</span>
@@ -690,7 +699,7 @@ export const CustomerPastAppointments: React.FC = () => {
                           className="px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
                         >
                           <Receipt className="w-3.5 h-3.5" />
-                          <span>Pass &amp; QR</span>
+                          <span>Pass &amp; Details</span>
                         </button>
 
                         <button

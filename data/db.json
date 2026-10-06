@@ -1,0 +1,234 @@
+{
+  "users": [
+    {
+      "id": "usr-admin-1",
+      "name": "Salon Owner & Master Stylist",
+      "username": "admin",
+      "email": "admin@modernsalon.com",
+      "phone": "8104026257",
+      "role": "ADMIN",
+      "password": "admin",
+      "pin": "9999",
+      "memberTier": "Owner Admin",
+      "loyaltyPoints": 5000,
+      "memberSince": "2022"
+    },
+    {
+      "id": "usr-cust-1",
+      "name": "Priya Sharma",
+      "username": "priya",
+      "email": "priya.sharma@example.com",
+      "phone": "9822012345",
+      "role": "CUSTOMER",
+      "password": "password123",
+      "memberTier": "VIP Member",
+      "loyaltyPoints": 450,
+      "totalVisits": 0,
+      "memberSince": "2023",
+      "preferredServices": [
+        "HD Party Make Up",
+        "Cheryla’s Facial",
+        "Hair Spa"
+      ]
+    },
+    {
+      "id": "usr-cust-2",
+      "name": "Rahul Kadam",
+      "username": "rahul",
+      "email": "rahul.kadam@gmail.com",
+      "phone": "9423078901",
+      "role": "CUSTOMER",
+      "password": "password123",
+      "memberTier": "Standard",
+      "loyaltyPoints": 180,
+      "totalVisits": 0,
+      "memberSince": "2024",
+      "preferredServices": [
+        "Men's Fade & Beard Sculpt",
+        "Face Clean Up"
+      ]
+    },
+    {
+      "id": "usr-cust-3",
+      "name": "Rohit Umdale",
+      "username": "rohit",
+      "email": "rohitumdale@gmail.com",
+      "phone": "8104026257",
+      "role": "CUSTOMER",
+      "password": "password123",
+      "memberTier": "VIP Member",
+      "loyaltyPoints": 500,
+      "totalVisits": 0,
+      "memberSince": "2023",
+      "preferredServices": [
+        "3D/4D HD Bridal & Grooming",
+        "Men's Fade & Beard Sculpt",
+        "L'Oréal Hair Spa"
+      ]
+    },
+    {
+      "id": "usr-cust-1791226420543",
+      "name": "Automated Test Client",
+      "username": "testuser_1791226420541",
+      "email": "testuser_1791226420541@example.com",
+      "phone": "9823069528",
+      "password": "securepassword123",
+      "role": "CUSTOMER",
+      "memberTier": "Silver VIP",
+      "loyaltyPoints": 100,
+      "totalVisits": 0,
+      "memberSince": "2026",
+      "preferredServices": [
+        "Hair Spa",
+        "Facial"
+      ]
+    },
+    {
+      "id": "usr-cust-1791226943974",
+      "name": "xyz 2",
+      "username": "xyz 2",
+      "email": "xyz2@gmail.com",
+      "phone": "9999999999",
+      "password": "xyz@9076",
+      "role": "CUSTOMER",
+      "memberTier": "Silver VIP",
+      "loyaltyPoints": 100,
+      "totalVisits": 0,
+      "memberSince": "2026",
+      "preferredServices": []
+    },
+    {
+      "id": "usr-cust-1791227247202",
+      "name": "Automated Test Client",
+      "username": "testuser_1791227247199",
+      "email": "testuser_1791227247199@example.com",
+      "phone": "9855488328",
+      "password": "securepassword123",
+      "role": "CUSTOMER",
+      "memberTier": "Silver VIP",
+      "loyaltyPoints": 100,
+      "totalVisits": 0,
+      "memberSince": "2026",
+      "preferredServices": [
+        "Hair Spa",
+        "Facial"
+      ]
+    }
+  ],
+  "settings": {
+    "salonName": "Modern Unisex Salon",
+    "tagline": "WE'LL STYLE YOU'LL SMILE",
+    "phone": "8104026257",
+    "email": "modernsalon02@gmail.com",
+    "address": "B.N. GUND COMPLEX, NEAR KANYA PRASHALA AND ICICI BANK, MOHOL - 413213",
+    "openingHours": "Mon - Sun: 09:00 AM - 09:00 PM",
+    "advancePercentage": 10,
+    "currencySymbol": "₹",
+    "razorpayKeyId": "rzp_test_modern_salon_mohol",
+    "bookingAutoConfirm": false,
+    "instagramUrl": "https://www.instagram.com/modern_unisex_salon_mohol?utm_source=qr",
+    "mapsUrl": "https://maps.app.goo.gl/CraeBa6gAjWA8o818",
+    "gstNumber": "27AABCM8104M1Z2 (Available on Invoice)",
+    "staffType": "Self-Employed (Master Stylist & Founder)"
+  },
+  "inquiries": [
+    {
+      "id": "inq-1",
+      "clientName": "Sneha Patil",
+      "phone": "9822109876",
+      "email": "sneha.patil@gmail.com",
+      "subject": "Bridal Package Consultation",
+      "serviceCategory": "Bridal & Pre-Bridal",
+      "message": "Looking for full bridal package details for wedding on Dec 15th.",
+      "receivedDate": "2026-03-01",
+      "status": "NEW"
+    },
+    {
+      "id": "inq-2",
+      "clientName": "Amol Shinde",
+      "phone": "9158402211",
+      "email": "amol.shinde@outlook.com",
+      "subject": "Keratin Treatment Inquiry",
+      "serviceCategory": "Hair Services",
+      "message": "Is keratin safe for colored hair? What is the duration?",
+      "receivedDate": "2026-03-03",
+      "status": "IN PROGRESS"
+    }
+  ],
+  "appointments": [
+    {
+      "id": "apt-1791227247262",
+      "bookingRef": "SS-TEST-247259",
+      "clientName": "Rohit Umdale",
+      "clientPhone": "8104026257",
+      "clientEmail": "rohitumdale@gmail.com",
+      "serviceId": "srv-bridal-1",
+      "serviceName": "3D/4D HD Bridal & Grooming",
+      "category": "Bridal",
+      "date": "2026-11-05",
+      "timeSlot": "11:45 AM",
+      "stylistName": "Master Stylist & Founder",
+      "totalAmount": 5000,
+      "advancePaid": 500,
+      "balanceDue": 4500,
+      "paymentStatus": "PAID",
+      "bookingStatus": "CONFIRMED",
+      "status": "CONFIRMED",
+      "razorpayPaymentId": "pay_1791227247262",
+      "razorpayOrderId": "order_1791227247262",
+      "createdAt": "2026-10-05T19:07:27.262Z",
+      "notes": "",
+      "isNew": true,
+      "whatsappUrl": "https://api.whatsapp.com/send?phone=918104026257&text=%E2%9C%A8%20*NEW%20APPOINTMENT%20CONFIRMED*%20%E2%9C%A8%0A*Modern%20Unisex%20Salon%2C%20Mohol*%0A%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A%F0%9F%93%8B%20*Booking%20Ref%3A*%20SS-TEST-247259%0A%F0%9F%91%A4%20*Client%20Name%3A*%20Rohit%20Umdale%0A%F0%9F%93%B1%20*Client%20Mobile%3A*%208104026257%0A%F0%9F%92%87%E2%80%8D%E2%99%80%EF%B8%8F%20*Service%3A*%203D%2F4D%20HD%20Bridal%20%26%20Grooming%0A%F0%9F%93%85%20*Date%20%26%20Slot%3A*%202026-11-05%20at%2011%3A45%20AM%0A%E2%9C%82%EF%B8%8F%20*Stylist%3A*%20Master%20Stylist%20%26%20Founder%0A%F0%9F%92%B0%20*Total%20Bill%3A*%20%E2%82%B95000%0A%E2%9C%85%20*10%25%20Advance%20Deposit%20Paid%3A*%20%E2%82%B9500%20(Verified%20via%20Razorpay)%0A%F0%9F%92%B5%20*Balance%20at%20Salon%20Counter%3A*%20%E2%82%B94500%0A%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A%F0%9F%93%8D%20*Salon%20Address%3A*%20B.N.%20Gund%20Complex%2C%20Near%20Kanya%20Prashala%20%26%20ICICI%20Bank%2C%20Mohol%20(413213)%0A%F0%9F%93%9E%20*Salon%20Helpline%3A*%20%2B91%2081040%2026257",
+      "ownerWhatsappUrl": "https://api.whatsapp.com/send?phone=918104026257&text=%E2%9C%A8%20*NEW%20APPOINTMENT%20CONFIRMED*%20%E2%9C%A8%0A*Modern%20Unisex%20Salon%2C%20Mohol*%0A%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A%F0%9F%93%8B%20*Booking%20Ref%3A*%20SS-TEST-247259%0A%F0%9F%91%A4%20*Client%20Name%3A*%20Rohit%20Umdale%0A%F0%9F%93%B1%20*Client%20Mobile%3A*%208104026257%0A%F0%9F%92%87%E2%80%8D%E2%99%80%EF%B8%8F%20*Service%3A*%203D%2F4D%20HD%20Bridal%20%26%20Grooming%0A%F0%9F%93%85%20*Date%20%26%20Slot%3A*%202026-11-05%20at%2011%3A45%20AM%0A%E2%9C%82%EF%B8%8F%20*Stylist%3A*%20Master%20Stylist%20%26%20Founder%0A%F0%9F%92%B0%20*Total%20Bill%3A*%20%E2%82%B95000%0A%E2%9C%85%20*10%25%20Advance%20Deposit%20Paid%3A*%20%E2%82%B9500%20(Verified%20via%20Razorpay)%0A%F0%9F%92%B5%20*Balance%20at%20Salon%20Counter%3A*%20%E2%82%B94500%0A%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A%F0%9F%93%8D%20*Salon%20Address%3A*%20B.N.%20Gund%20Complex%2C%20Near%20Kanya%20Prashala%20%26%20ICICI%20Bank%2C%20Mohol%20(413213)%0A%F0%9F%93%9E%20*Salon%20Helpline%3A*%20%2B91%2081040%2026257"
+    },
+    {
+      "id": "apt-1791226420596",
+      "bookingRef": "SS-TEST-420593",
+      "clientName": "Rohit Umdale",
+      "clientPhone": "8104026257",
+      "clientEmail": "rohitumdale@gmail.com",
+      "serviceId": "srv-bridal-1",
+      "serviceName": "3D/4D HD Bridal & Grooming",
+      "category": "Bridal",
+      "date": "2026-11-05",
+      "timeSlot": "11:45 AM",
+      "stylistName": "Master Stylist & Founder",
+      "totalAmount": 5000,
+      "advancePaid": 500,
+      "balanceDue": 4500,
+      "paymentStatus": "PAID",
+      "bookingStatus": "CONFIRMED",
+      "status": "CONFIRMED",
+      "razorpayPaymentId": "pay_1791226420596",
+      "razorpayOrderId": "order_1791226420596",
+      "createdAt": "2026-10-05T18:53:40.596Z",
+      "notes": "",
+      "isNew": true,
+      "whatsappUrl": "https://api.whatsapp.com/send?phone=918104026257&text=%E2%9C%A8%20*NEW%20APPOINTMENT%20CONFIRMED*%20%E2%9C%A8%0A*Modern%20Unisex%20Salon%2C%20Mohol*%0A%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A%F0%9F%93%8B%20*Booking%20Ref%3A*%20SS-TEST-420593%0A%F0%9F%91%A4%20*Client%20Name%3A*%20Rohit%20Umdale%0A%F0%9F%93%B1%20*Client%20Mobile%3A*%208104026257%0A%F0%9F%92%87%E2%80%8D%E2%99%80%EF%B8%8F%20*Service%3A*%203D%2F4D%20HD%20Bridal%20%26%20Grooming%0A%F0%9F%93%85%20*Date%20%26%20Slot%3A*%202026-11-05%20at%2011%3A45%20AM%0A%E2%9C%82%EF%B8%8F%20*Stylist%3A*%20Master%20Stylist%20%26%20Founder%0A%F0%9F%92%B0%20*Total%20Bill%3A*%20%E2%82%B95000%0A%E2%9C%85%20*10%25%20Advance%20Deposit%20Paid%3A*%20%E2%82%B9500%20(Verified%20via%20Razorpay)%0A%F0%9F%92%B5%20*Balance%20at%20Salon%20Counter%3A*%20%E2%82%B94500%0A%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A%F0%9F%93%8D%20*Salon%20Address%3A*%20B.N.%20Gund%20Complex%2C%20Near%20Kanya%20Prashala%20%26%20ICICI%20Bank%2C%20Mohol%20(413213)%0A%F0%9F%93%9E%20*Salon%20Helpline%3A*%20%2B91%2081040%2026257",
+      "ownerWhatsappUrl": "https://api.whatsapp.com/send?phone=918104026257&text=%E2%9C%A8%20*NEW%20APPOINTMENT%20CONFIRMED*%20%E2%9C%A8%0A*Modern%20Unisex%20Salon%2C%20Mohol*%0A%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A%F0%9F%93%8B%20*Booking%20Ref%3A*%20SS-TEST-420593%0A%F0%9F%91%A4%20*Client%20Name%3A*%20Rohit%20Umdale%0A%F0%9F%93%B1%20*Client%20Mobile%3A*%208104026257%0A%F0%9F%92%87%E2%80%8D%E2%99%80%EF%B8%8F%20*Service%3A*%203D%2F4D%20HD%20Bridal%20%26%20Grooming%0A%F0%9F%93%85%20*Date%20%26%20Slot%3A*%202026-11-05%20at%2011%3A45%20AM%0A%E2%9C%82%EF%B8%8F%20*Stylist%3A*%20Master%20Stylist%20%26%20Founder%0A%F0%9F%92%B0%20*Total%20Bill%3A*%20%E2%82%B95000%0A%E2%9C%85%20*10%25%20Advance%20Deposit%20Paid%3A*%20%E2%82%B9500%20(Verified%20via%20Razorpay)%0A%F0%9F%92%B5%20*Balance%20at%20Salon%20Counter%3A*%20%E2%82%B94500%0A%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A%F0%9F%93%8D%20*Salon%20Address%3A*%20B.N.%20Gund%20Complex%2C%20Near%20Kanya%20Prashala%20%26%20ICICI%20Bank%2C%20Mohol%20(413213)%0A%F0%9F%93%9E%20*Salon%20Helpline%3A*%20%2B91%2081040%2026257"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "notif-1791227247262",
+      "title": "New Online Reservation & 10% Deposit",
+      "message": "Rohit Umdale booked 3D/4D HD Bridal & Grooming for 2026-11-05 at 11:45 AM. Advance deposit ₹500 verified via Razorpay.",
+      "type": "booking",
+      "timestamp": "Just now",
+      "read": false,
+      "bookingRef": "SS-TEST-247259",
+      "appointmentId": "apt-1791227247262"
+    },
+    {
+      "id": "notif-1791226420596",
+      "title": "New Online Reservation & 10% Deposit",
+      "message": "Rohit Umdale booked 3D/4D HD Bridal & Grooming for 2026-11-05 at 11:45 AM. Advance deposit ₹500 verified via Razorpay.",
+      "type": "booking",
+      "timestamp": "Just now",
+      "read": false,
+      "bookingRef": "SS-TEST-420593",
+      "appointmentId": "apt-1791226420596"
+    }
+  ]
+}

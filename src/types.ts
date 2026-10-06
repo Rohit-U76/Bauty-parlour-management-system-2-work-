@@ -178,6 +178,11 @@ export interface SalonSettings {
   advancePercentage: number; // default 10
   currencySymbol: string;
   razorpayKeyId: string;
+  razorpayKeySecret?: string;
+  paymentGatewayMode?: 'live' | 'test';
+  merchantUpiId?: string;
+  bankAccountNumber?: string;
+  bankIfsc?: string;
   bookingAutoConfirm: boolean;
   instagramUrl?: string;
   mapsUrl?: string;

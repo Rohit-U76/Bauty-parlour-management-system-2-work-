@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import {
   ServiceItem,
   Appointment,
@@ -164,6 +164,7 @@ interface SalonContextType {
   activeCustomersCount: number;
   pendingInquiriesCount: number;
   advanceDepositTotal: number;
+  userVisitsCount: number;
 }
 
 const SalonContext = createContext<SalonContextType | undefined>(undefined);
@@ -633,10 +634,10 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
         localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
 
-        // Also register in customer CRM directory
+        // Also register in customer CRM directory with 0 initial visits for brand new account
         setCustomers(prev => {
-          if (prev.some(c => c.phone === newUser.phone || (newUser.email && c.email === newUser.email))) return prev;
-          return [...prev, {
+          const filtered = prev.filter(c => c.phone !== newUser.phone && (!newUser.email || c.email !== newUser.email));
+          return [...filtered, {
             id: `cust-${Date.now()}`,
             name: newUser.name,
             phone: newUser.phone,
@@ -1284,6 +1285,36 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const activeCustomersCount = customers.length;
   const pendingInquiriesCount = inquiries.filter(i => i.status === 'NEW' || i.status === 'IN PROGRESS').length;
 
+  // Centrally computed visits count strictly for the current logged-in account
+  // If no user is logged in, or if a new user creates an account, this is guaranteed to be 0
+  const userVisitsCount = useMemo(() => {
+    if (!currentUser) return 0;
+    if (currentUser.role === 'ADMIN') return appointments.length;
+
+    const userId = currentUser.id;
+    const userPhoneClean = (currentUser.phone || '').replace(/\D/g, '').slice(-10);
+    const userEmailClean = (currentUser.email || '').trim().toLowerCase();
+    const userNameClean = (currentUser.name || '').trim().toLowerCase();
+
+    return appointments.filter(apt => {
+      // 1. Strict match by persistent userId
+      if (apt.userId) {
+        return apt.userId === userId;
+      }
+      // 2. Strict phone & identity match only if appointment has no userId
+      if (userPhoneClean && userPhoneClean.length === 10) {
+        const aptPhoneClean = (apt.clientPhone || '').replace(/\D/g, '').slice(-10);
+        const aptEmailClean = (apt.clientEmail || '').trim().toLowerCase();
+        const aptNameClean = (apt.clientName || '').trim().toLowerCase();
+        if (aptPhoneClean === userPhoneClean) {
+          if (aptEmailClean && userEmailClean && aptEmailClean === userEmailClean) return true;
+          if (aptNameClean && userNameClean && aptNameClean === userNameClean) return true;
+        }
+      }
+      return false;
+    }).length;
+  }, [appointments, currentUser]);
+
   return (
     <SalonContext.Provider
       value={{
@@ -1371,7 +1402,8 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         confirmedBookingsCount,
         activeCustomersCount,
         pendingInquiriesCount,
-        advanceDepositTotal
+        advanceDepositTotal,
+        userVisitsCount
       }}
     >
       {children}

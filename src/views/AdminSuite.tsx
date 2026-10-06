@@ -22,7 +22,6 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
-  QrCode,
   DollarSign,
   UserCheck,
   TrendingUp,
@@ -45,15 +44,18 @@ import {
   Award,
   Briefcase,
   FileText,
-  ExternalLink
+  ExternalLink,
+  CreditCard,
+  Building2,
+  Lock,
+  Zap,
+  EyeOff,
+  AlertCircle
 } from 'lucide-react';
-import QRCode from 'qrcode';
 import { useSalon } from '../context/SalonContext';
 import { ServiceItem, Appointment, GalleryItem, OfferCoupon, AppointmentStatus, StaffMember } from '../types';
 import { AdminCharts } from '../components/AdminCharts';
 import { AdminReviewsTrends } from '../components/AdminReviewsTrends';
-import { ReceptionistQrScannerModal } from '../components/ReceptionistQrScannerModal';
-import { QrCodeGeneratorModal } from '../components/QrCodeGeneratorModal';
 import { AdminSmsEmailHubModal } from '../components/AdminSmsEmailHubModal';
 import { AdminTermsPolicies } from '../components/AdminTermsPolicies';
 
@@ -107,10 +109,6 @@ export const AdminSuite: React.FC = () => {
   const [editingGalleryItem, setEditingGalleryItem] = useState<GalleryItem | null>(null);
 
   const [showAddOfferModal, setShowAddOfferModal] = useState(false);
-  const [showQrScannerModal, setShowQrScannerModal] = useState(false);
-  const [showQrGeneratorModal, setShowQrGeneratorModal] = useState(false);
-  const [selectedServiceForQr, setSelectedServiceForQr] = useState<ServiceItem | null>(null);
-  const [qrGeneratorInitialType, setQrGeneratorInitialType] = useState<string>('booking');
   const [showSmsHubModal, setShowSmsHubModal] = useState(false);
   const [selectedAppForMessaging, setSelectedAppForMessaging] = useState<Appointment | null>(null);
 
@@ -134,6 +132,38 @@ export const AdminSuite: React.FC = () => {
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
   const [inquiryToDelete, setInquiryToDelete] = useState<string | null>(null);
   const [actionFeedbackToast, setActionFeedbackToast] = useState<string | null>(null);
+
+  // Real-world Payment Gateway Settings state
+  const [isTestingGateway, setIsTestingGateway] = useState(false);
+  const [gatewayTestResult, setGatewayTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showRazorpaySecret, setShowRazorpaySecret] = useState(false);
+
+  const handleTestGatewayConnection = async () => {
+    setIsTestingGateway(true);
+    setGatewayTestResult(null);
+    try {
+      const res = await fetch('/api/payment/test-connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          razorpayKeyId: settings.razorpayKeyId,
+          razorpayKeySecret: settings.razorpayKeySecret
+        })
+      });
+      const data = await res.json();
+      setGatewayTestResult({
+        success: data.success,
+        message: data.message || (data.success ? 'Razorpay credentials verified successfully!' : 'Verification failed')
+      });
+    } catch (err: any) {
+      setGatewayTestResult({
+        success: false,
+        message: 'Could not reach server to test credentials: ' + err.message
+      });
+    } finally {
+      setIsTestingGateway(false);
+    }
+  };
 
   const openAddStaffModal = () => {
     setStaffName('');
@@ -211,86 +241,6 @@ export const AdminSuite: React.FC = () => {
 
     setShowAddStaffModal(false);
     setEditingStaffMember(null);
-  };
-
-  // Dashboard Booking QR Widget State
-  const [dashQrType, setDashQrType] = useState<'booking' | 'service' | 'walkin'>('booking');
-  const [dashQrServiceId, setDashQrServiceId] = useState<string>(services[0]?.id || '');
-  const [dashQrDataUrl, setDashQrDataUrl] = useState<string>('');
-  const [dashQrCopied, setDashQrCopied] = useState<boolean>(false);
-
-  useEffect(() => {
-    const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
-    let targetUrl = `${origin}?book=true`;
-    if (dashQrType === 'service') {
-      const srvId = dashQrServiceId || (services[0]?.id || '');
-      targetUrl = `${origin}?service=${srvId}&book=true`;
-    } else if (dashQrType === 'walkin') {
-      targetUrl = `${origin}?book=true&ref=reception_desk`;
-    }
-
-    QRCode.toDataURL(targetUrl, {
-      width: 400,
-      margin: 2,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF'
-      }
-    })
-      .then(url => setDashQrDataUrl(url))
-      .catch(err => console.error('Failed to generate dashboard QR code', err));
-  }, [dashQrType, dashQrServiceId, services]);
-
-  const handleDownloadDashQr = () => {
-    if (!dashQrDataUrl) return;
-    const link = document.createElement('a');
-    link.href = dashQrDataUrl;
-    link.download = `ModernSalon_${dashQrType}_QR.png`;
-    link.click();
-  };
-
-  const handleCopyDashQrLink = () => {
-    const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
-    let targetUrl = `${origin}?book=true`;
-    if (dashQrType === 'service') {
-      const srvId = dashQrServiceId || (services[0]?.id || '');
-      targetUrl = `${origin}?service=${srvId}&book=true`;
-    } else if (dashQrType === 'walkin') {
-      targetUrl = `${origin}?book=true&ref=reception_desk`;
-    }
-    navigator.clipboard.writeText(targetUrl);
-    setDashQrCopied(true);
-    setTimeout(() => setDashQrCopied(false), 2000);
-  };
-
-  // Dashboard Front Desk QR Check-in Station State
-  const [dashCheckinQuery, setDashCheckinQuery] = useState('');
-  const [dashMatchedApp, setDashMatchedApp] = useState<Appointment | null>(null);
-  const [dashCheckinSuccess, setDashCheckinSuccess] = useState<string | null>(null);
-
-  const handleDashCheckinSearch = (q: string) => {
-    setDashCheckinQuery(q);
-    const clean = q.trim().toLowerCase();
-    if (!clean) {
-      setDashMatchedApp(null);
-      return;
-    }
-    const found = appointments.find(a => 
-      (a.bookingRef && a.bookingRef.toLowerCase().includes(clean)) ||
-      (a.clientPhone && a.clientPhone.includes(clean)) ||
-      (a.clientName && a.clientName.toLowerCase().includes(clean))
-    );
-    setDashMatchedApp(found || null);
-  };
-
-  const handleConfirmDashCheckin = (app: Appointment) => {
-    updateAppointmentStatus(app.id, 'COMPLETED');
-    setDashCheckinSuccess(`Appointment ${app.bookingRef || app.id} checked in successfully for ${app.clientName}!`);
-    setTimeout(() => {
-      setDashCheckinSuccess(null);
-      setDashCheckinQuery('');
-      setDashMatchedApp(null);
-    }, 3500);
   };
 
   // Add Service Form
@@ -467,7 +417,6 @@ export const AdminSuite: React.FC = () => {
     { id: 'customers', label: 'Customers CRM', icon: Users },
     { id: 'inquiries', label: 'Consultation Inquiries', icon: Mail, badge: inquiries.length },
     { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
-    { id: 'qr-scanner', label: 'QR Check-in Scanner', icon: QrCode },
     { id: 'policies', label: 'Terms & Policies', icon: FileText, badge: (policies || []).length },
     { id: 'themes', label: 'Theme Studio', icon: Palette },
     { id: 'settings', label: 'Salon Settings', icon: Settings },
@@ -753,24 +702,6 @@ export const AdminSuite: React.FC = () => {
                     <span>View Appointments ({confirmedCount})</span>
                   </button>
                   <button
-                    onClick={() => {
-                      setSelectedServiceForQr(null);
-                      setQrGeneratorInitialType('booking');
-                      setShowQrGeneratorModal(true);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <QrCode className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Generate Booking QR</span>
-                  </button>
-                  <button
-                    onClick={() => setShowQrScannerModal(true)}
-                    className="px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Camera className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Launch QR Scanner</span>
-                  </button>
-                  <button
                     onClick={openAddStaffModal}
                     className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                   >
@@ -792,280 +723,6 @@ export const AdminSuite: React.FC = () => {
                     <span>Add Gallery Photo</span>
                   </button>
                 </div>
-              </div>
-
-              {/* DASHBOARD QR SUITE: GENERATE BOOKING QR & FRONT DESK SCANNER STATION */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                
-                {/* 1. Generate Booking QR Section */}
-                <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col justify-between space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
-                          <QrCode className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h3 className="font-serif text-sm font-bold text-zinc-100">Generate Booking QR</h3>
-                          <p className="text-[11px] text-zinc-400">Display at reception desk or salon entrance in Mohol.</p>
-                        </div>
-                      </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400">
-                        Live Standee
-                      </span>
-                    </div>
-
-                    {/* QR Type Selector Tabs */}
-                    <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-950 border border-zinc-800/80 text-xs font-medium">
-                      <button
-                        onClick={() => setDashQrType('booking')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-center transition cursor-pointer ${
-                          dashQrType === 'booking'
-                            ? 'bg-amber-500 text-zinc-950 font-bold'
-                            : 'text-zinc-400 hover:text-white'
-                        }`}
-                      >
-                        Salon Booking Flow
-                      </button>
-                      <button
-                        onClick={() => setDashQrType('service')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-center transition cursor-pointer ${
-                          dashQrType === 'service'
-                            ? 'bg-amber-500 text-zinc-950 font-bold'
-                            : 'text-zinc-400 hover:text-white'
-                        }`}
-                      >
-                        Specific Treatment
-                      </button>
-                      <button
-                        onClick={() => setDashQrType('walkin')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-center transition cursor-pointer ${
-                          dashQrType === 'walkin'
-                            ? 'bg-amber-500 text-zinc-950 font-bold'
-                            : 'text-zinc-400 hover:text-white'
-                        }`}
-                      >
-                        Reception Desk Walk-in
-                      </button>
-                    </div>
-
-                    {/* Service Selector if Specific Treatment is chosen */}
-                    {dashQrType === 'service' && (
-                      <div className="space-y-1">
-                        <label className="text-[11px] text-zinc-400 block font-medium">Select Salon Treatment:</label>
-                        <select
-                          value={dashQrServiceId}
-                          onChange={(e) => setDashQrServiceId(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-100 focus:outline-none focus:border-amber-500"
-                        >
-                          {services.map(s => (
-                            <option key={s.id} value={s.id}>
-                              {s.name} (₹{s.price} • {settings.advancePercentage || 10}% deposit ₹{Math.round((s.price * (settings.advancePercentage || 10)) / 100)})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {/* QR Code Preview Box */}
-                    <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-xl bg-zinc-950/80 border border-zinc-800/80">
-                      {dashQrDataUrl ? (
-                        <div className="p-2.5 rounded-xl bg-white shadow-md shrink-0 flex items-center justify-center">
-                          <img
-                            src={dashQrDataUrl}
-                            alt="Salon Booking QR Code"
-                            className="w-28 h-28 sm:w-32 sm:h-32 object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-28 h-28 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 text-xs">
-                          Generating QR...
-                        </div>
-                      )}
-
-                      <div className="space-y-1.5 text-xs text-left">
-                        <div className="font-semibold text-zinc-200">
-                          {dashQrType === 'booking' && 'Direct Salon Booking QR'}
-                          {dashQrType === 'service' && `Book ${(services.find(s => s.id === dashQrServiceId)?.name) || 'Selected Service'}`}
-                          {dashQrType === 'walkin' && 'Front Desk Walk-In Check-In QR'}
-                        </div>
-                        <p className="text-[11px] text-zinc-400 leading-relaxed">
-                          Clients can scan this QR code with their mobile phone camera to open the instant appointment reservation modal with {settings.advancePercentage || 10}% verified advance deposit.
-                        </p>
-                        <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono pt-1">
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>Includes Verified Razorpay Gateway</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-800/60">
-                    <button
-                      onClick={handleDownloadDashQr}
-                      className="flex-1 min-w-[130px] py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download QR PNG</span>
-                    </button>
-                    <button
-                      onClick={handleCopyDashQrLink}
-                      className="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                    >
-                      {dashQrCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{dashQrCopied ? 'Link Copied!' : 'Copy Link'}</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (dashQrType === 'service') {
-                          const srv = services.find(s => s.id === dashQrServiceId) || services[0];
-                          openBookingModal(srv);
-                        } else {
-                          openBookingModal();
-                        }
-                      }}
-                      className="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                      title="Test and open the booking flow modal"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Test Booking</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedServiceForQr(null);
-                        setQrGeneratorInitialType('booking');
-                        setShowQrGeneratorModal(true);
-                      }}
-                      className="py-2 px-3 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-amber-400 hover:text-amber-300 text-xs font-medium flex items-center gap-1 cursor-pointer"
-                      title="Open full print studio with standee borders, logos and flyers"
-                    >
-                      <span>Studio</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. QR Check-in & Receptionist Scanner Station */}
-                <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col justify-between space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
-                          <Camera className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h3 className="font-serif text-sm font-bold text-zinc-100">QR Check-in Scanner Station</h3>
-                          <p className="text-[11px] text-zinc-400">Scan client passes or search reference codes upon arrival.</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setShowQrScannerModal(true)}
-                        className="px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 flex items-center gap-1 cursor-pointer transition active:scale-95"
-                      >
-                        <Camera className="w-3 h-3" />
-                        <span>Launch Camera</span>
-                      </button>
-                    </div>
-
-                    {/* Quick Search for Manual Check-in */}
-                    <div className="space-y-1">
-                      <div className="relative">
-                        <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-2.5" />
-                        <input
-                          type="text"
-                          placeholder="Type Booking Ref (e.g. MS-2026-...) or Client Phone..."
-                          value={dashCheckinQuery}
-                          onChange={(e) => handleDashCheckinSearch(e.target.value)}
-                          className="w-full pl-8 pr-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Success Alert */}
-                    {dashCheckinSuccess && (
-                      <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>{dashCheckinSuccess}</span>
-                      </div>
-                    )}
-
-                    {/* Matched Appointment Result Card */}
-                    {dashMatchedApp ? (
-                      <div className="p-3.5 rounded-xl bg-zinc-950 border border-amber-500/30 space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <div className="font-bold text-zinc-100">{dashMatchedApp.clientName}</div>
-                          <span className="font-mono text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">
-                            {dashMatchedApp.bookingRef || dashMatchedApp.id}
-                          </span>
-                        </div>
-                        <div className="text-zinc-400 text-[11px]">
-                          {dashMatchedApp.serviceName} • {dashMatchedApp.date} at {dashMatchedApp.timeSlot}
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-zinc-800">
-                          <span className="text-emerald-400 font-semibold font-mono">
-                            ₹{dashMatchedApp.advancePaid} Advance Paid
-                          </span>
-                          <span className="text-zinc-300 font-mono">
-                            ₹{Math.max(0, (dashMatchedApp.totalAmount || 0) - (dashMatchedApp.advancePaid || 0))} Due at Salon
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => handleConfirmDashCheckin(dashMatchedApp)}
-                          className="w-full mt-2 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Confirm Client Check-in</span>
-                        </button>
-                      </div>
-                    ) : (
-                      /* Today's Arrivals Preview List */
-                      <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/60 space-y-2 text-xs">
-                        <div className="flex items-center justify-between text-[11px] text-zinc-400 font-semibold">
-                          <span>Today's Pending Client Check-ins</span>
-                          <span className="font-mono text-amber-400">
-                            {appointments.filter(a => getAppStatus(a) === 'CONFIRMED').length} awaiting
-                          </span>
-                        </div>
-                        <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                          {appointments
-                            .filter(a => getAppStatus(a) === 'CONFIRMED')
-                            .slice(0, 3)
-                            .map(a => (
-                              <div
-                                key={a.id}
-                                onClick={() => setDashMatchedApp(a)}
-                                className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800/80 border border-zinc-800/80 flex items-center justify-between cursor-pointer transition text-[11px]"
-                              >
-                                <div>
-                                  <span className="font-semibold text-zinc-200">{a.clientName}</span>
-                                  <span className="text-zinc-500 ml-1.5">({a.timeSlot})</span>
-                                </div>
-                                <span className="text-amber-400 text-[10px] font-bold">Check-in →</span>
-                              </div>
-                            ))}
-                          {appointments.filter(a => getAppStatus(a) === 'CONFIRMED').length === 0 && (
-                            <p className="text-[11px] text-zinc-500 italic py-2 text-center">
-                              No pending client arrivals for today.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60 text-xs">
-                    <button
-                      onClick={() => setShowQrScannerModal(true)}
-                      className="w-full py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Camera className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Open Fullscreen Scanner &amp; UPI Collection</span>
-                    </button>
-                  </div>
-                </div>
-
               </div>
 
               {/* Dedicated Upcoming Appointments & Arrivals Section */}
@@ -2081,163 +1738,6 @@ export const AdminSuite: React.FC = () => {
             </div>
           )}
 
-          {/* QR CHECK-IN SCANNER TAB */}
-          {adminTab === 'qr-scanner' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h1 className="font-serif text-2xl font-bold text-zinc-100">QR Check-in &amp; Pass Terminal</h1>
-                  <p className="text-xs text-zinc-400">
-                    Live camera scanning, booking pass verification, and instant balance collection for salon arrivals.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowQrScannerModal(true)}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>Launch Live Camera Scanner</span>
-                </button>
-              </div>
-
-              {/* Terminal Card */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                {/* Left 2 Cols: Interactive Verification */}
-                <div className="lg:col-span-2 p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-5">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-serif text-sm font-bold text-zinc-200">Instant Check-in Search</h3>
-                    <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      Scanner Online
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs text-zinc-400 block font-medium">
-                      Scan or enter Client Booking Reference (e.g. MS-2026-...) or Mobile Phone:
-                    </label>
-                    <div className="relative">
-                      <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3" />
-                      <input
-                        type="text"
-                        placeholder="e.g. MS-2026-8821 or 9876543210"
-                        value={dashCheckinQuery}
-                        onChange={(e) => handleDashCheckinSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {dashCheckinSuccess && (
-                    <div className="p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-3 animate-in fade-in">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                      <div>
-                        <div className="font-bold">Arrival Confirmed!</div>
-                        <div>{dashCheckinSuccess}</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {dashMatchedApp ? (
-                    <div className="p-5 rounded-2xl bg-zinc-950 border border-amber-500/40 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400 font-mono">
-                            Verified Booking Reference
-                          </span>
-                          <h4 className="text-lg font-bold text-zinc-100">{dashMatchedApp.clientName}</h4>
-                        </div>
-                        <span className="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-400 font-mono font-bold text-xs">
-                          {dashMatchedApp.bookingRef || dashMatchedApp.id}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs">
-                        <div>
-                          <span className="text-zinc-500 text-[10px] block">Service</span>
-                          <span className="font-semibold text-zinc-200">{dashMatchedApp.serviceName}</span>
-                        </div>
-                        <div>
-                          <span className="text-zinc-500 text-[10px] block">Appointment Time</span>
-                          <span className="font-semibold text-zinc-200">{dashMatchedApp.date} at {dashMatchedApp.timeSlot}</span>
-                        </div>
-                        <div>
-                          <span className="text-zinc-500 text-[10px] block">{settings.advancePercentage || 10}% Paid Online</span>
-                          <span className="font-bold text-emerald-400 font-mono">₹{dashMatchedApp.advancePaid}</span>
-                        </div>
-                        <div>
-                          <span className="text-zinc-500 text-[10px] block">Balance at Salon</span>
-                          <span className="font-bold text-amber-400 font-mono">
-                            ₹{Math.max(0, (dashMatchedApp.totalAmount || 0) - (dashMatchedApp.advancePaid || 0))}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => handleConfirmDashCheckin(dashMatchedApp)}
-                          className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20"
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>Complete Client Check-in &amp; Mark Arrived</span>
-                        </button>
-                        <button
-                          onClick={() => setDashMatchedApp(null)}
-                          className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold cursor-pointer"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center rounded-2xl bg-zinc-950/60 border border-dashed border-zinc-800 space-y-2">
-                      <QrCode className="w-8 h-8 text-zinc-600 mx-auto" />
-                      <p className="text-xs text-zinc-400">
-                        Scan the client's booking QR code on their smartphone or enter their booking ID above.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right 1 Col: Quick Arrivals List */}
-                <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-serif text-sm font-bold text-zinc-200">Awaiting Check-in</h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400">
-                      {appointments.filter(a => getAppStatus(a) === 'CONFIRMED').length} Today
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                    {appointments
-                      .filter(a => getAppStatus(a) === 'CONFIRMED')
-                      .map(app => (
-                        <div
-                          key={app.id}
-                          onClick={() => setDashMatchedApp(app)}
-                          className="p-3 rounded-xl bg-zinc-950 hover:bg-zinc-800/80 border border-zinc-800 cursor-pointer transition text-xs space-y-1"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-zinc-200">{app.clientName}</span>
-                            <span className="text-amber-400 font-mono text-[10px]">{app.timeSlot}</span>
-                          </div>
-                          <div className="text-[11px] text-zinc-400 flex items-center justify-between">
-                            <span className="truncate max-w-[150px]">{app.serviceName}</span>
-                            <span className="text-emerald-400 font-mono">₹{app.advancePaid} Paid</span>
-                          </div>
-                        </div>
-                      ))}
-                    {appointments.filter(a => getAppStatus(a) === 'CONFIRMED').length === 0 && (
-                      <p className="text-xs text-zinc-500 italic py-6 text-center">
-                        All client bookings have been checked in.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* THEMES TAB */}
           {adminTab === 'themes' && (
             <div className="space-y-6">
@@ -2282,60 +1782,374 @@ export const AdminSuite: React.FC = () => {
             </div>
           )}
 
-          {/* SETTINGS TAB */}
+          {/* SETTINGS & REAL-WORLD PAYMENT GATEWAY TAB */}
           {adminTab === 'settings' && (
-            <div className="space-y-6 max-w-2xl">
+            <div className="space-y-6 max-w-4xl">
               <div>
-                <h1 className="font-serif text-2xl font-bold text-zinc-100">Salon Settings</h1>
-                <p className="text-xs text-zinc-400">Update salon contact details and deposit settings.</p>
+                <h1 className="font-serif text-2xl font-bold text-zinc-100 flex items-center gap-2.5">
+                  <Settings className="w-6 h-6 text-amber-400" />
+                  <span>Salon Settings &amp; Real-World Payment Setup</span>
+                </h1>
+                <p className="text-xs text-zinc-400">
+                  Configure live Razorpay gateway credentials, UPI merchant accounts, counter policies, and salon profile.
+                </p>
               </div>
 
+              {/* Status Header Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-zinc-900 via-purple-950/20 to-zinc-900 border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg ${
+                    settings.paymentGatewayMode === 'live' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                  }`}>
+                    ₹
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-zinc-100">Gateway Status:</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider ${
+                        settings.paymentGatewayMode === 'live'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      }`}>
+                        {settings.paymentGatewayMode === 'live' ? '🟢 Live Production Mode' : '🟡 Test Sandbox Mode'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Merchant UPI: <span className="font-mono text-zinc-200 font-semibold">{settings.merchantUpiId || '8104026257@okicici'}</span> • Key: <span className="font-mono text-zinc-200">{settings.razorpayKeyId ? (settings.razorpayKeyId.startsWith('rzp_live') ? 'Active (Live)' : settings.razorpayKeyId.slice(0, 14) + '...') : 'Not Configured'}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleTestGatewayConnection}
+                    disabled={isTestingGateway}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold flex items-center justify-center gap-2 border border-zinc-700 transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isTestingGateway ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                    ) : (
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    )}
+                    <span>Test Gateway Connection</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Gateway Test Feedback Toast */}
+              {gatewayTestResult && (
+                <div className={`p-4 rounded-2xl border text-xs font-semibold flex items-center gap-3 animate-in fade-in ${
+                  gatewayTestResult.success
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                }`}>
+                  {gatewayTestResult.success ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                  )}
+                  <span>{gatewayTestResult.message}</span>
+                </div>
+              )}
+
+              {/* CARD 1: REAL-WORLD PAYMENT GATEWAY SETTINGS */}
+              <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-5 text-xs shadow-sm">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-amber-400" />
+                      <span>1. Real-World Razorpay &amp; UPI Payment Gateway</span>
+                    </h3>
+                    <p className="text-[11px] text-zinc-400">
+                      Configure your production keys to accept real 10% online deposits from Google Pay, PhonePe, Paytm, and Cards.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Operating Mode Selector */}
+                <div className="space-y-2">
+                  <label className="font-semibold text-zinc-300 block">
+                    Payment Gateway Operating Mode *
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => updateSettings({ paymentGatewayMode: 'live' })}
+                      className={`p-3.5 rounded-xl border text-left transition flex items-start gap-3 cursor-pointer ${
+                        settings.paymentGatewayMode === 'live'
+                          ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-sm'
+                          : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 mt-0.5">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-xs text-zinc-100 flex items-center gap-1.5">
+                          <span>Live Production Mode</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500 text-zinc-950 font-extrabold uppercase">Real Money</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                          Real payments processed via Razorpay API. Funds automatically settle into your Mohol salon bank account.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateSettings({ paymentGatewayMode: 'test' })}
+                      className={`p-3.5 rounded-xl border text-left transition flex items-start gap-3 cursor-pointer ${
+                        settings.paymentGatewayMode === 'test'
+                          ? 'bg-amber-500/15 border-amber-500 text-white shadow-sm'
+                          : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 mt-0.5">
+                        <Zap className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-xs text-zinc-100 flex items-center gap-1.5">
+                          <span>Test Sandbox Mode</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500 text-zinc-950 font-extrabold uppercase">Demo</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                          Simulated deposits for staff demonstration and system testing without debiting real bank accounts.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* API Key ID & Secret */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="font-semibold text-zinc-300">
+                        Razorpay Key ID *
+                      </label>
+                      <span className="text-[10px] text-zinc-500 font-mono">
+                        (e.g. rzp_live_... or rzp_test_...)
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="rzp_live_xxxxxxxxxxxxxx"
+                      value={settings.razorpayKeyId || ''}
+                      onChange={(e) => updateSettings({ razorpayKeyId: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="font-semibold text-zinc-300">
+                        Razorpay Key Secret *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowRazorpaySecret(!showRazorpaySecret)}
+                        className="text-[10px] text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        {showRazorpaySecret ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        <span>{showRazorpaySecret ? 'Hide Secret' : 'Show Secret'}</span>
+                      </button>
+                    </div>
+                    <input
+                      type={showRazorpaySecret ? 'text' : 'password'}
+                      placeholder="Enter 20-character secret key"
+                      value={settings.razorpayKeySecret || ''}
+                      onChange={(e) => updateSettings({ razorpayKeySecret: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Business UPI ID & Bank Account */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div>
+                    <label className="font-semibold text-zinc-300 block mb-1">
+                      Merchant UPI ID (VPA) *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="8104026257@okicici"
+                      value={settings.merchantUpiId || '8104026257@okicici'}
+                      onChange={(e) => updateSettings({ merchantUpiId: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="text-[10px] text-zinc-500 mt-1 block">
+                      Direct mobile UPI deep-link destination (PhonePe, GPay, Paytm)
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-zinc-300 block mb-1">
+                      Settlement Account Number
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="025701509988"
+                      value={settings.bankAccountNumber || ''}
+                      onChange={(e) => updateSettings({ bankAccountNumber: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="text-[10px] text-zinc-500 mt-1 block">
+                      Salon business bank account for daily settlements
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-zinc-300 block mb-1">
+                      Bank IFSC Code
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ICIC0000257"
+                      value={settings.bankIfsc || ''}
+                      onChange={(e) => updateSettings({ bankIfsc: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="text-[10px] text-zinc-500 mt-1 block">
+                      ICICI Bank, Mohol Branch IFSC
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD 2: STEP-BY-STEP PRODUCTION REAL-WORLD PAYMENT GUIDE */}
+              <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4 text-xs shadow-sm">
+                <div className="flex items-center gap-2 text-sm font-bold text-amber-400">
+                  <Building2 className="w-4 h-4" />
+                  <span>2. Production Deployment Guide: How to Accept Real Money in India</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  To receive real customer money directly in your Indian bank account for Modern Unisex Salon, follow these 5 straightforward steps:
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
+                    <div className="flex items-center gap-2 font-bold text-zinc-200">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">1</span>
+                      <span>Register Merchant Account</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      Visit <a href="https://razorpay.com" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline font-semibold">razorpay.com</a> and sign up with your Salon Business or Individual PAN card.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
+                    <div className="flex items-center gap-2 font-bold text-zinc-200">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">2</span>
+                      <span>Add Bank Account (Mohol Branch)</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      Add your ICICI or any Indian bank account details in the Razorpay dashboard for automated T+1 day settlements.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
+                    <div className="flex items-center gap-2 font-bold text-zinc-200">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">3</span>
+                      <span>Generate Live API Keys</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      Switch Razorpay toggle to <strong>"Live Mode"</strong>. Go to <em>Settings &gt; API Keys</em> and click <em>Generate Key</em> to get your <code className="text-amber-300">rzp_live_...</code> Key ID &amp; Key Secret.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
+                    <div className="flex items-center gap-2 font-bold text-zinc-200">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">4</span>
+                      <span>Paste Keys &amp; Switch to Live</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      Paste the Key ID and Key Secret above, select <strong>Live Production Mode</strong>, and click <em>Test Gateway Connection</em>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-3">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="text-[11px] text-zinc-300 leading-relaxed">
+                    <strong className="text-emerald-300">How Customer Payments Work:</strong> When a customer books any hair, skin, or bridal treatment, the system securely collects the 10% advance deposit via Razorpay UPI / Cards. The deposit is credited to your bank account, and an instant booking pass and WhatsApp notification are dispatched to <strong className="text-white">+91 81040 26257</strong>.
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD 3: SALON PROFILE & POLICIES */}
               <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4 shadow-sm text-xs">
+                <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2 border-b border-zinc-800 pb-3">
+                  <Scissors className="w-4 h-4 text-amber-400" />
+                  <span>3. Salon Identity &amp; Contact Details</span>
+                </h3>
+
                 <div>
                   <label className="font-semibold text-zinc-300 block mb-1">Salon Name</label>
                   <input
                     type="text"
                     value={settings.salonName}
                     onChange={(e) => updateSettings({ salonName: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-semibold text-zinc-300 block mb-1">Phone</label>
+                    <label className="font-semibold text-zinc-300 block mb-1">Helpline Phone *</label>
                     <input
                       type="text"
                       value={settings.phone}
                       onChange={(e) => updateSettings({ phone: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-amber-500"
                     />
                   </div>
                   <div>
-                    <label className="font-semibold text-zinc-300 block mb-1">Email</label>
+                    <label className="font-semibold text-zinc-300 block mb-1">Official Email</label>
                     <input
                       type="email"
                       value={settings.email}
                       onChange={(e) => updateSettings({ email: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="font-semibold text-zinc-300 block mb-1">Physical Address</label>
+                  <label className="font-semibold text-zinc-300 block mb-1">Physical Address *</label>
                   <input
                     type="text"
                     value={settings.address}
                     onChange={(e) => updateSettings({ address: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
                   />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold text-zinc-300 block mb-1">Operating Hours</label>
+                    <input
+                      type="text"
+                      value={settings.openingHours || 'Mon - Sun: 09:00 AM - 09:00 PM'}
+                      onChange={(e) => updateSettings({ openingHours: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-zinc-300 block mb-1">GST Number (Optional)</label>
+                    <input
+                      type="text"
+                      value={settings.gstNumber || ''}
+                      onChange={(e) => updateSettings({ gstNumber: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
                 </div>
 
                 <div className="p-4 rounded-xl bg-zinc-950 border border-amber-500/30 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-amber-400">Advance Deposit Percentage:</span>
-                    <span className="font-mono font-bold text-amber-400 text-sm">{settings.advancePercentage}%</span>
+                    <span className="font-mono font-bold text-amber-400 text-sm">{settings.advancePercentage}% Online Deposit</span>
                   </div>
                   <input
                     type="range"
@@ -2346,6 +2160,9 @@ export const AdminSuite: React.FC = () => {
                     onChange={(e) => updateSettings({ advancePercentage: Number(e.target.value) })}
                     className="w-full accent-amber-500 cursor-pointer"
                   />
+                  <p className="text-[11px] text-zinc-400">
+                    Calculates required online reservation deposit for client appointments. Standard recommendation is 10%.
+                  </p>
                 </div>
               </div>
             </div>
@@ -3095,22 +2912,7 @@ export const AdminSuite: React.FC = () => {
         </div>
       )}
 
-      {/* Global QR and Messaging Modals */}
-      <ReceptionistQrScannerModal
-        isOpen={showQrScannerModal}
-        onClose={() => setShowQrScannerModal(false)}
-      />
-
-      <QrCodeGeneratorModal
-        isOpen={showQrGeneratorModal}
-        onClose={() => {
-          setShowQrGeneratorModal(false);
-          setSelectedServiceForQr(null);
-        }}
-        initialType={qrGeneratorInitialType}
-        initialService={selectedServiceForQr}
-      />
-
+      {/* Global Messaging Modal */}
       <AdminSmsEmailHubModal
         isOpen={showSmsHubModal}
         onClose={() => setShowSmsHubModal(false)}

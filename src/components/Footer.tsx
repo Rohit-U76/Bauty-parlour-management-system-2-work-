@@ -42,7 +42,7 @@ export const Footer: React.FC = () => {
             </div>
             <div>
               <div className="text-zinc-100 font-bold text-sm">24-Hour Reminder Alert</div>
-              <div className="text-zinc-400 text-xs">Automatic notification with digital QR pass sent 24h prior to appointment.</div>
+              <div className="text-zinc-400 text-xs">Automatic notification with digital appointment pass sent 24h prior to appointment.</div>
             </div>
           </div>
         </div>

@@ -20,79 +20,129 @@ import { useSalon } from '../context/SalonContext';
 import { Customer } from '../types';
 
 export const LoyaltyProgram: React.FC = () => {
-  const { customers, appointments, openBookingModal } = useSalon();
+  const { customers, appointments, openBookingModal, currentUser } = useSalon();
 
   // Search/Lookup State
-  const [phoneNumber, setPhoneNumber] = useState<string>('8104026257');
+  const [phoneNumber, setPhoneNumber] = useState<string>(() => currentUser?.phone || '');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [simulatedVisits, setSimulatedVisits] = useState<number>(5);
+  const [simulatedVisits, setSimulatedVisits] = useState<number>(0);
   const [isManualSimulation, setIsManualSimulation] = useState<boolean>(false);
+
+  // Sync phone when currentUser logs in or changes
+  React.useEffect(() => {
+    if (currentUser) {
+      setPhoneNumber(currentUser.phone || '');
+      setIsManualSimulation(false);
+    } else {
+      setPhoneNumber('');
+    }
+  }, [currentUser]);
 
   // Quick Preset demo profiles
   const sampleProfiles = [
-    { name: 'Pooja Kadam (5 Visits)', phone: '8104026257', visits: 5, tier: 'VIP Member' },
+    { name: 'Pooja Kadam (5 Visits)', phone: '9822099881', visits: 5, tier: 'VIP Member' },
     { name: 'Rohan Shinde (4 Visits)', phone: '9765433445', visits: 4, tier: 'Standard' },
     { name: 'Tanvi Gaikwad (9 Visits)', phone: '9822144556', visits: 9, tier: 'VIP Member' },
     { name: 'New Client (0 Visits)', phone: '9123456789', visits: 0, tier: 'New Client' }
   ];
 
+  // User appointments count for currentUser
+  const currentUserVisits = useMemo(() => {
+    if (!currentUser) return 0;
+    const userId = currentUser.id;
+    const userPhoneClean = (currentUser.phone || '').replace(/\D/g, '').slice(-10);
+    const userEmailClean = (currentUser.email || '').trim().toLowerCase();
+    const userNameClean = (currentUser.name || '').trim().toLowerCase();
+
+    return appointments.filter(apt => {
+      if (apt.userId) return apt.userId === userId;
+      if (userPhoneClean && userPhoneClean.length === 10) {
+        const aptPhoneClean = (apt.clientPhone || '').replace(/\D/g, '').slice(-10);
+        const aptEmailClean = (apt.clientEmail || '').trim().toLowerCase();
+        const aptNameClean = (apt.clientName || '').trim().toLowerCase();
+        if (aptPhoneClean === userPhoneClean) {
+          if (aptEmailClean && userEmailClean && aptEmailClean === userEmailClean) return true;
+          if (aptNameClean && userNameClean && aptNameClean === userNameClean) return true;
+        }
+      }
+      return false;
+    }).length;
+  }, [appointments, currentUser]);
+
   // Dynamic Lookup Computation
   const activeUserData = useMemo(() => {
-    const cleanPhone = phoneNumber.replace(/\D/g, '');
-    
-    // Check customers list
-    const matchedCustomer = customers.find(c => {
-      const cClean = c.phone.replace(/\D/g, '');
-      return cleanPhone && (cClean.includes(cleanPhone) || cleanPhone.includes(cClean));
-    });
-
-    // Check actual appointments list
-    const matchedApts = appointments.filter(a => {
-      const aClean = a.clientPhone.replace(/\D/g, '');
-      return cleanPhone && (aClean.includes(cleanPhone) || cleanPhone.includes(aClean));
-    });
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
 
     if (isManualSimulation) {
       return {
-        name: matchedCustomer?.name || (matchedApts.length > 0 ? matchedApts[0].clientName : 'Valued Client'),
+        name: currentUser?.name || 'Valued Client',
         phone: phoneNumber.startsWith('+91') ? phoneNumber : `+91 ${phoneNumber}`,
         totalVisits: simulatedVisits,
         tier: simulatedVisits >= 5 ? 'VIP Member' : (simulatedVisits === 0 ? 'New Client' : 'Standard'),
-        matchedAppointmentsCount: matchedApts.length
+        matchedAppointmentsCount: simulatedVisits
       };
     }
 
-    if (matchedCustomer) {
-      const totalVisits = Math.max(matchedCustomer.totalVisits, matchedApts.length);
-      return {
-        name: matchedCustomer.name,
-        phone: matchedCustomer.phone,
-        totalVisits: totalVisits,
-        tier: totalVisits >= 5 ? 'VIP Member' : 'Standard',
-        matchedAppointmentsCount: matchedApts.length
-      };
+    // If currentUser is logged in: strictly prioritize currentUser's authenticated account
+    if (currentUser) {
+      const userCleanPhone = (currentUser.phone || '').replace(/\D/g, '').slice(-10);
+      // If phone input is empty or matches currentUser's phone, return current user's actual visits
+      if (!cleanPhone || cleanPhone === userCleanPhone) {
+        const totalVisits = currentUserVisits;
+        return {
+          name: currentUser.name,
+          phone: currentUser.phone,
+          totalVisits: totalVisits,
+          tier: totalVisits >= 5 ? 'VIP Member' : (totalVisits === 0 ? 'New Client' : (currentUser.memberTier || 'Standard')),
+          matchedAppointmentsCount: totalVisits
+        };
+      }
     }
 
-    if (matchedApts.length > 0) {
-      const totalVisits = matchedApts.length;
-      return {
-        name: matchedApts[0].clientName,
-        phone: matchedApts[0].clientPhone,
-        totalVisits: totalVisits,
-        tier: totalVisits >= 5 ? 'VIP Member' : 'Standard',
-        matchedAppointmentsCount: matchedApts.length
-      };
+    // Phone Lookup: STRICT 10-digit match only
+    if (cleanPhone && cleanPhone.length === 10) {
+      const matchedApts = appointments.filter(a => {
+        const aClean = (a.clientPhone || '').replace(/\D/g, '').slice(-10);
+        return aClean === cleanPhone;
+      });
+
+      const matchedCustomer = customers.find(c => {
+        const cClean = (c.phone || '').replace(/\D/g, '').slice(-10);
+        return cClean === cleanPhone;
+      });
+
+      if (matchedCustomer) {
+        const totalVisits = matchedApts.length > 0 ? matchedApts.length : (matchedCustomer.totalVisits || 0);
+        return {
+          name: matchedCustomer.name,
+          phone: matchedCustomer.phone,
+          totalVisits: totalVisits,
+          tier: totalVisits >= 5 ? 'VIP Member' : (totalVisits === 0 ? 'New Client' : 'Standard'),
+          matchedAppointmentsCount: matchedApts.length
+        };
+      }
+
+      if (matchedApts.length > 0) {
+        const totalVisits = matchedApts.length;
+        return {
+          name: matchedApts[0].clientName,
+          phone: matchedApts[0].clientPhone,
+          totalVisits: totalVisits,
+          tier: totalVisits >= 5 ? 'VIP Member' : (totalVisits === 0 ? 'New Client' : 'Standard'),
+          matchedAppointmentsCount: matchedApts.length
+        };
+      }
     }
 
-    // Default or new phone lookup
+    // Default or new phone lookup: strictly 0 visits
     return {
-      name: 'Valued Client',
-      phone: phoneNumber.startsWith('+91') ? phoneNumber : `+91 ${phoneNumber}`,
-      totalVisits: simulatedVisits,
-      tier: simulatedVisits >= 5 ? 'VIP Member' : (simulatedVisits === 0 ? 'New Client' : 'Standard'),
+      name: currentUser?.name || 'New Client',
+      phone: phoneNumber ? (phoneNumber.startsWith('+91') ? phoneNumber : `+91 ${phoneNumber}`) : '',
+      totalVisits: 0,
+      tier: 'New Client',
       matchedAppointmentsCount: 0
     };
-  }, [customers, appointments, phoneNumber, isManualSimulation, simulatedVisits]);
+  }, [customers, appointments, phoneNumber, isManualSimulation, simulatedVisits, currentUser, currentUserVisits]);
 
   const handleLookup = (e?: React.FormEvent) => {
     if (e) e.preventDefault();

@@ -17,7 +17,6 @@ import {
   CornerDownRight,
   Share2,
   Download,
-  QrCode,
   Award,
   Heart,
   Smile,

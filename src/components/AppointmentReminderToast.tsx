@@ -339,7 +339,7 @@ export const AppointmentReminderToast: React.FC = () => {
                     className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-yellow-500 dark:hover:bg-yellow-400 dark:text-zinc-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/20 dark:shadow-yellow-500/20 active:scale-95 transition-all cursor-pointer"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>View Pass &amp; QR</span>
+                    <span>View Pass &amp; Details</span>
                   </button>
 
                   <a

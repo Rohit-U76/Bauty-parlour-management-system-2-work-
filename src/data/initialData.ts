@@ -783,8 +783,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-today-1',
     bookingRef: 'MS-2026-901244',
+    userId: 'demo-usr-pooja',
     clientName: 'Pooja Kadam',
-    clientPhone: '+91 8104026257',
+    clientPhone: '+91 98220 99881',
     clientEmail: 'pooja.kadam@gmail.com',
     serviceId: 'srv-sk-6',
     serviceName: 'O3 Prof. Facial',
@@ -806,6 +807,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-today-2',
     bookingRef: 'MS-2026-901245',
+    userId: 'demo-usr-neha',
     clientName: 'Neha Sharma',
     clientPhone: '+91 98230 45678',
     clientEmail: 'neha.sharma@gmail.com',
@@ -829,6 +831,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-today-3',
     bookingRef: 'MS-2026-901246',
+    userId: 'demo-usr-rohan',
     clientName: 'Rohan Shinde',
     clientPhone: '+91 97654 33445',
     clientEmail: 'rohan.shinde@yahoo.com',
@@ -852,6 +855,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-today-4',
     bookingRef: 'MS-2026-901247',
+    userId: 'demo-usr-rahul',
     clientName: 'Rahul Mane',
     clientPhone: '+91 98810 33221',
     clientEmail: 'rahul.m@gmail.com',
@@ -875,6 +879,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-today-5',
     bookingRef: 'MS-2026-901248',
+    userId: 'demo-usr-sneha',
     clientName: 'Sneha Jadhav',
     clientPhone: '+91 99234 55667',
     clientEmail: 'sneha.j@gmail.com',
@@ -898,6 +903,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-today-6',
     bookingRef: 'MS-2026-901249',
+    userId: 'demo-usr-aditya',
     clientName: 'Aditya Patil',
     clientPhone: '+91 97660 11223',
     clientEmail: 'aditya.p@outlook.com',
@@ -921,6 +927,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-today-7',
     bookingRef: 'MS-2026-901250',
+    userId: 'demo-usr-kunal',
     clientName: 'Kunal Deshmukh',
     clientPhone: '+91 98901 88990',
     clientEmail: 'kunal.d@gmail.com',
@@ -944,6 +951,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-tom-1',
     bookingRef: 'MS-2026-901251',
+    userId: 'demo-usr-tanvi',
     clientName: 'Tanvi Gaikwad',
     clientPhone: '+91 98221 44556',
     clientEmail: 'tanvi.g@gmail.com',
@@ -967,6 +975,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-tom-2',
     bookingRef: 'MS-2026-901252',
+    userId: 'demo-usr-amit',
     clientName: 'Amit Deshmukh',
     clientPhone: '+91 98812 77889',
     clientEmail: 'amit.deshmukh@gmail.com',
@@ -990,6 +999,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-past-1',
     bookingRef: 'MS-2026-448211',
+    userId: 'demo-usr-patil',
     clientName: 'Sneha Patil',
     clientPhone: '+91 99234 11223',
     clientEmail: 'sneha.patil@outlook.com',
@@ -1013,6 +1023,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-past-2',
     bookingRef: 'MS-2026-339870',
+    userId: 'demo-usr-vikram',
     clientName: 'Vikram Joshi',
     clientPhone: '+91 97665 44332',
     clientEmail: 'vikram.joshi@gmail.com',
@@ -1066,7 +1077,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
   {
     id: 'cust-1',
     name: 'Pooja Kadam',
-    phone: '+91 8104026257',
+    phone: '+91 98220 99881',
     email: 'pooja.kadam@gmail.com',
     totalVisits: 5,
     totalSpent: 7500,
@@ -1393,8 +1404,13 @@ export const INITIAL_SETTINGS: SalonSettings = {
   advancePercentage: 10,
   currencySymbol: '₹',
   razorpayKeyId: 'rzp_test_modern_salon_mohol',
+  razorpayKeySecret: '',
+  paymentGatewayMode: 'test',
+  merchantUpiId: '8104026257@okicici',
+  bankAccountNumber: '025701509988',
+  bankIfsc: 'ICIC0000257',
   bookingAutoConfirm: false,
-  instagramUrl: 'https://www.instagram.com/modern_unisex_salon_mohol?utm_source=qr',
+  instagramUrl: 'https://www.instagram.com/modern_unisex_salon_mohol',
   mapsUrl: 'https://maps.app.goo.gl/CraeBa6gAjWA8o818',
   gstNumber: '27AABCM8104M1Z2 (Available on Invoice)',
   staffType: 'Self-Employed (Master Stylist & Founder)'
@@ -1412,6 +1428,7 @@ export const INITIAL_USERS: import('../types').User[] = [
     pin: '9999',
     memberTier: 'VIP Member',
     loyaltyPoints: 5000,
+    totalVisits: 0,
     memberSince: '2022'
   },
   {
@@ -1424,7 +1441,7 @@ export const INITIAL_USERS: import('../types').User[] = [
     password: 'password123',
     memberTier: 'VIP Member',
     loyaltyPoints: 450,
-    totalVisits: 14,
+    totalVisits: 0,
     memberSince: '2023',
     preferredServices: ['HD Party Make Up', 'Cheryla’s Facial', 'Hair Spa']
   },
@@ -1438,7 +1455,7 @@ export const INITIAL_USERS: import('../types').User[] = [
     password: 'password123',
     memberTier: 'Standard',
     loyaltyPoints: 180,
-    totalVisits: 6,
+    totalVisits: 0,
     memberSince: '2024',
     preferredServices: ["Men's Fade & Beard Sculpt", 'Face Clean Up']
   },
@@ -1452,7 +1469,7 @@ export const INITIAL_USERS: import('../types').User[] = [
     password: 'password123',
     memberTier: 'VIP Member',
     loyaltyPoints: 500,
-    totalVisits: 8,
+    totalVisits: 0,
     memberSince: '2023',
     preferredServices: ['3D/4D HD Bridal & Grooming', "Men's Fade & Beard Sculpt", "L'Oréal Hair Spa"]
   }

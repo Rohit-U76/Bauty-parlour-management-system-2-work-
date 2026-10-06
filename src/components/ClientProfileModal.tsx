@@ -128,9 +128,7 @@ export const ClientProfileModal: React.FC = () => {
           city: formData.city,
           emergencyContact: formData.emergencyContact,
           allergies: formData.allergies,
-          preferredSlot: formData.preferredSlot,
-          whatsappNotifications: formData.whatsappNotifications,
-          emailNotifications: formData.emailNotifications
+          preferredSlot: formData.preferredSlot
         });
       } else {
         // Guest user creating their client profile directly
