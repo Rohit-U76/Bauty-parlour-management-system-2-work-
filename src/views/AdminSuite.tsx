@@ -137,6 +137,28 @@ export const AdminSuite: React.FC = () => {
   const [inquiryToDelete, setInquiryToDelete] = useState<string | null>(null);
   const [actionFeedbackToast, setActionFeedbackToast] = useState<string | null>(null);
 
+  // Appointment Actions State
+  const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
+  const [receiptAppointment, setReceiptAppointment] = useState<Appointment | null>(null);
+
+  const handleCompleteAppointment = (app: Appointment) => {
+    updateAppointmentStatus(app.id, 'COMPLETED');
+    setActionFeedbackToast(`Booking #${app.bookingRef} for ${app.clientName} marked as COMPLETED.`);
+    setTimeout(() => setActionFeedbackToast(null), 3500);
+  };
+
+  const handleCancelAppointment = (app: Appointment) => {
+    updateAppointmentStatus(app.id, 'CANCELLED');
+    setActionFeedbackToast(`Booking #${app.bookingRef} cancelled.`);
+    setTimeout(() => setActionFeedbackToast(null), 3500);
+  };
+
+  const handleReopenAppointment = (app: Appointment) => {
+    updateAppointmentStatus(app.id, 'CONFIRMED');
+    setActionFeedbackToast(`Booking #${app.bookingRef} reopened as CONFIRMED.`);
+    setTimeout(() => setActionFeedbackToast(null), 3500);
+  };
+
   // Real-world Payment Gateway Settings state
   const [isTestingGateway, setIsTestingGateway] = useState(false);
   const [gatewayTestResult, setGatewayTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -816,7 +838,7 @@ export const AdminSuite: React.FC = () => {
                             </span>
                           </div>
 
-                          <div className="flex items-center justify-between gap-2 pt-1">
+                          <div className="flex items-center justify-between gap-1.5 pt-1 flex-wrap">
                             <a
                               href={whatsappDirectUrl}
                               target="_blank"
@@ -826,21 +848,53 @@ export const AdminSuite: React.FC = () => {
                               <MessageSquare className="w-3 h-3" />
                               <span>WhatsApp</span>
                             </a>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1">
                               <button
-                                onClick={() => updateAppointmentStatus(app.id, 'COMPLETED')}
-                                className="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer"
-                                title="Mark as completed upon salon visit"
+                                type="button"
+                                onClick={() => setReceiptAppointment(app)}
+                                className="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-[11px] flex items-center gap-1 transition cursor-pointer"
+                                title="View & Print Receipt"
                               >
-                                <Check className="w-3 h-3" />
-                                <span>Complete</span>
+                                <Receipt className="w-3 h-3 text-amber-400" />
+                                <span>Receipt</span>
                               </button>
+                              {getAppStatus(app) !== 'COMPLETED' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCompleteAppointment(app)}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer"
+                                  title="Mark as completed upon salon visit"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>Complete</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleReopenAppointment(app)}
+                                  className="px-2 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 text-[11px] font-semibold transition cursor-pointer"
+                                  title="Reopen booking"
+                                >
+                                  Reopen
+                                </button>
+                              )}
+                              {getAppStatus(app) !== 'CANCELLED' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelAppointment(app)}
+                                  className="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-[11px] transition cursor-pointer"
+                                  title="Cancel appointment"
+                                >
+                                  Cancel
+                                </button>
+                              )}
                               <button
-                                onClick={() => updateAppointmentStatus(app.id, 'CANCELLED')}
-                                className="px-2 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 text-[11px] transition cursor-pointer"
-                                title="Cancel appointment"
+                                type="button"
+                                onClick={() => setAppointmentToDelete(app)}
+                                className="p-1 rounded-lg bg-rose-600/15 hover:bg-rose-600/25 text-rose-400 transition cursor-pointer"
+                                title="Delete appointment"
                               >
-                                Cancel
+                                <Trash2 className="w-3 h-3" />
                               </button>
                             </div>
                           </div>
@@ -952,34 +1006,72 @@ export const AdminSuite: React.FC = () => {
                             {getAppStatus(app)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right space-x-1.5">
-                          <button
-                            onClick={() => {
-                              setSelectedAppForMessaging(app);
-                              setShowSmsHubModal(true);
-                            }}
-                            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-semibold"
-                            title="SMS & WhatsApp Hub"
-                          >
-                            <Smartphone className="w-3.5 h-3.5 inline mr-1" />
-                            <span>Notify</span>
-                          </button>
-                          {getAppStatus(app) === 'CONFIRMED' && (
-                            <>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedAppForMessaging(app);
+                                setShowSmsHubModal(true);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition"
+                              title="SMS & WhatsApp Hub"
+                            >
+                              <Smartphone className="w-3.5 h-3.5" />
+                              <span>Notify</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setReceiptAppointment(app)}
+                              className="px-2 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-[11px] flex items-center gap-1 transition cursor-pointer"
+                              title="View & Print Official Receipt"
+                            >
+                              <Receipt className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Receipt</span>
+                            </button>
+
+                            {getAppStatus(app) !== 'COMPLETED' ? (
                               <button
-                                onClick={() => updateAppointmentStatus(app.id, 'COMPLETED')}
-                                className="px-2 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-600/30"
+                                type="button"
+                                onClick={() => handleCompleteAppointment(app)}
+                                className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 text-[11px] font-bold hover:bg-emerald-600/30 flex items-center gap-1 transition cursor-pointer"
+                                title="Mark as Completed"
                               >
-                                Done
+                                <Check className="w-3 h-3" />
+                                <span>Complete</span>
                               </button>
+                            ) : (
                               <button
-                                onClick={() => updateAppointmentStatus(app.id, 'CANCELLED')}
-                                className="px-2 py-1 rounded-lg bg-red-600/20 text-red-400 text-[11px] font-semibold hover:bg-red-600/30"
+                                type="button"
+                                onClick={() => handleReopenAppointment(app)}
+                                className="px-2 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 text-[11px] font-semibold hover:bg-blue-600/30 transition cursor-pointer"
+                                title="Reopen Appointment"
+                              >
+                                Reopen
+                              </button>
+                            )}
+
+                            {getAppStatus(app) !== 'CANCELLED' && (
+                              <button
+                                type="button"
+                                onClick={() => handleCancelAppointment(app)}
+                                className="px-2 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-[11px] font-semibold transition cursor-pointer"
+                                title="Cancel Appointment"
                               >
                                 Cancel
                               </button>
-                            </>
-                          )}
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setAppointmentToDelete(app)}
+                              className="p-1.5 rounded-lg bg-rose-600/15 hover:bg-rose-600/25 text-rose-400 transition cursor-pointer"
+                              title="Delete Appointment Record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1069,36 +1161,70 @@ export const AdminSuite: React.FC = () => {
                           </a>
 
                           <button
+                            type="button"
                             onClick={() => {
                               setSelectedAppForMessaging(app);
                               setShowSmsHubModal(true);
                             }}
-                            className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 text-xs font-bold flex items-center gap-1.5 min-h-[40px]"
+                            className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 text-xs font-bold flex items-center gap-1.5 min-h-[40px] cursor-pointer"
                             title="SMS & WhatsApp Hub"
                           >
                             <Smartphone className="w-3.5 h-3.5" />
                             <span>Notify</span>
                           </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setReceiptAppointment(app)}
+                            className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 min-h-[40px] cursor-pointer"
+                            title="View & Print Official Receipt"
+                          >
+                            <Receipt className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Receipt</span>
+                          </button>
                         </div>
 
-                        {/* Status Change Buttons on Mobile */}
-                        {status === 'CONFIRMED' && (
-                          <div className="flex items-center gap-2 pt-1 border-t border-zinc-800/80">
+                        {/* Status Change & Delete Buttons on Mobile */}
+                        <div className="flex items-center gap-2 pt-1 border-t border-zinc-800/80">
+                          {status !== 'COMPLETED' ? (
                             <button
-                              onClick={() => updateAppointmentStatus(app.id, 'COMPLETED')}
-                              className="flex-1 py-2 px-3 rounded-xl bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-600/40 text-xs font-bold flex items-center justify-center gap-1.5 min-h-[40px]"
+                              type="button"
+                              onClick={() => handleCompleteAppointment(app)}
+                              className="flex-1 py-2 px-3 rounded-xl bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-600/40 text-xs font-bold flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Mark Completed</span>
+                              <span>Complete</span>
                             </button>
+                          ) : (
                             <button
-                              onClick={() => updateAppointmentStatus(app.id, 'CANCELLED')}
-                              className="py-2 px-3 rounded-xl bg-red-600/15 text-red-400 hover:bg-red-600/25 border border-red-600/30 text-xs font-bold min-h-[40px]"
+                              type="button"
+                              onClick={() => handleReopenAppointment(app)}
+                              className="flex-1 py-2 px-3 rounded-xl bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-600/40 text-xs font-bold flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer"
+                            >
+                              <span>Reopen</span>
+                            </button>
+                          )}
+
+                          {status !== 'CANCELLED' && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelAppointment(app)}
+                              className="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs font-semibold min-h-[40px] cursor-pointer"
                             >
                               Cancel
                             </button>
-                          </div>
-                        )}
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setAppointmentToDelete(app)}
+                            className="py-2 px-3 rounded-xl bg-rose-600/15 hover:bg-rose-600/25 border border-rose-600/30 text-rose-400 text-xs font-bold flex items-center justify-center gap-1 min-h-[40px] cursor-pointer"
+                            title="Delete Appointment Record"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
                       </div>
                     );
                   })
@@ -2998,6 +3124,57 @@ export const AdminSuite: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* DELETE APPOINTMENT CONFIRMATION MODAL */}
+      {appointmentToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-serif text-base font-bold text-zinc-100">Delete Appointment Record?</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Are you sure you want to permanently delete booking <span className="font-mono font-bold text-amber-400">#{appointmentToDelete.bookingRef}</span> for <span className="font-bold text-zinc-200">{appointmentToDelete.clientName}</span>?
+              </p>
+              <p className="text-[11px] text-zinc-500 pt-1">
+                {appointmentToDelete.serviceName} • {appointmentToDelete.date} at {appointmentToDelete.timeSlot}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setAppointmentToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-xs transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const ref = appointmentToDelete.bookingRef;
+                  deleteAppointment(appointmentToDelete.id);
+                  setAppointmentToDelete(null);
+                  setActionFeedbackToast(`Appointment #${ref} was permanently deleted.`);
+                  setTimeout(() => setActionFeedbackToast(null), 3500);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition shadow-lg shadow-rose-600/30 cursor-pointer"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN RECEIPT PREVIEW MODAL */}
+      {receiptAppointment && (
+        <ReceiptModal
+          isOpen={!!receiptAppointment}
+          onClose={() => setReceiptAppointment(null)}
+          appointment={receiptAppointment}
+        />
       )}
 
       {/* Floating Action Feedback Toast */}

@@ -20,7 +20,8 @@ import {
   Flame,
   Zap,
   AlertCircle,
-  MessageSquare
+  MessageSquare,
+  Receipt
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { RazorpayModal } from './RazorpayModal';
