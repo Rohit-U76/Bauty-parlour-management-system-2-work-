@@ -21,7 +21,8 @@ import {
   Zap,
   AlertCircle,
   MessageSquare,
-  Receipt
+  Receipt,
+  Eye
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { RazorpayModal } from './RazorpayModal';
@@ -30,6 +31,7 @@ import { ModernSalonLogo } from './ModernSalonLogo';
 import { SALON_TIME_SLOTS, getSlotAvailability, getDayAvailabilitySummary, isSlotAvailableForDate } from '../utils/availability';
 import { printSalonReceipt, downloadReceiptFile } from '../utils/receiptPrinter';
 import { ReceiptModal } from './ReceiptModal';
+import { AppointmentPassModal } from './AppointmentPassModal';
 
 export const BookingModal: React.FC = () => {
   const {
@@ -68,6 +70,7 @@ export const BookingModal: React.FC = () => {
   const [showRazorpayModal, setShowRazorpayModal] = useState<boolean>(false);
   const [confirmedBooking, setConfirmedBooking] = useState<Appointment | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
+  const [showPassModal, setShowPassModal] = useState<boolean>(false);
 
   // Stylists list - "Self Employed" default
   const stylists = [
@@ -839,32 +842,44 @@ export const BookingModal: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 pt-2">
                 <button
                   type="button"
+                  id="booking-view-pass-btn"
+                  onClick={() => setShowPassModal(true)}
+                  className="flex-1 min-w-[140px] py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-purple-600/30"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>View Pass</span>
+                </button>
+                <button
+                  type="button"
+                  id="booking-view-receipt-btn"
                   onClick={() => setShowReceiptModal(true)}
-                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-zinc-950 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  className="flex-1 min-w-[140px] py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-amber-500/20"
                 >
                   <Receipt className="w-3.5 h-3.5" />
                   <span>View Official Receipt</span>
                 </button>
                 <button
                   type="button"
+                  id="booking-print-receipt-btn"
                   onClick={async () => {
                     await printSalonReceipt(confirmedBooking);
                   }}
-                  className="flex-1 py-2.5 rounded-xl border border-purple-200 dark:border-zinc-800 hover:bg-purple-50 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="py-2.5 px-3 rounded-xl border border-purple-200 dark:border-zinc-800 hover:bg-purple-50 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400" />
                   <span>Print Receipt</span>
                 </button>
                 <button
                   type="button"
+                  id="booking-download-receipt-btn"
                   onClick={() => downloadReceiptFile(confirmedBooking)}
-                  className="flex-1 py-2.5 rounded-xl border border-purple-200 dark:border-zinc-800 hover:bg-purple-50 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="py-2.5 px-3 rounded-xl border border-purple-200 dark:border-zinc-800 hover:bg-purple-50 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400" />
-                  <span>Save PDF Receipt</span>
+                  <span>Save PDF</span>
                 </button>
                 <button
                   type="button"
@@ -948,6 +963,15 @@ export const BookingModal: React.FC = () => {
         <ReceiptModal
           isOpen={showReceiptModal}
           onClose={() => setShowReceiptModal(false)}
+          appointment={confirmedBooking}
+        />
+      )}
+
+      {/* Official Appointment Pass Modal */}
+      {confirmedBooking && showPassModal && (
+        <AppointmentPassModal
+          isOpen={showPassModal}
+          onClose={() => setShowPassModal(false)}
           appointment={confirmedBooking}
         />
       )}

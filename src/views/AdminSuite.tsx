@@ -52,7 +52,8 @@ import {
   EyeOff,
   AlertCircle,
   Receipt,
-  Printer
+  Printer,
+  Compass
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { ServiceItem, Appointment, GalleryItem, OfferCoupon, AppointmentStatus, StaffMember } from '../types';
@@ -87,6 +88,7 @@ export const AdminSuite: React.FC = () => {
     updateAppointmentStatus,
     deleteAppointment,
     setIsAdminMode,
+    setActiveNavTab,
     theme,
     setTheme,
     adminTab,
@@ -517,6 +519,20 @@ export const AdminSuite: React.FC = () => {
             </div>
           )}
 
+          {/* Switch to Client Website button */}
+          <button
+            id="admin-sidebar-client-website-btn"
+            onClick={() => {
+              setIsAdminMode(false);
+              setActiveNavTab('home');
+            }}
+            className="w-full py-2 px-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+            title="Switch to Client / Customer Website"
+          >
+            <Compass className="w-4 h-4 text-purple-400" />
+            <span>Switch to Client Website</span>
+          </button>
+
           {/* Dedicated Sign Out button that returns to Authorization Page */}
           <button
             id="admin-sidebar-signout-btn"
@@ -553,6 +569,19 @@ export const AdminSuite: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            id="admin-mobile-client-website-btn"
+            onClick={() => {
+              setIsAdminMode(false);
+              setActiveNavTab('home');
+            }}
+            className="text-xs text-purple-300 hover:text-white font-bold px-2.5 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center gap-1 cursor-pointer"
+            title="Switch to Client Website"
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Client Site</span>
+          </button>
+
           <button
             id="admin-mobile-signout-btn"
             onClick={() => logout()}
@@ -1014,11 +1043,11 @@ export const AdminSuite: React.FC = () => {
                                 setSelectedAppForMessaging(app);
                                 setShowSmsHubModal(true);
                               }}
-                              className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition"
-                              title="SMS & WhatsApp Hub"
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition"
+                              title="Send message through WhatsApp"
                             >
-                              <Smartphone className="w-3.5 h-3.5" />
-                              <span>Notify</span>
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              <span>WhatsApp</span>
                             </button>
 
                             <button
@@ -1166,11 +1195,11 @@ export const AdminSuite: React.FC = () => {
                               setSelectedAppForMessaging(app);
                               setShowSmsHubModal(true);
                             }}
-                            className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 text-xs font-bold flex items-center gap-1.5 min-h-[40px] cursor-pointer"
-                            title="SMS & WhatsApp Hub"
+                            className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5 min-h-[40px] cursor-pointer"
+                            title="Send message through WhatsApp"
                           >
-                            <Smartphone className="w-3.5 h-3.5" />
-                            <span>Notify</span>
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>WhatsApp</span>
                           </button>
 
                           <button

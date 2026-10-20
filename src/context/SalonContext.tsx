@@ -303,7 +303,29 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [theme]);
 
   // UI state
-  const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
+  const [isAdminMode, setIsAdminModeState] = useState<boolean>(() => {
+    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`);
+    const userSaved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
+    if (userSaved) {
+      try {
+        const u = JSON.parse(userSaved);
+        // Only allow admin mode if user is verified ADMIN and explicitly chose admin view
+        if (u.role === 'ADMIN' && saved === 'true') {
+          return true;
+        }
+      } catch {}
+    }
+    return false;
+  });
+
+  const setIsAdminMode = (val: boolean) => {
+    setIsAdminModeState(val);
+    if (val) {
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`, 'true');
+    } else {
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`, 'false');
+    }
+  };
   const [activeNavTab, setActiveNavTab] = useState<string>('home');
   const [adminTab, setAdminTab] = useState<string>('dashboard');
   const [selectedServiceForBooking, setSelectedServiceForBooking] = useState<ServiceItem | null>(null);
@@ -732,6 +754,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setIsGuestMode(false);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`);
     if (wasAdmin) {
       setIsAdminMode(false);
       setActiveNavTab('home');

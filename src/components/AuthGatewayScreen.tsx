@@ -612,13 +612,22 @@ export const AuthGatewayScreen: React.FC = () => {
             )}
 
             {/* Bottom Notice: Authorization Enforced */}
-            <div className="pt-4 border-t border-purple-100 dark:border-zinc-800 text-center space-y-1.5">
+            <div className="pt-4 border-t border-purple-100 dark:border-zinc-800 text-center space-y-2">
               <div className="text-xs text-zinc-600 dark:text-zinc-300 flex items-center justify-center gap-1.5 font-medium">
                 <Lock className="w-3.5 h-3.5 text-purple-600 dark:text-amber-500" />
-                <span>Authorization Required: Please sign in or create an account to enter</span>
+                <span>Sign in for saved passes & VIP perks, or explore as visitor</span>
               </div>
+              <button
+                type="button"
+                id="auth-explore-guest-btn"
+                onClick={() => setIsGuestMode(true)}
+                className="w-full py-2.5 px-4 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-purple-200 dark:border-zinc-700 text-purple-700 dark:text-amber-400 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <Compass className="w-4 h-4 text-purple-600 dark:text-amber-400" />
+                <span>Browse Salon Website & Rate Card as Visitor &rarr;</span>
+              </button>
               <p className="text-[11px] text-zinc-500">
-                All client profiles and appointments are saved directly to the salon MySQL database.
+                All client profiles and appointments are saved directly to the salon database.
               </p>
             </div>
           </div>

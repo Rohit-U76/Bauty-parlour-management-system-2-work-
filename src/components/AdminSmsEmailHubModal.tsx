@@ -43,7 +43,7 @@ export const AdminSmsEmailHubModal: React.FC<AdminSmsEmailHubModalProps> = ({
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string>(
     initialAppointment ? initialAppointment.id : (appointments[0]?.id || '')
   );
-  const [activeTab, setActiveTab] = useState<'sms' | 'email' | 'bulk' | 'whatsapp' | 'logs'>('sms');
+  const [activeTab, setActiveTab] = useState<'whatsapp' | 'sms' | 'email' | 'bulk' | 'logs'>('whatsapp');
   const [templateType, setTemplateType] = useState<'CONFIRMATION' | 'REMINDER_2H' | 'CHECKIN_COMPLETED' | 'PROMOTION'>('CONFIRMATION');
   
   const [customPhone, setCustomPhone] = useState(initialAppointment?.clientPhone || appointments[0]?.clientPhone || '');
@@ -318,19 +318,27 @@ export const AdminSmsEmailHubModal: React.FC<AdminSmsEmailHubModalProps> = ({
     const rawPhone = customPhone || currentApp?.clientPhone || '';
     const clean = rawPhone.replace(/[^0-9]/g, '');
     const phone = clean.length === 10 ? `91${clean}` : clean;
-    const msg = currentPreviewMessage;
+    if (!phone) {
+      setStatusMessage('Please enter or select a recipient mobile number.');
+      return;
+    }
+    const msg = customText || currentPreviewMessage;
     const waUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
+    try {
+      navigator.clipboard.writeText(msg);
+    } catch {}
     try {
       window.open(waUrl, '_blank');
     } catch {
       window.location.href = waUrl;
     }
     
+    setStatusMessage(`WhatsApp opened for +${phone}. Message text copied to clipboard!`);
     setLogs(prev => [
       {
         id: `log-${Date.now()}`,
         type: 'WHATSAPP',
-        recipient: phone,
+        recipient: `+${phone}`,
         template: templateType,
         status: 'SENT',
         timestamp: 'Just now'
@@ -432,9 +440,9 @@ export const AdminSmsEmailHubModal: React.FC<AdminSmsEmailHubModalProps> = ({
         {/* Tab Selector */}
         <div className="px-6 pt-4 border-b border-zinc-800 flex flex-wrap gap-2">
           {[
-            { id: 'sms', label: 'Direct SMS', icon: Smartphone },
+            { id: 'whatsapp', label: 'Send message through WhatsApp', icon: MessageSquare },
+            { id: 'sms', label: 'Direct SMS Gateway', icon: Smartphone },
             { id: 'bulk', label: 'Bulk Campaign SMS', icon: Users },
-            { id: 'whatsapp', label: 'WhatsApp API', icon: MessageSquare },
             { id: 'email', label: 'Luxury HTML Email', icon: Mail },
             { id: 'logs', label: 'Delivery Audit Log', icon: FileText }
           ].map(t => {
@@ -446,7 +454,9 @@ export const AdminSmsEmailHubModal: React.FC<AdminSmsEmailHubModalProps> = ({
                 onClick={() => setActiveTab(t.id as any)}
                 className={`px-4 py-2 rounded-t-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
                   isActive
-                    ? 'bg-purple-600/20 text-purple-300 border-t border-x border-purple-500/40'
+                    ? t.id === 'whatsapp'
+                      ? 'bg-emerald-600/20 text-emerald-300 border-t border-x border-emerald-500/40'
+                      : 'bg-purple-600/20 text-purple-300 border-t border-x border-purple-500/40'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
                 }`}
               >
@@ -611,11 +621,13 @@ export const AdminSmsEmailHubModal: React.FC<AdminSmsEmailHubModalProps> = ({
 
                   {activeTab === 'whatsapp' && (
                     <button
+                      type="button"
+                      id="hub-send-whatsapp-btn"
                       onClick={handleSendWhatsApp}
                       className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer"
                     >
                       <MessageSquare className="w-4 h-4" />
-                      <span>Open in WhatsApp</span>
+                      <span>Send message through WhatsApp</span>
                     </button>
                   )}
                 </div>

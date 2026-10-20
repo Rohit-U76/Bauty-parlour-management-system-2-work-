@@ -282,17 +282,23 @@ export async function printSalonReceipt(appointment: Appointment): Promise<boole
     printContainer.innerHTML = html;
     document.body.appendChild(printContainer);
 
-    // 4. Trigger print
+    // 4. Always initiate file download guarantee alongside print
+    try {
+      await downloadReceiptFile(appointment);
+    } catch (dlErr) {
+      console.warn('Backup file download exception:', dlErr);
+    }
+
+    // 5. Trigger native print
     let printSucceeded = false;
     try {
       window.print();
       printSucceeded = true;
     } catch (e) {
-      console.warn('Native window.print failed, initiating direct download fallback:', e);
-      await downloadReceiptFile(appointment);
+      console.warn('Native window.print blocked in iframe:', e);
     }
 
-    // 5. Cleanup DOM after print dialog closes
+    // 6. Cleanup DOM after print dialog closes
     setTimeout(() => {
       if (document.body.contains(printContainer)) {
         document.body.removeChild(printContainer);
@@ -300,7 +306,7 @@ export async function printSalonReceipt(appointment: Appointment): Promise<boole
       if (document.head.contains(printStyle)) {
         document.head.removeChild(printStyle);
       }
-    }, 3000);
+    }, 4000);
 
     return printSucceeded;
   } catch (error) {
@@ -319,9 +325,14 @@ export async function downloadReceiptFile(appointment: Appointment): Promise<voi
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `ModernSalon_Receipt_${appointment.bookingRef || appointment.id}.html`;
+  link.setAttribute('download', `ModernSalon_Receipt_${appointment.bookingRef || appointment.id}.html`);
+  link.style.display = 'none';
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    if (document.body.contains(link)) {
+      document.body.removeChild(link);
+    }
+    URL.revokeObjectURL(url);
+  }, 1000);
 }

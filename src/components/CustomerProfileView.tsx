@@ -45,7 +45,7 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
     name: currentUser?.name || '',
     phone: currentUser?.phone || '',
     email: currentUser?.email || '',
-    gender: currentUser?.gender || 'Female',
+    gender: currentUser?.gender || '',
     birthDate: currentUser?.birthDate || '',
     anniversaryDate: currentUser?.anniversaryDate || '',
     preferredStylist: currentUser?.preferredStylist || '',
@@ -66,7 +66,7 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
         name: currentUser.name || '',
         phone: currentUser.phone || '',
         email: currentUser.email || '',
-        gender: currentUser.gender || 'Female',
+        gender: currentUser.gender || '',
         birthDate: currentUser.birthDate || '',
         anniversaryDate: currentUser.anniversaryDate || '',
         preferredStylist: currentUser.preferredStylist || '',
@@ -85,7 +85,7 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
         name: '',
         phone: '',
         email: '',
-        gender: 'Female',
+        gender: '',
         birthDate: '',
         anniversaryDate: '',
         preferredStylist: '',
@@ -299,6 +299,7 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
                   onChange={e => setFormData({ ...formData, gender: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
+                  <option value="">Select Gender</option>
                   <option value="Female">Female</option>
                   <option value="Male">Male</option>
                   <option value="Unisex / Non-Binary">Unisex / Other</option>
@@ -349,7 +350,7 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
                   onChange={e => setFormData({ ...formData, preferredStylist: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  <option value="">Any Available Specialist</option>
+                  <option value="">Select Preferred Stylist (Optional)</option>
                   <option value="Rohit Umdale (Master Stylist & Founder)">Rohit Umdale (Master Stylist &amp; Founder)</option>
                   {staffList.map(st => (
                     <option key={st.id} value={st.name}>

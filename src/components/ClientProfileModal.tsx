@@ -36,10 +36,10 @@ export const ClientProfileModal: React.FC = () => {
     name: '',
     phone: '',
     email: '',
-    gender: 'Female',
+    gender: '',
     birthDate: '',
     anniversaryDate: '',
-    preferredStylist: 'Rohit Umdale (Master Stylist)',
+    preferredStylist: '',
     skinOrHairType: 'Normal Hair & Skin',
     specialNotes: '',
     address: '',
@@ -60,10 +60,10 @@ export const ClientProfileModal: React.FC = () => {
         name: currentUser.name || '',
         phone: currentUser.phone || '',
         email: currentUser.email || '',
-        gender: currentUser.gender || 'Female',
+        gender: currentUser.gender || '',
         birthDate: currentUser.birthDate || '',
         anniversaryDate: currentUser.anniversaryDate || '',
-        preferredStylist: currentUser.preferredStylist || (staffMembers?.[0]?.name ? `${staffMembers[0].name} (${staffMembers[0].role})` : 'Rohit Umdale (Master Stylist)'),
+        preferredStylist: currentUser.preferredStylist || '',
         skinOrHairType: currentUser.skinOrHairType || 'Normal Hair & Skin',
         specialNotes: currentUser.specialNotes || '',
         address: currentUser.address || '',
@@ -78,10 +78,10 @@ export const ClientProfileModal: React.FC = () => {
         name: '',
         phone: '',
         email: '',
-        gender: 'Female',
+        gender: '',
         birthDate: '',
         anniversaryDate: '',
-        preferredStylist: 'Rohit Umdale (Master Stylist)',
+        preferredStylist: '',
         skinOrHairType: 'Normal Hair & Skin',
         specialNotes: '',
         address: '',
@@ -276,6 +276,7 @@ export const ClientProfileModal: React.FC = () => {
                   onChange={e => setFormData({ ...formData, gender: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
+                  <option value="">Select Gender</option>
                   <option value="Female">Female</option>
                   <option value="Male">Male</option>
                   <option value="Non-binary">Non-binary</option>
@@ -341,10 +342,16 @@ export const ClientProfileModal: React.FC = () => {
                   onChange={e => setFormData({ ...formData, preferredStylist: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
+                  <option value="">Select Preferred Stylist (Optional)</option>
                   <option value="Rohit Umdale (Master Stylist)">Rohit Umdale (Master Stylist - Mohol)</option>
                   <option value="Pooja (Senior Hairdresser)">Pooja (Senior Hairdresser)</option>
                   <option value="Amit (Creative Colorist)">Amit (Creative Colorist)</option>
                   <option value="Sneha (Skin & Bridal Expert)">Sneha (Skin &amp; Bridal Expert)</option>
+                  {staffMembers && staffMembers.length > 0 && staffMembers.map(st => (
+                    <option key={st.id} value={`${st.name} (${st.role})`}>
+                      {st.name} ({st.role})
+                    </option>
+                  ))}
                   <option value="Any Available Expert">Any Available Expert Stylist</option>
                 </select>
               </div>
