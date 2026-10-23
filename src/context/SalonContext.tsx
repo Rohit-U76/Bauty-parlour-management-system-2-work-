@@ -458,7 +458,13 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
-          setReviews(data);
+          const safe = data.map((r: any) => ({
+            ...r,
+            clientName: r.clientName || r.userName || 'Valued Client',
+            userName: r.userName || r.clientName || 'Valued Client',
+            serviceName: r.serviceName || 'Signature Salon Service'
+          }));
+          setReviews(safe);
         }
       })
       .catch(() => {});

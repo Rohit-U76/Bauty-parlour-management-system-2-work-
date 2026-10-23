@@ -358,6 +358,11 @@ function getUniqueClientContacts(db: any) {
           formattedPhone: `91${cleanPhone}`,
           source: 'appointment'
         });
+      } else {
+        const existing = contactMap.get(cleanPhone)!;
+        if (existing.name === 'Valued Client' && a.clientName) {
+          existing.name = a.clientName.trim();
+        }
       }
     }
   });
@@ -376,6 +381,11 @@ function getUniqueClientContacts(db: any) {
           formattedPhone: `91${cleanPhone}`,
           source: 'user'
         });
+      } else {
+        const existing = contactMap.get(cleanPhone)!;
+        if (u.name && (existing.name === 'Valued Client' || existing.name !== u.name)) {
+          existing.name = u.name.trim();
+        }
       }
     }
   });
@@ -439,6 +449,13 @@ function dispatchWhatsAppOfferBroadcast(db: any, offer: any) {
     };
   });
 
+  const breakdown = {
+    total: recipientResults.length,
+    users: recipientResults.filter(r => r.source === 'user').length,
+    customers: recipientResults.filter(r => r.source === 'customer').length,
+    appointments: recipientResults.filter(r => r.source === 'appointment').length
+  };
+
   // Record Broadcast Log in db.broadcastLogs
   if (!db.broadcastLogs) db.broadcastLogs = [];
   const broadcastLog = {
@@ -450,6 +467,8 @@ function dispatchWhatsAppOfferBroadcast(db: any, offer: any) {
     discountAmount: offer.discountAmount,
     dispatchedAt,
     totalRecipients: recipientResults.length,
+    breakdown,
+    status: 'SUCCESS' as const,
     messageText: buildOfferWhatsAppMessage(offer, 'Client Name', salonSettings),
     recipients: recipientResults
   };
@@ -846,6 +865,64 @@ async function startServer() {
     }
   });
 
+  // Dynamic WhatsApp Broadcast Preview & Live Client Scanner
+  app.get(['/api/offers/:id/broadcast-whatsapp', '/api/offers/:id/broadcast-preview'], (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = readDb();
+      const offer = (db.offers || []).find((o: any) => o.id === id || o.code === id.toUpperCase());
+
+      if (!offer) {
+        return res.status(404).json({ success: false, message: 'Offer not found in database.' });
+      }
+
+      const recipients = getUniqueClientContacts(db);
+      const salonSettings = db.settings || {};
+
+      const recipientResults = recipients.map((r) => {
+        const messageText = buildOfferWhatsAppMessage(offer, r.name, salonSettings);
+        const encodedText = encodeURIComponent(messageText);
+        return {
+          id: r.id,
+          name: r.name,
+          phone: r.phone,
+          formattedPhone: r.formattedPhone,
+          source: r.source,
+          whatsappUrl: `https://api.whatsapp.com/send?phone=${r.formattedPhone}&text=${encodedText}`,
+          webWhatsappUrl: `https://web.whatsapp.com/send?phone=${r.formattedPhone}&text=${encodedText}`,
+          status: 'QUEUED' as const
+        };
+      });
+
+      const breakdown = {
+        total: recipientResults.length,
+        users: recipientResults.filter(r => r.source === 'user').length,
+        customers: recipientResults.filter(r => r.source === 'customer').length,
+        appointments: recipientResults.filter(r => r.source === 'appointment').length
+      };
+
+      res.json({
+        success: true,
+        offer,
+        broadcast: {
+          id: `preview-${Date.now()}`,
+          offerId: offer.id,
+          offerCode: offer.code,
+          offerTitle: offer.title,
+          discountPercent: offer.discountPercent,
+          discountAmount: offer.discountAmount,
+          dispatchedAt: new Date().toISOString(),
+          totalRecipients: recipientResults.length,
+          breakdown,
+          messageText: buildOfferWhatsAppMessage(offer, 'Client Name', salonSettings),
+          recipients: recipientResults
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Re-broadcast an existing offer to all clients (including any users added up to this moment!)
   app.post('/api/offers/:id/broadcast-whatsapp', (req, res) => {
     try {
@@ -1062,6 +1139,23 @@ async function startServer() {
       console.log(`[SMS Gateway Triggered] LogID: ${smsLogId} | To: ${phone} | Template: ${templateType || 'CUSTOM'}`);
       console.log(`[SMS Payload Content]:\n"${messageText}"`);
 
+      // Record in notifications
+      try {
+        const db = readDb();
+        if (!db.notifications) db.notifications = [];
+        db.notifications.unshift({
+          id: `notif-${Date.now()}`,
+          title: `📱 SMS Pass Dispatched: ${bookingRef || 'Booking'}`,
+          message: `SMS pass dispatched to ${clientName || 'Client'} (${phone}) for ${serviceName || 'Treatment'} on ${date || 'upcoming'}.`,
+          type: 'reminder',
+          timestamp: 'Just now',
+          read: false
+        });
+        writeDb(db);
+      } catch (e) {
+        console.warn('Could not record SMS notification in DB:', e);
+      }
+
       // Construct direct Web SMS link for mobile click fallback
       const webSmsUrl = `sms:${phone}?body=${encodeURIComponent(messageText)}`;
       // Construct WhatsApp URL
@@ -1169,6 +1263,37 @@ async function startServer() {
 
       console.log(`[Email Dispatcher] LogID: ${emailLogId} | To: ${email} (${clientName}) | Subject: ${emailSubject}`);
 
+      const emailBody = `Modern Unisex Salon Mohol - Official Booking Pass Receipt\n\n` +
+        `Booking Ref: ${bookingRef || 'SS-CONF'}\n` +
+        `Client: ${clientName || 'Valued Client'}\n` +
+        `Service: ${serviceName || 'Salon Service'}\n` +
+        `Date & Time: ${date || ''} at ${timeSlot || ''}\n` +
+        `10% Advance Deposit Paid: ₹${advancePaid || '0'} (Verified)\n` +
+        `Remaining Balance at Counter: ₹${balanceDue || '0'}\n` +
+        `Total Service Amount: ₹${totalAmount || '0'}\n\n` +
+        `Venue: B.N. Gund Complex, Near Kanya Prashala & ICICI Bank, Solapur-Pune Road, Mohol - 413213\n` +
+        `Helpline: +91 81040 26257\n\n` +
+        `Thank you for booking with Modern Unisex Salon!`;
+
+      const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+
+      // Record in notifications
+      try {
+        const db = readDb();
+        if (!db.notifications) db.notifications = [];
+        db.notifications.unshift({
+          id: `notif-${Date.now()}`,
+          title: `📧 Digital Receipt Emailed: ${bookingRef || 'Booking'}`,
+          message: `Official pass receipt emailed to ${clientName || 'Client'} (${email}). Advance Paid: ₹${advancePaid || '0'}.`,
+          type: 'reminder',
+          timestamp: 'Just now',
+          read: false
+        });
+        writeDb(db);
+      } catch (e) {
+        console.warn('Could not record Email notification in DB:', e);
+      }
+
       res.json({
         success: true,
         emailLogId,
@@ -1176,6 +1301,7 @@ async function startServer() {
         subject: emailSubject,
         status: 'SENT',
         sentAt: new Date().toISOString(),
+        mailtoUrl,
         message: `Digital invoice & confirmation email dispatched to ${email}`
       });
     } catch (err: any) {
@@ -1544,7 +1670,13 @@ async function startServer() {
   app.get('/api/reviews', (req, res) => {
     try {
       const db = readDb();
-      res.json(db.reviews || []);
+      const safeReviews = (db.reviews || []).map((r: any) => ({
+        ...r,
+        clientName: r.clientName || r.userName || 'Valued Client',
+        userName: r.userName || r.clientName || 'Valued Client',
+        serviceName: r.serviceName || 'Signature Salon Service'
+      }));
+      res.json(safeReviews);
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

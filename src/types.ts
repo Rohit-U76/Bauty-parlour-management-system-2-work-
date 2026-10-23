@@ -147,7 +147,7 @@ export interface WhatsAppBroadcastRecipient {
   whatsappUrl: string;
   webWhatsappUrl: string;
   status: 'QUEUED' | 'SENT' | 'FAILED';
-  source: 'customer' | 'appointment' | 'user';
+  source: 'customer' | 'appointment' | 'user' | 'inquiry' | string;
 }
 
 export interface WhatsAppBroadcastLog {

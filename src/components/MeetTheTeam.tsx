@@ -14,6 +14,7 @@ import {
   BadgeCheck
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
+import { initialStaffMembers } from '../data/initialData';
 
 export interface TeamMember {
   id: string;
@@ -43,29 +44,27 @@ export const MeetTheTeam: React.FC = () => {
   const [selectedStylistModal, setSelectedStylistModal] = useState<TeamMember | null>(null);
 
   const team: TeamMember[] = useMemo(() => {
-    if (staffMembers && staffMembers.length > 0) {
-      return staffMembers.map(m => ({
-        id: m.id,
-        name: m.name,
-        role: m.role,
-        department: m.department,
-        experience: m.experience || '5+ Years',
-        specialties: m.specialties || ['Signature Styling'],
-        certifications: m.certifications || ['Professional Certified'],
-        rating: m.rating || 4.95,
-        reviewsCount: m.reviewsCount || 120,
-        totalClients: m.totalClients || 1500,
-        shiftHours: m.shiftHours || '10:00 AM - 07:30 PM',
-        availability: {
-          status: m.status === 'On Leave' ? ('Booked Today' as const) : m.status === 'Available Today' ? ('Available Today' as const) : ('Limited Slots' as const),
-          slotsLeft: m.status === 'On Leave' ? 0 : 3,
-          nextAvailableSlot: m.status === 'On Leave' ? 'Tomorrow, 11:00 AM' : 'Today, 02:45 PM'
-        },
-        bio: m.bio || 'Dedicated beauty and styling professional providing personalized salon care.',
-        image: m.image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80'
-      }));
-    }
-    return [];
+    const list = (staffMembers && staffMembers.length > 0) ? staffMembers : initialStaffMembers;
+    return (list || []).map(m => ({
+      id: m.id,
+      name: m.name,
+      role: m.role,
+      department: m.department,
+      experience: m.experience || '5+ Years',
+      specialties: m.specialties || ['Signature Styling'],
+      certifications: m.certifications || ['Professional Certified'],
+      rating: m.rating || 4.95,
+      reviewsCount: m.reviewsCount || 120,
+      totalClients: m.totalClients || 1500,
+      shiftHours: m.shiftHours || '10:00 AM - 07:30 PM',
+      availability: {
+        status: m.status === 'On Leave' ? ('Booked Today' as const) : m.status === 'Available Today' ? ('Available Today' as const) : ('Limited Slots' as const),
+        slotsLeft: m.status === 'On Leave' ? 0 : 3,
+        nextAvailableSlot: m.status === 'On Leave' ? 'Tomorrow, 11:00 AM' : 'Today, 02:45 PM'
+      },
+      bio: m.bio || 'Dedicated beauty and styling professional providing personalized salon care.',
+      image: m.image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80'
+    }));
   }, [staffMembers]);
 
   const departments = ['All', 'Hair Care', 'Skin & Facial', 'Bridal & Makeup', 'Men Grooming', 'Spa & Wellness'];

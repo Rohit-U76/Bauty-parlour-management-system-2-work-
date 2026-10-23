@@ -105,9 +105,9 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
       // Text search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchesClient = rev.clientName.toLowerCase().includes(q);
-        const matchesService = rev.serviceName.toLowerCase().includes(q);
-        const matchesComment = rev.comment.toLowerCase().includes(q);
+        const matchesClient = ((rev.clientName || (rev as any).userName || '')).toLowerCase().includes(q);
+        const matchesService = (rev.serviceName || '').toLowerCase().includes(q);
+        const matchesComment = (rev.comment || '').toLowerCase().includes(q);
         if (!matchesClient && !matchesService && !matchesComment) return false;
       }
 
@@ -475,14 +475,14 @@ export const CustomerReviews: React.FC<CustomerReviewsProps> = ({
                       <div className="w-10 h-10 rounded-full overflow-hidden border border-purple-300 dark:border-yellow-500/30 bg-purple-50 dark:bg-zinc-800 shrink-0">
                         <img
                           src={rev.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=240&q=80'}
-                          alt={rev.clientName}
+                          alt={rev.clientName || (rev as any).userName || 'Client'}
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
                         />
                       </div>
                       <div>
                         <div className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 group-hover:text-purple-700 dark:group-hover:text-yellow-400 transition-colors flex items-center gap-1.5">
-                          <span>{rev.clientName}</span>
+                          <span>{rev.clientName || (rev as any).userName || 'Valued Client'}</span>
                           {rev.verifiedBooking && (
                             <span className="inline-flex items-center text-emerald-600 dark:text-emerald-400 text-[10px]" title="Verified Appointment Booking">
                               <CheckCircle2 className="w-3.5 h-3.5" />

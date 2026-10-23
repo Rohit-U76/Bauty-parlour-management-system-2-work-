@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Bell,
   Calendar,
@@ -16,7 +16,9 @@ import {
   AlertCircle,
   Play,
   RotateCcw,
-  Compass
+  Compass,
+  Move,
+  GripHorizontal
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { Appointment } from '../types';
@@ -41,6 +43,105 @@ export const AppointmentReminderToast: React.FC = () => {
   const [manualTriggerAppointmentId, setManualTriggerAppointmentId] = useState<string | null>(null);
   const [hasPlayedChime, setHasPlayedChime] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
+
+  // Draggable position state (movable popup across screen)
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const saved = sessionStorage.getItem('appointment_reminder_pos');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const toastRef = useRef<HTMLDivElement | null>(null);
+
+  const isAdmin = currentUser?.role === 'ADMIN';
+
+  // Drag handlers for mouse & touch
+  const handleStartDrag = (clientX: number, clientY: number) => {
+    if (!toastRef.current) return;
+    const rect = toastRef.current.getBoundingClientRect();
+    dragRef.current = {
+      startX: clientX,
+      startY: clientY,
+      initialX: rect.left,
+      initialY: rect.top
+    };
+    setIsDragging(true);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a') || target.closest('input')) return;
+    handleStartDrag(e.clientX, e.clientY);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a') || target.closest('input')) return;
+    if (e.touches[0]) {
+      handleStartDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const deltaX = e.clientX - dragRef.current.startX;
+      const deltaY = e.clientY - dragRef.current.startY;
+      
+      const newX = Math.max(10, Math.min(window.innerWidth - 380, dragRef.current.initialX + deltaX));
+      const newY = Math.max(10, Math.min(window.innerHeight - 150, dragRef.current.initialY + deltaY));
+
+      const newPos = { x: newX, y: newY };
+      setPosition(newPos);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!dragRef.current || !e.touches[0]) return;
+      const deltaX = e.touches[0].clientX - dragRef.current.startX;
+      const deltaY = e.touches[0].clientY - dragRef.current.startY;
+
+      const newX = Math.max(10, Math.min(window.innerWidth - 320, dragRef.current.initialX + deltaX));
+      const newY = Math.max(10, Math.min(window.innerHeight - 150, dragRef.current.initialY + deltaY));
+
+      const newPos = { x: newX, y: newY };
+      setPosition(newPos);
+    };
+
+    const handleEndDrag = () => {
+      setIsDragging(false);
+      dragRef.current = null;
+      if (position) {
+        try {
+          sessionStorage.setItem('appointment_reminder_pos', JSON.stringify(position));
+        } catch (e) {}
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleEndDrag);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchend', handleEndDrag);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleEndDrag);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEndDrag);
+    };
+  }, [isDragging, position]);
+
+  const handleResetPosition = () => {
+    setPosition(null);
+    try {
+      sessionStorage.removeItem('appointment_reminder_pos');
+    } catch (e) {}
+  };
 
   // Periodically update reference time every 30s so reminders dynamically stay accurate
   useEffect(() => {
@@ -229,21 +330,39 @@ export const AppointmentReminderToast: React.FC = () => {
 
   return (
     <>
-      {/* IN-APP 24-HOUR TOAST NOTIFICATION CONTAINER (Positioned Top-Left away from AI Assistant Bar) */}
+      {/* IN-APP 24-HOUR TOAST NOTIFICATION CONTAINER (Movable / Draggable anywhere across screen) */}
       <div
         id="appointment-reminder-toast"
-        className="fixed top-20 sm:top-24 left-3 sm:left-6 z-40 max-w-[400px] w-[calc(100vw-24px)] sm:w-full transition-all duration-300"
+        ref={toastRef}
+        style={position ? {
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          position: 'fixed'
+        } : undefined}
+        className={`fixed z-40 max-w-[400px] w-[calc(100vw-24px)] sm:w-full transition-all duration-150 ${
+          position
+            ? ''
+            : isAdmin
+              ? 'top-20 sm:top-24 right-3 sm:right-6 lg:left-72'
+              : 'top-20 sm:top-24 left-3 sm:left-6'
+        }`}
       >
         {isCollapsed ? (
-          /* COLLAPSED COMPACT PILL */
-          <div className="bg-white/95 dark:bg-[#141419]/95 backdrop-blur-md border-2 border-purple-400 dark:border-amber-500/50 rounded-2xl p-3 shadow-2xl flex items-center justify-between gap-3 text-left animate-in slide-in-from-top-4 duration-300">
+          /* COLLAPSED COMPACT PILL (Draggable) */
+          <div
+            onMouseDown={handleMouseDown}
+            onTouchStart={handleTouchStart}
+            className="bg-white/95 dark:bg-[#141419]/95 backdrop-blur-md border-2 border-purple-400 dark:border-amber-500/50 rounded-2xl p-3 shadow-2xl flex items-center justify-between gap-3 text-left animate-in slide-in-from-top-4 duration-300 cursor-grab active:cursor-grabbing select-none"
+            title="Click and drag anywhere to move"
+          >
             <div className="flex items-center gap-2.5 truncate">
               <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-amber-500/20 border border-purple-300 dark:border-amber-500/40 flex items-center justify-center text-purple-700 dark:text-amber-400 shrink-0">
                 <Bell className="w-4 h-4 animate-pulse" />
               </div>
               <div className="truncate">
-                <div className="text-xs font-bold text-zinc-900 dark:text-amber-400 truncate">
-                  {activeAppointment.serviceName}
+                <div className="text-xs font-bold text-zinc-900 dark:text-amber-400 truncate flex items-center gap-1.5">
+                  <span>{activeAppointment.serviceName}</span>
+                  <GripHorizontal className="w-3 h-3 text-zinc-400 opacity-60" />
                 </div>
                 <div className="text-[10px] text-zinc-600 dark:text-zinc-400 truncate">
                   {reminderInfo.timeLabel} • {activeAppointment.timeSlot}
@@ -273,6 +392,32 @@ export const AppointmentReminderToast: React.FC = () => {
             {/* Top Glowing Ambient Accents */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-600 via-pink-500 to-amber-500" />
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 dark:bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+            {/* Drag Handle Bar */}
+            <div
+              onMouseDown={handleMouseDown}
+              onTouchStart={handleTouchStart}
+              className="px-4 py-1.5 bg-zinc-100/90 dark:bg-zinc-800/90 border-b border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between cursor-grab active:cursor-grabbing select-none text-[10px] text-zinc-500 font-semibold"
+              title="Click and drag to move this alert anywhere on your screen"
+            >
+              <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
+                <GripHorizontal className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400" />
+                <span className="uppercase tracking-wider font-bold text-[9px]">Movable Alert • Drag Anywhere</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {position && (
+                  <button
+                    type="button"
+                    onClick={handleResetPosition}
+                    className="text-[9px] text-purple-600 dark:text-amber-400 hover:underline cursor-pointer"
+                    title="Reset to default position"
+                  >
+                    Reset Pos
+                  </button>
+                )}
+                <Move className="w-3 h-3 text-zinc-400 opacity-60" />
+              </div>
+            </div>
 
             {/* Header: Badge & Window Controls */}
             <div className="p-4 sm:p-5 pb-3 border-b border-zinc-200 dark:border-zinc-800/80 flex items-start justify-between gap-3">

@@ -599,6 +599,7 @@ export const Navbar: React.FC = () => {
       {/* Digital Check-in Pass Modal */}
       {selectedPassAppointment && (
         <AppointmentPassModal
+          isOpen={true}
           appointment={selectedPassAppointment}
           onClose={() => setSelectedPassAppointment(null)}
         />

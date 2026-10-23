@@ -104,7 +104,8 @@ export const AdminSuite: React.FC = () => {
     staffMembers,
     addStaffMember,
     updateStaffMember,
-    deleteStaffMember
+    deleteStaffMember,
+    fetchBroadcastLogs
   } = useSalon();
 
   // Search & Filter
@@ -3303,6 +3304,14 @@ export const AdminSuite: React.FC = () => {
         onClose={() => setIsBroadcastModalOpen(false)}
         offer={broadcastOffer}
         broadcastResult={broadcastResult}
+        onBroadcastResultUpdated={(updated) => {
+          setBroadcastResult(updated);
+          fetchBroadcastLogs();
+        }}
+        onShowToast={(msg) => {
+          setActionFeedbackToast(msg);
+          setTimeout(() => setActionFeedbackToast(null), 4500);
+        }}
       />
 
       {/* Floating Action Feedback Toast */}

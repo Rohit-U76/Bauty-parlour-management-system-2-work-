@@ -745,6 +745,7 @@ export const CustomerPastAppointments: React.FC = () => {
       {/* Digital Pass Modal */}
       {selectedPassAppointment && (
         <AppointmentPassModal
+          isOpen={true}
           appointment={selectedPassAppointment}
           onClose={() => setSelectedPassAppointment(null)}
         />

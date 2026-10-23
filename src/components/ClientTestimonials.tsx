@@ -108,20 +108,28 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
     return () => { isMounted = false; };
   }, []);
 
-  const allReviews = (apiFetchedReviews && apiFetchedReviews.length > 0) ? apiFetchedReviews : reviews;
+  const allReviews = useMemo(() => {
+    const raw = (apiFetchedReviews && apiFetchedReviews.length > 0) ? apiFetchedReviews : reviews;
+    return (raw || []).map(r => ({
+      ...r,
+      clientName: r.clientName || (r as any).userName || 'Valued Client',
+      serviceName: r.serviceName || 'Signature Salon Service'
+    }));
+  }, [apiFetchedReviews, reviews]);
 
   // Filter and Sort Reviews
   const filteredReviews = useMemo(() => {
     return allReviews.filter(rev => {
       // Category filter
       if (selectedCategory !== 'All') {
+        const sName = (rev.serviceName || '').toLowerCase();
         const matchesCategory =
-          rev.serviceName.toLowerCase().includes(selectedCategory.toLowerCase().replace("'", '')) ||
-          (selectedCategory === 'Skin & Facial' && (rev.serviceName.includes('Facial') || rev.serviceName.includes('Skin') || rev.serviceName.includes('Glow'))) ||
-          (selectedCategory === 'Hair Care' && (rev.serviceName.includes('Hair') || rev.serviceName.includes('Keratin') || rev.serviceName.includes('Balayage') || rev.serviceName.includes('Styling'))) ||
-          (selectedCategory === "Men's Grooming" && (rev.serviceName.includes('Men') || rev.serviceName.includes('Beard') || rev.serviceName.includes('Fade'))) ||
-          (selectedCategory === 'Bridal' && (rev.serviceName.includes('Bridal') || rev.serviceName.includes('Pre-Bridal') || rev.serviceName.includes('Makeover'))) ||
-          (selectedCategory === 'Spa' && (rev.serviceName.includes('Spa') || rev.serviceName.includes('Massage') || rev.serviceName.includes('Detox')));
+          sName.includes(selectedCategory.toLowerCase().replace("'", '')) ||
+          (selectedCategory === 'Skin & Facial' && (sName.includes('facial') || sName.includes('skin') || sName.includes('glow'))) ||
+          (selectedCategory === 'Hair Care' && (sName.includes('hair') || sName.includes('keratin') || sName.includes('balayage') || sName.includes('styling'))) ||
+          (selectedCategory === "Men's Grooming" && (sName.includes('men') || sName.includes('beard') || sName.includes('fade'))) ||
+          (selectedCategory === 'Bridal' && (sName.includes('bridal') || sName.includes('pre-bridal') || sName.includes('makeover'))) ||
+          (selectedCategory === 'Spa' && (sName.includes('spa') || sName.includes('massage') || sName.includes('detox')));
         if (!matchesCategory) return false;
       }
       // Min rating
@@ -507,7 +515,7 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-purple-100 dark:bg-yellow-500/10 text-purple-700 dark:text-yellow-400 font-bold text-sm">
-                            {rev.clientName.charAt(0)}
+                            {(rev.clientName || 'C').charAt(0).toUpperCase()}
                           </div>
                         )}
                         {rev.avatarUrl && (
@@ -617,7 +625,7 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-yellow-500/10 text-yellow-400 font-bold text-3xl">
-                      {displayReviews[carouselIndex].clientName.charAt(0)}
+                      {((displayReviews[carouselIndex] && displayReviews[carouselIndex].clientName) || 'C').charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div className="absolute bottom-2 right-2 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md text-[10px] font-bold text-yellow-400 border border-yellow-500/30 flex items-center gap-1">
