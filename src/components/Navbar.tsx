@@ -214,7 +214,7 @@ export const Navbar: React.FC = () => {
                                 </div>
                               </div>
                               <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
-                                {info.hoursUntil}h away
+                                {Math.round(info.hoursUntil) <= 0 ? 'Due soon' : `${Math.round(info.hoursUntil)}h away`}
                               </span>
                             </div>
 

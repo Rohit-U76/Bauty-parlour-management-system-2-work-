@@ -23,7 +23,7 @@ import { CustomerTerms } from './views/CustomerTerms';
 import { MobileBottomNav } from './components/MobileBottomNav';
 
 function SalonAppContent() {
-  const { isAdminMode, currentUser, isGuestMode, activeNavTab } = useSalon();
+  const { isAdminMode, setIsAdminMode, currentUser, isGuestMode, activeNavTab } = useSalon();
 
   // Authorization Gate: Show auth gateway if neither logged in nor continuing as guest
   if (!currentUser && !isGuestMode) {
@@ -35,22 +35,30 @@ function SalonAppContent() {
     );
   }
 
-  if (isAdminMode) {
-    if (!currentUser || currentUser.role !== 'ADMIN') {
-      return (
-        <div className="min-h-screen bg-stone-50 dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors duration-200">
-          <AdminAuthGate />
-          <AuthModal />
-        </div>
-      );
-    }
+  // Standard Role Authorization: Customers are strictly regular clients and never routed to admin gate
+  if (currentUser && currentUser.role !== 'ADMIN' && isAdminMode) {
+    setIsAdminMode(false);
+  }
 
+  const effectiveAdmin = isAdminMode && currentUser?.role === 'ADMIN';
+
+  if (effectiveAdmin) {
     return (
       <div className="min-h-screen bg-stone-50 dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors duration-200">
         <AdminSuite />
         <AuthModal />
         <BookingModal />
         <AppointmentReminderToast />
+      </div>
+    );
+  }
+
+  // Show AdminAuthGate only if an unauthenticated user or guest explicitly requested admin view
+  if (isAdminMode && !currentUser) {
+    return (
+      <div className="min-h-screen bg-stone-50 dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors duration-200">
+        <AdminAuthGate />
+        <AuthModal />
       </div>
     );
   }

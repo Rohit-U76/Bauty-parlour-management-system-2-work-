@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { Appointment } from '../types';
+import { SALON_TIME_SLOTS, getSlotAvailability, isSlotAvailableForDate } from '../utils/availability';
 
 interface RescheduleModalProps {
   appointment: Appointment | null;
@@ -20,35 +21,20 @@ interface RescheduleModalProps {
   onSuccess?: () => void;
 }
 
-const AVAILABLE_SLOTS = [
-  '09:00 AM',
-  '10:00 AM',
-  '11:00 AM',
-  '12:00 PM',
-  '01:30 PM',
-  '02:30 PM',
-  '03:30 PM',
-  '04:30 PM',
-  '05:30 PM',
-  '06:30 PM',
-  '07:30 PM',
-  '08:00 PM'
-];
-
 export const RescheduleModal: React.FC<RescheduleModalProps> = ({
   appointment,
   isOpen,
   onClose,
   onSuccess
 }) => {
-  const { rescheduleAppointment } = useSalon();
+  const { rescheduleAppointment, appointments } = useSalon();
 
   const [selectedDate, setSelectedDate] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split('T')[0];
   });
-  const [selectedSlot, setSelectedSlot] = useState('11:00 AM');
+  const [selectedSlot, setSelectedSlot] = useState('11:45 AM');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -68,6 +54,17 @@ export const RescheduleModal: React.FC<RescheduleModalProps> = ({
 
     if (selectedDate < todayStr) {
       setErrorMessage('Selected date cannot be in the past.');
+      return;
+    }
+
+    if (!isSlotAvailableForDate(selectedSlot, selectedDate)) {
+      setErrorMessage('The selected time slot is closed for today or has already passed. Please select an open slot.');
+      return;
+    }
+
+    const slotInfo = getSlotAvailability(appointments, selectedDate, selectedSlot);
+    if (slotInfo.status === 'SOLD_OUT' && slotInfo.remainingSeats === 0) {
+      setErrorMessage(`The ${selectedSlot} slot on ${selectedDate} is fully booked. Please select another time slot.`);
       return;
     }
 
@@ -180,21 +177,41 @@ export const RescheduleModal: React.FC<RescheduleModalProps> = ({
             <label className="block text-xs font-bold text-zinc-800 dark:text-zinc-200">
               Select Preferred Time Slot
             </label>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
-              {AVAILABLE_SLOTS.map(slot => (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => setSelectedSlot(slot)}
-                  className={`py-2 px-2 rounded-xl text-xs font-bold transition cursor-pointer text-center ${
-                    selectedSlot === slot
-                      ? 'bg-amber-500 text-zinc-950 shadow-md font-extrabold'
-                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-                  }`}
-                >
-                  {slot}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+              {SALON_TIME_SLOTS.map(slot => {
+                const slotInfo = getSlotAvailability(appointments, selectedDate, slot);
+                const isSoldOut = slotInfo.status === 'SOLD_OUT';
+                const isSelected = selectedSlot === slot;
+
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    disabled={isSoldOut}
+                    onClick={() => setSelectedSlot(slot)}
+                    className={`p-2 rounded-xl text-xs font-bold transition flex flex-col justify-between text-left ${
+                      isSoldOut
+                        ? 'opacity-40 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed border border-transparent'
+                        : isSelected
+                        ? 'bg-amber-500 text-zinc-950 shadow-md font-extrabold ring-2 ring-amber-400/50 cursor-pointer'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer border border-zinc-200/50 dark:border-zinc-700/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="font-mono">{slot}</span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                        isSoldOut 
+                          ? 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400' 
+                          : isSelected
+                          ? 'bg-zinc-950 text-amber-400'
+                          : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                      }`}>
+                        {isSoldOut ? 'Full' : 'Open'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

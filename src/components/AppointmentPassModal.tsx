@@ -24,8 +24,7 @@ import {
 import { Appointment } from '../types';
 import {
   getAppointmentReminderInfo,
-  generateGoogleCalendarUrl,
-  downloadIcsCalendarFile
+  generateGoogleCalendarUrl
 } from '../utils/appointmentReminderUtils';
 import { useSalon } from '../context/SalonContext';
 import { printSalonReceipt, downloadReceiptFile } from '../utils/receiptPrinter';
@@ -150,7 +149,7 @@ export const AppointmentPassModal: React.FC<AppointmentPassModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="relative max-w-lg w-full bg-[#141418] border border-purple-500/40 rounded-3xl shadow-2xl overflow-hidden my-6 text-left animate-in zoom-in-95 duration-200">
         
         {/* Top Header */}
@@ -337,25 +336,17 @@ export const AppointmentPassModal: React.FC<AppointmentPassModalProps> = ({
             )}
           </div>
 
-          {/* Action Buttons: Calendar & Map */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+          {/* Action Buttons: Calendar */}
+          <div className="pt-1">
             <a
               href={googleCalUrl}
               target="_blank"
               rel="noreferrer"
-              className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Calendar className="w-4 h-4 text-purple-400" />
               <span>Add to Google Calendar</span>
             </a>
-
-            <button
-              onClick={() => downloadIcsCalendarFile(appointment, settings.address)}
-              className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Download className="w-4 h-4 text-purple-400" />
-              <span>Download iCal / Outlook</span>
-            </button>
           </div>
 
           {/* Quick Share / Print / Close footer */}

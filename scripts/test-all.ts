@@ -108,8 +108,26 @@ async function runSuite() {
 
     const info = getAppointmentReminderInfo(appointment as any, reference);
     assertEqual(info.isToday, true, 'Should be detected as today');
+    assertEqual(info.isUpcoming, true, 'Should be upcoming since 2:00 PM is after 10:00 AM');
+    assertEqual(info.isPast, false, 'Should not be marked as past');
     assert(info.isUpcoming24h, 'Should be within 24h window');
     assert(Math.abs(info.hoursUntil - 4) < 0.1, `Hours until should be ~4 hours, got ${info.hoursUntil}`);
+
+    // Test past appointment earlier today (e.g. 7:30 PM appointment when current time is 9:15 PM)
+    const lateReference = new Date(2026, 9, 15, 21, 15, 0); // 9:15 PM
+    const pastAppt = { ...appointment, timeSlot: '07:30 PM' };
+    const pastInfo = getAppointmentReminderInfo(pastAppt as any, lateReference);
+    assertEqual(pastInfo.isToday, true, 'Should be detected as today');
+    assertEqual(pastInfo.isPast, true, '7:30 PM at 9:15 PM should be detected as passed');
+    assertEqual(pastInfo.isUpcoming, false, 'Passed appointment must NOT be marked as upcoming');
+    assertEqual(pastInfo.isUpcoming24h, false, 'Passed appointment must NOT be in 24h upcoming alert');
+
+    // Test tomorrow appointment
+    const tomorrowAppt = { ...appointment, date: '2026-10-16', timeSlot: '11:00 AM' };
+    const tomorrowInfo = getAppointmentReminderInfo(tomorrowAppt as any, reference);
+    assertEqual(tomorrowInfo.isTomorrow, true, 'Should be detected as tomorrow');
+    assertEqual(tomorrowInfo.isUpcoming, true, 'Tomorrow appointment should be upcoming');
+    assertEqual(tomorrowInfo.headingLabel, 'Upcoming Appointment Tomorrow', 'Heading should say Upcoming Appointment Tomorrow');
   });
 
   // ==========================================
@@ -443,6 +461,138 @@ async function runSuite() {
     assert(Boolean(created), `Created appointment ${bookingRef} should be found`);
     assertEqual(created.advancePaid, 500, 'Advance paid must match 500');
     assertEqual(created.balanceDue, 4500, 'Balance due must match 4500');
+
+    // Test PUT /api/appointments/:id (reschedule / cancel updates)
+    const updateRes = await fetch(`${BASE_URL}/api/appointments/${created.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        timeSlot: '01:00 PM',
+        notes: 'Rescheduled via test'
+      })
+    });
+    assertEqual(updateRes.status, 200, 'Update appointment should return 200');
+    const updateJson = await updateRes.json();
+    assert(updateJson.success === true, 'Update should succeed');
+    assertEqual(updateJson.appointment?.timeSlot, '01:00 PM', 'Time slot must be updated');
+  });
+
+  // ==========================================
+  // SUITE 7: Reviews & Testimonials
+  // ==========================================
+  console.log('\n--- Suite 7: Reviews & Testimonials API ---');
+
+  await runTest('API: Reviews', 'GET /api/reviews and POST /api/reviews manage customer testimonials', async () => {
+    // 1. Fetch initial reviews
+    const getRes = await fetch(`${BASE_URL}/api/reviews`);
+    assertEqual(getRes.status, 200, 'GET /api/reviews should return 200');
+    const getJson = await getRes.json();
+    assert(Array.isArray(getJson), 'Reviews must be an array');
+
+    // 2. Post a new review
+    const postRes = await fetch(`${BASE_URL}/api/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userName: 'Aanya Verma',
+        serviceName: 'Bridal Makeup',
+        rating: 5,
+        comment: 'Absolutely stunning work! Felt like royalty on my special day.',
+        date: '2026-10-22'
+      })
+    });
+    assertEqual(postRes.status, 201, 'POST /api/reviews should return 201');
+    const postJson = await postRes.json();
+    assert(postJson.success === true, 'Posting review should succeed');
+    assert(Boolean(postJson.review?.id), 'Saved review must have an ID');
+
+    // 3. Confirm review is returned in list
+    const verifyRes = await fetch(`${BASE_URL}/api/reviews`);
+    const verifyJson = await verifyRes.json();
+    assert(Array.isArray(verifyJson), 'Verify response must be an array');
+    const found = verifyJson.some((r: any) => r.id === postJson.review.id);
+    assert(found, 'Newly posted review should be returned by GET /api/reviews');
+  });
+
+  // ==========================================
+  // SUITE 8: Dynamic WhatsApp Offer Broadcasting
+  // ==========================================
+  console.log('\n--- Suite 8: Dynamic WhatsApp Offer Broadcasting ---');
+
+  await runTest('API: Offers & WhatsApp Broadcast', 'GET /api/offers/clients-preview dynamically retrieves unique past & present clients', async () => {
+    const res = await fetch(`${BASE_URL}/api/offers/clients-preview`);
+    assertEqual(res.status, 200, 'GET /api/offers/clients-preview should return 200');
+    const json = await res.json();
+    assert(json.success === true, 'Success must be true');
+    assert(typeof json.totalClients === 'number', 'totalClients should be a number');
+    assert(json.totalClients > 0, 'Database should dynamically find existing clients');
+    assert(Array.isArray(json.clients), 'clients should be an array');
+    
+    // Check that every recipient has sanitized phone number (10 digits)
+    json.clients.forEach((c: any) => {
+      assert(c.phone && c.phone.length === 10, `Client ${c.name} phone should be clean 10 digits, got: ${c.phone}`);
+      assert(Boolean(c.name), 'Client must have a name');
+    });
+  });
+
+  await runTest('API: Offers & WhatsApp Broadcast', 'POST /api/offers creates offer, dispatches WhatsApp broadcast with deep links, and cleans up', async () => {
+    // 1. Create a new offer
+    const testCode = `TESTOFFER${Date.now().toString().slice(-4)}`;
+    const createRes = await fetch(`${BASE_URL}/api/offers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: testCode,
+        title: 'Automation Test Festive Glow Special',
+        description: 'Get Flat 25% discount on all premium salon and spa services.',
+        discountPercent: 25,
+        minBookingAmount: 999,
+        validTill: '2026-12-31',
+        active: true
+      })
+    });
+
+    assertEqual(createRes.status, 201, 'POST /api/offers should return 201');
+    const createJson = await createRes.json();
+    assert(createJson.success === true, 'Creation should be successful');
+    assert(Boolean(createJson.offer?.id), 'Created offer must have an ID');
+    assertEqual(createJson.offer.code, testCode, 'Offer code should match');
+
+    // 2. Validate WhatsApp Broadcast payload
+    assert(Boolean(createJson.broadcast), 'Broadcast payload must be returned');
+    assert(createJson.broadcast.totalRecipients > 0, 'Broadcast must have recipients');
+    assert(Boolean(createJson.broadcast.messageText), 'Broadcast must contain formatted promotional message');
+    assert(createJson.broadcast.messageText.includes(testCode), 'Message must include coupon code');
+    assert(createJson.broadcast.messageText.includes('25%'), 'Message must include discount');
+
+    // 3. Validate recipient deep links
+    const firstRecipient = createJson.broadcast.recipients[0];
+    assert(Boolean(firstRecipient.whatsappUrl), 'Recipient must have WhatsApp direct URL');
+    assert(firstRecipient.whatsappUrl.startsWith('https://api.whatsapp.com/send?phone=91'), 'URL must format Indian country code 91');
+    assert(Boolean(firstRecipient.webWhatsappUrl), 'Recipient must have WhatsApp Web URL');
+
+    // 4. Test Re-broadcast of existing offer
+    const rebroadcastRes = await fetch(`${BASE_URL}/api/offers/${createJson.offer.id}/broadcast-whatsapp`, {
+      method: 'POST'
+    });
+    assertEqual(rebroadcastRes.status, 200, 'Re-broadcast endpoint should return 200');
+    const rebroadcastJson = await rebroadcastRes.json();
+    assert(rebroadcastJson.success === true, 'Re-broadcast should succeed');
+    assert(rebroadcastJson.broadcast.offerCode === testCode, 'Broadcast code should match');
+
+    // 5. Test toggle offer active status
+    const toggleRes = await fetch(`${BASE_URL}/api/offers/${createJson.offer.id}/toggle`, {
+      method: 'PATCH'
+    });
+    assertEqual(toggleRes.status, 200, 'Toggle endpoint should return 200');
+    const toggleJson = await toggleRes.json();
+    assertEqual(toggleJson.offer.active, false, 'Offer active state should toggle to false');
+
+    // 6. Clean up the test offer
+    const deleteRes = await fetch(`${BASE_URL}/api/offers/${createJson.offer.id}`, {
+      method: 'DELETE'
+    });
+    assertEqual(deleteRes.status, 200, 'DELETE /api/offers/:id should return 200');
   });
 
   // ==========================================

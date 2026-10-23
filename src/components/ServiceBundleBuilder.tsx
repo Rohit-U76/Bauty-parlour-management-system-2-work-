@@ -55,7 +55,7 @@ export const PREDEFINED_BUNDLES: PredefinedBundlePreset[] = [
     badge: 'Save 20% • Bridal Favorite',
     discountPercent: 20,
     description: 'Complete royal wedding makeover with HD bridal makeup, O3+ facial whitening glow, and hair therapy styling.',
-    serviceIds: ['s1', 's4', 's6'], // Bridal Make Up, O3+ Facial, Hair Spa/Keratin
+    serviceIds: ['srv-wom-1', 'srv-sk-6', 'srv-ch-4'], // Bridal 4D Makeover, O3+ Facial, Hair Spa/Treatment
     imageUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80',
     gender: 'women'
   },
@@ -65,7 +65,7 @@ export const PREDEFINED_BUNDLES: PredefinedBundlePreset[] = [
     badge: 'Save 15% • Trending',
     discountPercent: 15,
     description: 'Deep pore vacuum hydration with customized hair shaping and intense nutritive conditioning.',
-    serviceIds: ['s5', 's7'], // Hydrafacial glow + Advance Hair Cut
+    serviceIds: ['srv-sk-7', 'srv-hr-5'], // Hydrafacial glow + Advance Hair Cut
     imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=600&q=80',
     gender: 'women'
   },
@@ -75,7 +75,7 @@ export const PREDEFINED_BUNDLES: PredefinedBundlePreset[] = [
     badge: "Save 15% • Men's Top Choice",
     discountPercent: 15,
     description: "Precision haircut, luxury beard sculpting spa, and refreshing charcoal d-tan face treatment.",
-    serviceIds: ['s12', 's13', 's14'], // Men haircut, beard spa, D-tan facial
+    serviceIds: ['srv-men-1', 'srv-men-2'], // Men fade & beard sculpt + Charcoal D-tan facial
     imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=600&q=80',
     gender: 'men'
   },
@@ -85,7 +85,7 @@ export const PREDEFINED_BUNDLES: PredefinedBundlePreset[] = [
     badge: 'Save 15% • Frizz-Free',
     discountPercent: 15,
     description: 'Professional protein botox/keratin treatment with customized face-framing layer cut and shine serum blowdry.',
-    serviceIds: ['s10', 's7'], // Keratin treatment + Women Hair Cut
+    serviceIds: ['srv-ch-3', 'srv-hr-5'], // Keratin treatment + Advance Hair Cut
     imageUrl: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=600&q=80',
     gender: 'women'
   },
@@ -95,7 +95,7 @@ export const PREDEFINED_BUNDLES: PredefinedBundlePreset[] = [
     badge: 'Save 18% • Premium',
     discountPercent: 18,
     description: 'Bespoke hand-painted balayage highlights with bond-protecting mask and glam waves.',
-    serviceIds: ['s9', 's6'], // Balayage + Hair spa / treatment
+    serviceIds: ['srv-cl-4', 'srv-ch-4'], // Balayage Color Tech + Hair Treatment Spa & Repair
     imageUrl: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?auto=format&fit=crop&w=600&q=80',
     gender: 'women'
   },
@@ -105,7 +105,7 @@ export const PREDEFINED_BUNDLES: PredefinedBundlePreset[] = [
     badge: 'Save 12% • Event Ready',
     discountPercent: 12,
     description: '3D party makeup with light clean-up exfoliation and elegant hair curling or blowout.',
-    serviceIds: ['s2', 's3'], // 3D Make up + Skin cleanup / O3
+    serviceIds: ['srv-mu-2', 'srv-sk-3'], // HD Make Up + Face Clean Up
     imageUrl: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=600&q=80',
     gender: 'women'
   }

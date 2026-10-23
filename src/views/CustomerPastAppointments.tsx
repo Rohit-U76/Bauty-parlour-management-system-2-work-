@@ -35,6 +35,7 @@ import { AppointmentPassModal } from '../components/AppointmentPassModal';
 import { CustomerFeedbackForm } from '../components/CustomerFeedbackForm';
 import { CustomerProfileView } from '../components/CustomerProfileView';
 import { printSalonReceipt, downloadReceiptFile } from '../utils/receiptPrinter';
+import { getAppointmentReminderInfo, parseAppointmentDateTime } from '../utils/appointmentReminderUtils';
 
 export const CustomerPastAppointments: React.FC = () => {
   const {
@@ -93,11 +94,13 @@ export const CustomerPastAppointments: React.FC = () => {
 
   // Separate upcoming appointments from completed/cancelled for this user
   const upcomingAppointments = useMemo(() => {
-    return userAppointments.filter(apt => {
-      const status = apt.bookingStatus || apt.status;
-      return (status === 'CONFIRMED' || status === 'PENDING') && apt.date >= todayStr;
-    }).sort((a, b) => new Date(`${a.date} ${a.timeSlot}`).getTime() - new Date(`${b.date} ${b.timeSlot}`).getTime());
-  }, [userAppointments, todayStr]);
+    return userAppointments
+      .filter(apt => {
+        const status = apt.bookingStatus || apt.status;
+        return (status === 'CONFIRMED' || status === 'PENDING') && getAppointmentReminderInfo(apt).isUpcoming;
+      })
+      .sort((a, b) => parseAppointmentDateTime(a.date, a.timeSlot).getTime() - parseAppointmentDateTime(b.date, b.timeSlot).getTime());
+  }, [userAppointments]);
 
   // Filtered appointments list for this user
   const filteredAppointments = useMemo(() => {
@@ -107,7 +110,7 @@ export const CustomerPastAppointments: React.FC = () => {
         
         let matchesStatus = true;
         if (statusFilter === 'UPCOMING') {
-          matchesStatus = (status === 'CONFIRMED' || status === 'PENDING') && apt.date >= todayStr;
+          matchesStatus = (status === 'CONFIRMED' || status === 'PENDING') && getAppointmentReminderInfo(apt).isUpcoming;
         } else if (statusFilter === 'CONFIRMED') {
           matchesStatus = status === 'CONFIRMED';
         } else if (statusFilter === 'COMPLETED') {
@@ -169,8 +172,10 @@ export const CustomerPastAppointments: React.FC = () => {
     window.open(`https://wa.me/918104026257?text=${text}`, '_blank');
   };
 
-  const getStatusBadge = (status?: string, aptDate?: string) => {
-    const isUpcoming = aptDate && aptDate >= todayStr && status === 'CONFIRMED';
+  const getStatusBadge = (status?: string, aptDate?: string, aptTimeSlot?: string) => {
+    const isUpcoming = aptDate
+      ? getAppointmentReminderInfo({ date: aptDate, timeSlot: aptTimeSlot, bookingStatus: status } as any).isUpcoming
+      : false;
     
     if (isUpcoming) {
       return (
@@ -613,7 +618,7 @@ export const CustomerPastAppointments: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {filteredAppointments.map(apt => {
                 const status = apt.bookingStatus || apt.status;
-                const isUpcomingSlot = apt.date >= todayStr && status === 'CONFIRMED';
+                const isUpcomingSlot = getAppointmentReminderInfo(apt).isUpcoming;
 
                 return (
                   <div
@@ -646,7 +651,7 @@ export const CustomerPastAppointments: React.FC = () => {
                         </h3>
                       </div>
                       <div className="shrink-0">
-                        {getStatusBadge(status, apt.date)}
+                        {getStatusBadge(status, apt.date, apt.timeSlot)}
                       </div>
                     </div>
 

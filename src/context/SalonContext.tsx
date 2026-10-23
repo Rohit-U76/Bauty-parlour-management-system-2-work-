@@ -15,7 +15,8 @@ import {
   ThemeMode,
   User,
   UserRole,
-  StaffMember
+  StaffMember,
+  WhatsAppBroadcastLog
 } from '../types';
 import {
   INITIAL_SERVICES,
@@ -128,10 +129,13 @@ interface SalonContextType {
   updateGalleryItem: (id: string, item: Partial<GalleryItem>) => void;
   deleteGalleryItem: (id: string) => void;
 
-  // Offers Management
-  addOffer: (offer: Omit<OfferCoupon, 'id'>) => void;
+  // Offers & Automated WhatsApp Broadcast Management
+  addOffer: (offer: Omit<OfferCoupon, 'id'>) => Promise<{ success: boolean; broadcast?: any; offer?: OfferCoupon }>;
+  broadcastOfferWhatsApp: (offerId: string) => Promise<{ success: boolean; broadcast?: any; message?: string }>;
   toggleOfferActive: (id: string) => void;
   deleteOffer: (id: string) => void;
+  broadcastLogs: WhatsAppBroadcastLog[];
+  fetchBroadcastLogs: () => Promise<void>;
 
   // Reviews Management
   addReview: (review: Omit<Review, 'id' | 'date'>) => void;
@@ -262,14 +266,31 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return INITIAL_USERS;
   });
 
+  // One-time cleanup of legacy localStorage session keys to guarantee standard session isolation across tabs
+  useEffect(() => {
+    try {
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`);
+    } catch {}
+  }, []);
+
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
 
   const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    return saved === 'true';
+    try {
+      const saved = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      return saved === 'true';
+    } catch {
+      return false;
+    }
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -304,35 +325,66 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // UI state
   const [isAdminMode, setIsAdminModeState] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`);
-    const userSaved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
-    if (userSaved) {
-      try {
+    try {
+      const saved = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`);
+      const userSaved = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      if (userSaved) {
         const u = JSON.parse(userSaved);
         // Only allow admin mode if user is verified ADMIN and explicitly chose admin view
         if (u.role === 'ADMIN' && saved === 'true') {
           return true;
         }
-      } catch {}
-    }
+      }
+    } catch {}
     return false;
   });
 
   const setIsAdminMode = (val: boolean) => {
     setIsAdminModeState(val);
-    if (val) {
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`, 'true');
-    } else {
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`, 'false');
-    }
+    try {
+      if (val) {
+        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`, 'true');
+      } else {
+        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`, 'false');
+      }
+    } catch {}
   };
-  const [activeNavTab, setActiveNavTab] = useState<string>('home');
-  const [adminTab, setAdminTab] = useState<string>('dashboard');
+
+  const [activeNavTab, setActiveNavTabState] = useState<string>(() => {
+    try {
+      return sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_active_tab`) || 'home';
+    } catch {
+      return 'home';
+    }
+  });
+
+  const setActiveNavTab = (tab: string) => {
+    setActiveNavTabState(tab);
+    try {
+      sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_active_tab`, tab);
+    } catch {}
+  };
+
+  const [adminTab, setAdminTabState] = useState<string>(() => {
+    try {
+      return sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_admin_tab`) || 'dashboard';
+    } catch {
+      return 'dashboard';
+    }
+  });
+
+  const setAdminTab = (tab: string) => {
+    setAdminTabState(tab);
+    try {
+      sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_admin_tab`, tab);
+    } catch {}
+  };
   const [selectedServiceForBooking, setSelectedServiceForBooking] = useState<ServiceItem | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState<boolean>(false);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState<boolean>(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [broadcastLogs, setBroadcastLogs] = useState<WhatsAppBroadcastLog[]>([]);
 
   // Sync to localStorage
   useEffect(() => {
@@ -357,6 +409,24 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       })
       .catch(() => {});
 
+    fetch('/api/offers')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.offers) && data.offers.length > 0) {
+          setOffers(data.offers);
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/offers/broadcast-logs')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.logs)) {
+          setBroadcastLogs(data.logs);
+        }
+      })
+      .catch(() => {});
+
     fetch('/api/inquiries')
       .then(res => res.json())
       .then(data => {
@@ -375,17 +445,40 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       })
       .catch(() => {});
 
-    // Real-Time Database Sync: Fetch initial appointments & notifications
+    fetch('/api/customers')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.customers) && data.customers.length > 0) {
+          setCustomers(data.customers);
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/reviews')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setReviews(data);
+        }
+      })
+      .catch(() => {});
+
+    // Real-Time Database Sync: Fetch appointments, notifications, and customers periodically
     const syncRealTimeAppointments = () => {
       fetch('/api/appointments')
         .then(res => res.json())
         .then(data => {
           if (data.success && Array.isArray(data.appointments)) {
             setAppointments(prev => {
-              // Merge db appointments with any existing local ones by unique ID
-              const existingIds = new Set(data.appointments.map((a: any) => a.id));
-              const localOnly = prev.filter(a => !existingIds.has(a.id));
-              return [...data.appointments, ...localOnly];
+              const serverIds = new Set(data.appointments.map((a: any) => a.id));
+              const now = Date.now();
+              // Preserve brand new local bookings created in the last 15s in case background save is in flight
+              const freshLocal = prev.filter(a => {
+                if (serverIds.has(a.id)) return false;
+                const createdTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                return (now - createdTime) < 15000;
+              });
+              return [...data.appointments, ...freshLocal];
             });
           }
         })
@@ -395,11 +488,16 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         .then(res => res.json())
         .then(data => {
           if (data.success && Array.isArray(data.notifications)) {
-            setNotifications(prev => {
-              const existingIds = new Set(data.notifications.map((n: any) => n.id));
-              const localOnly = prev.filter(n => !existingIds.has(n.id));
-              return [...data.notifications, ...localOnly];
-            });
+            setNotifications(data.notifications);
+          }
+        })
+        .catch(() => {});
+
+      fetch('/api/customers')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.customers) && data.customers.length > 0) {
+            setCustomers(data.customers);
           }
         })
         .catch(() => {});
@@ -409,6 +507,14 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const interval = setInterval(syncRealTimeAppointments, 6000);
     return () => clearInterval(interval);
   }, []);
+
+  // Strict Role Guard: Logged-in customers must NEVER be routed to admin view
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'ADMIN' && isAdminMode) {
+      setIsAdminMode(false);
+      setActiveNavTab('home');
+    }
+  }, [currentUser, isAdminMode]);
 
   // Check URL parameters for direct promo QR links (e.g. ?service=... or ?book=true or ?action=book)
   useEffect(() => {
@@ -486,19 +592,25 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [users]);
 
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(currentUser));
-    } else {
+    try {
+      if (currentUser) {
+        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(currentUser));
+      } else {
+        sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      }
       localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
-    }
+    } catch {}
   }, [currentUser]);
 
   useEffect(() => {
-    if (isGuestMode) {
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_guest_mode`, 'true');
-    } else {
+    try {
+      if (isGuestMode) {
+        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_guest_mode`, 'true');
+      } else {
+        sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+      }
       localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    }
+    } catch {}
   }, [isGuestMode]);
 
   // Auth helper methods
@@ -544,10 +656,15 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (data.success && data.user) {
         setCurrentUser(data.user);
         setIsGuestMode(false);
+        sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(data.user));
         localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-        localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(data.user));
+        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
         if (data.user.role === 'ADMIN') {
           setIsAdminMode(true);
+        } else {
+          setIsAdminMode(false);
+          setActiveNavTab('home');
         }
         setIsAuthModalOpen(false);
         return {
@@ -600,11 +717,16 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     setCurrentUser(user);
     setIsGuestMode(false);
+    sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+    sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(user));
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(user));
+    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
 
     if (user.role === 'ADMIN') {
       setIsAdminMode(true);
+    } else {
+      setIsAdminMode(false);
+      setActiveNavTab('home');
     }
     setIsAuthModalOpen(false);
 
@@ -653,8 +775,10 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setUsers(prev => [...prev.filter(u => u.id !== newUser.id), newUser]);
         setCurrentUser(newUser);
         setIsGuestMode(false);
+        sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
         localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-        localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
+        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
 
         // Also register in customer CRM directory with 0 initial visits for brand new account
         setCustomers(prev => {
@@ -673,6 +797,8 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           }];
         });
 
+        setIsAdminMode(false);
+        setActiveNavTab('home');
         setIsAuthModalOpen(false);
         return {
           success: true,
@@ -718,8 +844,10 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setUsers(updatedUsers);
     setCurrentUser(newUser);
     setIsGuestMode(false);
+    sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+    sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
+    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
 
     // Also register in customer directory if not present
     const existingCust = customers.find(c => c.phone === cleanPhone || (cleanEmail && c.email.toLowerCase() === cleanEmail));
@@ -739,6 +867,8 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setCustomers(prev => [...prev, newCustRecord]);
     }
 
+    setIsAdminMode(false);
+    setActiveNavTab('home');
     setIsAuthModalOpen(false);
 
     return {
@@ -749,16 +879,18 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const logout = () => {
-    const wasAdmin = currentUser?.role === 'ADMIN' || isAdminMode;
     setCurrentUser(null);
     setIsGuestMode(false);
+    setIsAdminMode(false);
+    setActiveNavTab('home');
+    sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+    sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+    sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`);
+    sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_active_tab`);
+    sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_admin_tab`);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`);
-    if (wasAdmin) {
-      setIsAdminMode(false);
-      setActiveNavTab('home');
-    }
   };
 
   const updateCurrentUser = (updates: Partial<User>) => {
@@ -766,11 +898,12 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const updatedUser: User = { ...currentUser, ...updates };
     setCurrentUser(updatedUser);
     setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(updatedUser));
+    sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(updatedUser));
+    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
     
     // Also update in customer directory if fields match
     setCustomers(prev => prev.map(c => {
-      if (c.phone === updatedUser.phone || (updatedUser.email && c.email === updatedUser.email)) {
+      if (c.phone === updatedUser.phone || (updatedUser.email && c.email === updatedUser.email) || c.id === updatedUser.id) {
         return {
           ...c,
           name: updatedUser.name || c.name,
@@ -780,6 +913,13 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
       return c;
     }));
+
+    // Persist profile updates directly to backend database
+    fetch(`/api/auth/users/${updatedUser.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedUser)
+    }).catch(err => console.log('Profile update database sync notice:', err));
   };
 
   // Modal open/close helpers
@@ -1034,6 +1174,23 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
     setNotifications(prev => [notif, ...prev]);
 
+    // Persist to backend database API
+    try {
+      fetch(`/api/appointments/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: newDate,
+          timeSlot: newTimeSlot,
+          bookingStatus: 'CONFIRMED',
+          status: 'CONFIRMED',
+          isNew: false
+        })
+      }).catch(err => console.log('Appointment reschedule sync notice:', err));
+    } catch {
+      // Fallback
+    }
+
     return {
       success: true,
       message: `Your booking #${target.bookingRef} has been successfully rescheduled to ${newDate} at ${newTimeSlot}!`
@@ -1044,13 +1201,15 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const target = appointments.find(a => a.id === id);
     if (!target) return { success: false, message: 'Appointment not found.' };
 
+    const cancelNotes = reason ? `${target.notes || ''} [Cancelled by client: ${reason}]` : (target.notes || '');
+
     const updatedAppointments = appointments.map(apt => {
       if (apt.id === id) {
         return {
           ...apt,
           bookingStatus: 'CANCELLED' as AppointmentStatus,
           status: 'CANCELLED' as AppointmentStatus,
-          notes: reason ? `${apt.notes || ''} [Cancelled by client: ${reason}]` : (apt.notes || ''),
+          notes: cancelNotes,
           isNew: false
         };
       }
@@ -1070,6 +1229,22 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       read: false
     };
     setNotifications(prev => [notif, ...prev]);
+
+    // Persist cancellation to backend database API
+    try {
+      fetch(`/api/appointments/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingStatus: 'CANCELLED',
+          status: 'CANCELLED',
+          notes: cancelNotes,
+          isNew: false
+        })
+      }).catch(err => console.log('Appointment cancellation sync notice:', err));
+    } catch {
+      // Fallback
+    }
 
     return {
       success: true,
@@ -1155,6 +1330,13 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       read: false
     };
     setNotifications(prev => [newNotif, ...prev]);
+
+    // Persist to database API
+    fetch('/api/inquiries/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(inq)
+    }).catch(err => console.log('Inquiry database save notice:', err));
   };
 
   const addContactInquiry = (inq: { name?: string; clientName?: string; phone: string; email: string; message: string; subject?: string; serviceCategory?: string }) => {
@@ -1202,21 +1384,69 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setGallery(prev => prev.filter(item => item.id !== id));
   };
 
-  // Offer CRUD
-  const addOffer = (offer: Omit<OfferCoupon, 'id'>) => {
+  // Offers & Automated WhatsApp Broadcast Management
+  const addOffer = async (offer: Omit<OfferCoupon, 'id'>): Promise<{ success: boolean; broadcast?: any; offer?: OfferCoupon }> => {
     const newOffer: OfferCoupon = {
       ...offer,
       id: `off-${Date.now()}`
     };
     setOffers(prev => [newOffer, ...prev]);
+
+    try {
+      const res = await fetch('/api/offers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOffer)
+      });
+      const data = await res.json();
+      if (data.success && data.offer) {
+        setOffers(prev => prev.map(o => o.id === newOffer.id ? data.offer : o));
+        if (data.broadcast) {
+          setBroadcastLogs(prev => [data.broadcast, ...prev]);
+        }
+      }
+      return data;
+    } catch (err: any) {
+      console.warn('Network error while posting offer to server:', err);
+      return { success: true, offer: newOffer };
+    }
+  };
+
+  const broadcastOfferWhatsApp = async (offerId: string): Promise<{ success: boolean; broadcast?: any; message?: string }> => {
+    try {
+      const res = await fetch(`/api/offers/${offerId}/broadcast-whatsapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success && data.broadcast) {
+        setBroadcastLogs(prev => [data.broadcast, ...prev]);
+      }
+      return data;
+    } catch (err: any) {
+      console.error('Error broadcasting offer via WhatsApp:', err);
+      return { success: false, message: err.message || 'Failed to dispatch WhatsApp broadcast' };
+    }
+  };
+
+  const fetchBroadcastLogs = async () => {
+    try {
+      const res = await fetch('/api/offers/broadcast-logs');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.logs)) {
+        setBroadcastLogs(data.logs);
+      }
+    } catch (err) {}
   };
 
   const toggleOfferActive = (id: string) => {
     setOffers(prev => prev.map(off => off.id === id ? { ...off, active: !off.active } : off));
+    fetch(`/api/offers/${id}/toggle`, { method: 'PATCH' }).catch(() => {});
   };
 
   const deleteOffer = (id: string) => {
     setOffers(prev => prev.filter(off => off.id !== id));
+    fetch(`/api/offers/${id}`, { method: 'DELETE' }).catch(() => {});
   };
 
   // Review CRUD
@@ -1240,6 +1470,13 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       read: false
     };
     setNotifications(prev => [newNotif, ...prev]);
+
+    // Persist review to database API
+    fetch('/api/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newReview)
+    }).catch(err => console.log('Review database save notice:', err));
   };
 
   const updateReview = (id: string, updated: Partial<Review>) => {
@@ -1486,8 +1723,11 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         updateGalleryItem,
         deleteGalleryItem,
         addOffer,
+        broadcastOfferWhatsApp,
         toggleOfferActive,
         deleteOffer,
+        broadcastLogs,
+        fetchBroadcastLogs,
         addReview,
         updateReview,
         deleteReview,

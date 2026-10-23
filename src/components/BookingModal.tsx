@@ -52,7 +52,7 @@ export const BookingModal: React.FC = () => {
   const [selectedTier, setSelectedTier] = useState<PriceTierVariant | null>(null);
   const [selectedStylist, setSelectedStylist] = useState<string>('Self-Employed (Master Stylist & Founder)');
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('11:00 AM');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('11:45 AM');
   
   // Client details
   const [clientName, setClientName] = useState<string>('');
@@ -79,24 +79,11 @@ export const BookingModal: React.FC = () => {
     'Certified Hair & Chemical Treatment Expert'
   ];
 
-  // Time slots
-  const timeSlots = [
-    '09:30 AM',
-    '10:30 AM',
-    '11:45 AM',
-    '01:30 PM',
-    '02:45 PM',
-    '04:00 PM',
-    '05:30 PM',
-    '06:45 PM',
-    '07:30 PM'
-  ];
-
   const resetBookingForm = (targetService?: ServiceItem | null) => {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
     setSelectedDate(dateStr);
-    setSelectedTimeSlot('11:00 AM');
+    setSelectedTimeSlot('11:45 AM');
     setSelectedStylist('Self-Employed (Master Stylist & Founder)');
     const srv = targetService !== undefined ? targetService : (selectedServiceForBooking || services[0] || null);
     setSelectedService(srv);
@@ -256,6 +243,7 @@ export const BookingModal: React.FC = () => {
       });
 
       setConfirmedBooking(created);
+      setShowPassModal(true);
       setStep(4);
     } catch (e) {
       console.error(e);

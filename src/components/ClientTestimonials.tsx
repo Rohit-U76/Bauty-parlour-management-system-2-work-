@@ -108,7 +108,7 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
     return () => { isMounted = false; };
   }, []);
 
-  const allReviews = reviews;
+  const allReviews = (apiFetchedReviews && apiFetchedReviews.length > 0) ? apiFetchedReviews : reviews;
 
   // Filter and Sort Reviews
   const filteredReviews = useMemo(() => {

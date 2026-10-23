@@ -136,6 +136,31 @@ export interface OfferCoupon {
   validTill: string;
   description: string;
   active: boolean;
+  expiryDate?: string;
+}
+
+export interface WhatsAppBroadcastRecipient {
+  id: string;
+  name: string;
+  phone: string;
+  formattedPhone: string;
+  whatsappUrl: string;
+  webWhatsappUrl: string;
+  status: 'QUEUED' | 'SENT' | 'FAILED';
+  source: 'customer' | 'appointment' | 'user';
+}
+
+export interface WhatsAppBroadcastLog {
+  id: string;
+  offerId: string;
+  offerCode: string;
+  offerTitle: string;
+  discountPercent?: number;
+  discountAmount?: number;
+  dispatchedAt: string;
+  totalRecipients: number;
+  messageText: string;
+  recipients: WhatsAppBroadcastRecipient[];
 }
 
 export type OfferItem = OfferCoupon;

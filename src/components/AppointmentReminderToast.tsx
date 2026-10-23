@@ -23,12 +23,13 @@ import { Appointment } from '../types';
 import {
   getAppointmentReminderInfo,
   generateGoogleCalendarUrl,
-  playLuxuryNotificationChime
+  playLuxuryNotificationChime,
+  parseAppointmentDateTime
 } from '../utils/appointmentReminderUtils';
 import { AppointmentPassModal } from './AppointmentPassModal';
 
 export const AppointmentReminderToast: React.FC = () => {
-  const { appointments, settings } = useSalon();
+  const { appointments, settings, currentUser } = useSalon();
 
   // State
   const [activeToastIndex, setActiveToastIndex] = useState<number>(0);
@@ -39,17 +40,78 @@ export const AppointmentReminderToast: React.FC = () => {
   const [selectedPassAppointment, setSelectedPassAppointment] = useState<Appointment | null>(null);
   const [manualTriggerAppointmentId, setManualTriggerAppointmentId] = useState<string | null>(null);
   const [hasPlayedChime, setHasPlayedChime] = useState<boolean>(false);
+  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
 
-  // Find all upcoming appointments within 24 hours (or tomorrow/today)
+  // Periodically update reference time every 30s so reminders dynamically stay accurate
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Find all upcoming appointments for the active user (today, tomorrow, or future dates)
   const upcomingReminders = useMemo(() => {
-    return appointments.filter(apt => {
+    const list = currentUser?.role === 'ADMIN'
+      ? appointments
+      : appointments.filter(apt => {
+          if (!currentUser) return false;
+          if (apt.userId) return apt.userId === currentUser.id;
+          const userPhoneClean = (currentUser.phone || '').replace(/\D/g, '').slice(-10);
+          const userEmailClean = (currentUser.email || '').trim().toLowerCase();
+          const userNameClean = (currentUser.name || '').trim().toLowerCase();
+          if (userPhoneClean && userPhoneClean.length === 10) {
+            const aptPhoneClean = (apt.clientPhone || '').replace(/\D/g, '').slice(-10);
+            const aptEmailClean = (apt.clientEmail || '').trim().toLowerCase();
+            const aptNameClean = (apt.clientName || '').trim().toLowerCase();
+            if (aptPhoneClean === userPhoneClean) {
+              if (aptEmailClean && userEmailClean && aptEmailClean === userEmailClean) return true;
+              if (aptNameClean && userNameClean && aptNameClean === userNameClean) return true;
+            }
+          }
+          return false;
+        });
+
+    const filtered = list.filter(apt => {
       if (manualTriggerAppointmentId && apt.id === manualTriggerAppointmentId) {
         return true;
       }
-      const info = getAppointmentReminderInfo(apt);
-      return info.isUpcoming24h;
+      const info = getAppointmentReminderInfo(apt, currentTime);
+      // Include only genuinely upcoming appointments (not passed ones)
+      return info.isUpcoming;
     });
-  }, [appointments, manualTriggerAppointmentId]);
+
+    // Sort chronologically by appointment date and time
+    return filtered.sort((a, b) => {
+      const timeA = parseAppointmentDateTime(a.date, a.timeSlot).getTime();
+      const timeB = parseAppointmentDateTime(b.date, b.timeSlot).getTime();
+      return timeA - timeB;
+    });
+  }, [appointments, currentUser, manualTriggerAppointmentId, currentTime]);
+
+  // Keep activeToastIndex safely within bounds
+  useEffect(() => {
+    if (upcomingReminders.length > 0 && activeToastIndex >= upcomingReminders.length) {
+      setActiveToastIndex(0);
+    }
+  }, [upcomingReminders.length, activeToastIndex]);
+
+  // Auto-switch focus to newly booked appointment
+  const prevAptCountRef = React.useRef(appointments.length);
+  useEffect(() => {
+    if (appointments.length > prevAptCountRef.current) {
+      const newestApt = appointments[0];
+      if (newestApt) {
+        const foundIdx = upcomingReminders.findIndex(a => a.id === newestApt.id);
+        if (foundIdx !== -1) {
+          setActiveToastIndex(foundIdx);
+          setIsDismissed(false);
+          setSnoozeUntil(null);
+        }
+      }
+    }
+    prevAptCountRef.current = appointments.length;
+  }, [appointments, upcomingReminders]);
 
   // Active appointment to show in the toast
   const activeAppointment: Appointment | undefined =
@@ -57,8 +119,8 @@ export const AppointmentReminderToast: React.FC = () => {
 
   const reminderInfo = useMemo(() => {
     if (!activeAppointment) return null;
-    return getAppointmentReminderInfo(activeAppointment);
-  }, [activeAppointment]);
+    return getAppointmentReminderInfo(activeAppointment, currentTime);
+  }, [activeAppointment, currentTime]);
 
   // Check snooze state
   const isSnoozed = snoozeUntil !== null && Date.now() < snoozeUntil;
@@ -226,11 +288,11 @@ export const AppointmentReminderToast: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-amber-400 bg-purple-50 dark:bg-amber-500/10 border border-purple-200 dark:border-amber-500/30 px-2 py-0.5 rounded-full">
-                      ⏰ 24-Hour Salon Reminder
+                      {reminderInfo.badgeLabel}
                     </span>
                   </div>
                   <h4 className="font-serif text-sm font-bold text-zinc-900 dark:text-zinc-100 mt-0.5">
-                    Upcoming Appointment Tomorrow
+                    {reminderInfo.headingLabel}
                   </h4>
                 </div>
               </div>
@@ -271,7 +333,7 @@ export const AppointmentReminderToast: React.FC = () => {
               {/* Client Greeting & Service Info */}
               <div>
                 <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  Dear <strong className="text-purple-700 dark:text-yellow-400 font-semibold">{activeAppointment.clientName}</strong>, this is a friendly reminder that your salon session is scheduled in <strong className="text-purple-900 dark:text-yellow-300 font-bold">{reminderInfo.timeLabel}</strong>.
+                  Dear <strong className="text-purple-700 dark:text-yellow-400 font-semibold">{activeAppointment.clientName}</strong>, this is a friendly reminder that your salon session {reminderInfo.relativeScheduleText}.
                 </p>
               </div>
 

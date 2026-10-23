@@ -47,4 +47,13 @@ public class InquiryController {
             return ResponseEntity.ok(inquiryRepository.save(inq));
         }).orElse(ResponseEntity.notFound().build());
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteInquiry(@PathVariable String id) {
+        if (!inquiryRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        inquiryRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Consultation inquiry deleted successfully", "deletedId", id));
+    }
 }

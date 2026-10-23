@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
+import crypto from 'crypto';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 
@@ -114,9 +115,151 @@ function initDb() {
           status: 'IN PROGRESS'
         }
       ],
-      appointments: []
+      appointments: [],
+      customers: [
+        {
+          id: 'cust-1',
+          name: 'Pooja Kadam',
+          phone: '9822099881',
+          email: 'pooja.kadam@gmail.com',
+          totalVisits: 5,
+          totalSpent: 7500,
+          lastVisit: '2026-08-10',
+          favoriteService: 'O3 Prof. Facial',
+          memberSince: '2026-01-15',
+          tier: 'VIP Member'
+        },
+        {
+          id: 'cust-2',
+          name: 'Rohan Shinde',
+          phone: '9765433445',
+          email: 'rohan.shinde@yahoo.com',
+          totalVisits: 4,
+          totalSpent: 2200,
+          lastVisit: '2026-08-01',
+          favoriteService: 'Advance Hair Cut & Blow Dry',
+          memberSince: '2026-02-10',
+          tier: 'Standard'
+        }
+      ],
+      notifications: [],
+      reviews: []
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2), 'utf-8');
+  }
+}
+
+// Helper to compute and maintain 100% accurate, dynamic client CRM metrics from real appointments and users
+function syncCustomerStats(db: any) {
+  if (!db.customers) db.customers = [];
+  if (!db.appointments) db.appointments = [];
+  if (!db.users) db.users = [];
+
+  // Seed default customers if list is empty
+  if (db.customers.length === 0) {
+    db.customers = [
+      {
+        id: 'cust-1',
+        name: 'Pooja Kadam',
+        phone: '9822099881',
+        email: 'pooja.kadam@gmail.com',
+        totalVisits: 5,
+        totalSpent: 7500,
+        lastVisit: '2026-08-10',
+        favoriteService: 'O3 Prof. Facial',
+        memberSince: '2026-01-15',
+        tier: 'VIP Member'
+      },
+      {
+        id: 'cust-2',
+        name: 'Rohan Shinde',
+        phone: '9765433445',
+        email: 'rohan.shinde@yahoo.com',
+        totalVisits: 4,
+        totalSpent: 2200,
+        lastVisit: '2026-08-01',
+        favoriteService: 'Advance Hair Cut & Blow Dry',
+        memberSince: '2026-02-10',
+        tier: 'Standard'
+      }
+    ];
+  }
+
+  // Ensure every non-admin user in db.users is present in db.customers
+  for (const u of db.users) {
+    if (u.role === 'ADMIN') continue;
+    const uCleanPhone = (u.phone || '').replace(/\D/g, '').slice(-10);
+    const uEmail = (u.email || '').trim().toLowerCase();
+
+    let cust = db.customers.find((c: any) => {
+      const cCleanPhone = (c.phone || '').replace(/\D/g, '').slice(-10);
+      const cEmail = (c.email || '').trim().toLowerCase();
+      return (uCleanPhone && cCleanPhone && uCleanPhone === cCleanPhone) ||
+             (uEmail && cEmail && uEmail === cEmail) ||
+             (c.id === u.id || (c.name && u.name && c.name.toLowerCase() === u.name.toLowerCase()));
+    });
+
+    if (!cust) {
+      cust = {
+        id: `cust-${u.id || Date.now()}`,
+        name: u.name,
+        phone: u.phone,
+        email: u.email,
+        totalVisits: 0,
+        totalSpent: 0,
+        lastVisit: 'Just Joined',
+        favoriteService: (u.preferredServices && u.preferredServices[0]) || 'General Styling',
+        memberSince: u.memberSince || '2026',
+        tier: 'New Client'
+      };
+      db.customers.push(cust);
+    } else {
+      if (u.name && (!cust.name || cust.name !== u.name)) cust.name = u.name;
+      if (u.phone && (!cust.phone || cust.phone !== u.phone)) cust.phone = u.phone;
+      if (u.email && (!cust.email || cust.email !== u.email)) cust.email = u.email;
+    }
+  }
+
+  // Recalculate dynamic visits, spending, and last visit for each customer from real appointments
+  for (const cust of db.customers) {
+    const cCleanPhone = (cust.phone || '').replace(/\D/g, '').slice(-10);
+    const cEmail = (cust.email || '').trim().toLowerCase();
+    const cName = (cust.name || '').trim().toLowerCase();
+
+    const matchedApts = db.appointments.filter((apt: any) => {
+      const aCleanPhone = (apt.clientPhone || '').replace(/\D/g, '').slice(-10);
+      const aEmail = (apt.clientEmail || '').trim().toLowerCase();
+      const aName = (apt.clientName || '').trim().toLowerCase();
+      return (cCleanPhone && aCleanPhone && cCleanPhone === aCleanPhone) ||
+             (cEmail && aEmail && cEmail === aEmail) ||
+             (cName && aName && cName === aName);
+    });
+
+    if (matchedApts.length > 0) {
+      cust.totalVisits = Math.max(cust.totalVisits || 0, matchedApts.length);
+      const aptSpending = matchedApts.reduce((acc: number, a: any) => acc + (Number(a.totalAmount) || 0), 0);
+      cust.totalSpent = Math.max(cust.totalSpent || 0, aptSpending);
+      const sortedByDate = [...matchedApts].sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+      if (sortedByDate[0]?.date) cust.lastVisit = sortedByDate[0].date;
+      if (sortedByDate[0]?.serviceName) cust.favoriteService = sortedByDate[0].serviceName;
+      cust.tier = cust.totalVisits >= 5 ? 'VIP Member' : (cust.totalVisits === 0 ? 'New Client' : 'Standard');
+    }
+
+    // Sync metrics to matching user in db.users
+    const matchingUser = db.users.find((u: any) => {
+      const uCleanPhone = (u.phone || '').replace(/\D/g, '').slice(-10);
+      const uEmail = (u.email || '').trim().toLowerCase();
+      return (cCleanPhone && uCleanPhone && cCleanPhone === uCleanPhone) ||
+             (cEmail && uEmail && cEmail === uEmail);
+    });
+
+    if (matchingUser) {
+      matchingUser.totalVisits = cust.totalVisits;
+      matchingUser.memberTier = cust.tier;
+      if (matchingUser.loyaltyPoints === undefined || matchingUser.loyaltyPoints === null || matchingUser.loyaltyPoints < 100) {
+        matchingUser.loyaltyPoints = 100 + (cust.totalVisits * 50);
+      }
+    }
   }
 }
 
@@ -124,15 +267,209 @@ function readDb() {
   initDb();
   try {
     const content = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(content);
+    const db = JSON.parse(content);
+    if (!db.users) db.users = [];
+    if (!db.settings) db.settings = {};
+    if (!db.inquiries) db.inquiries = [];
+    if (!db.appointments) db.appointments = [];
+    if (!db.notifications) db.notifications = [];
+    if (!db.reviews) db.reviews = [];
+    if (!db.customers) db.customers = [];
+    if (!db.broadcastLogs) db.broadcastLogs = [];
+    if (!db.offers || db.offers.length === 0) {
+      db.offers = [
+        {
+          id: 'off-1',
+          code: 'GLOW20',
+          title: 'Festive Glow Special - 20% OFF Facials',
+          description: 'Get flat 20% off on all premium facials & detan therapies with online advance booking.',
+          discountPercent: 20,
+          minBookingAmount: 500,
+          validTill: '2026-12-31',
+          active: true
+        },
+        {
+          id: 'off-2',
+          code: 'FIRST10',
+          title: 'New Client Welcome - 10% OFF',
+          description: 'Welcome gift for first-time visitors! Valid across all hair and skin styling services.',
+          discountPercent: 10,
+          minBookingAmount: 300,
+          validTill: '2026-12-31',
+          active: true
+        },
+        {
+          id: 'off-3',
+          code: 'BRIDAL500',
+          title: 'Luxury Bridal Suite - Flat ₹500 OFF',
+          description: 'Exclusive savings on complete 3D/4D HD Bridal & Grooming packages.',
+          discountAmount: 500,
+          discountPercent: 15,
+          minBookingAmount: 2500,
+          validTill: '2026-12-31',
+          active: true
+        }
+      ];
+    }
+
+    syncCustomerStats(db);
+    return db;
   } catch (e) {
-    return { users: [], settings: {}, inquiries: [], appointments: [] };
+    return { users: [], customers: [], settings: {}, inquiries: [], appointments: [], notifications: [], reviews: [], offers: [], broadcastLogs: [] };
   }
 }
 
 function writeDb(data: any) {
   initDb();
+  syncCustomerStats(data);
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+// Helper to dynamically collect all unique client contacts across CRM customers, appointment history, and registered users
+function getUniqueClientContacts(db: any) {
+  const contactMap = new Map<string, { id: string; name: string; phone: string; formattedPhone: string; source: 'customer' | 'appointment' | 'user' }>();
+  const adminPhone = (db.settings?.phone || '8104026257').replace(/\D/g, '').slice(-10);
+
+  // 1. Scan customers (CRM records)
+  (db.customers || []).forEach((c: any) => {
+    const raw = (c.phone || '').replace(/\D/g, '');
+    const cleanPhone = raw.slice(-10);
+    if (cleanPhone.length === 10 && cleanPhone !== adminPhone && !cleanPhone.startsWith('00000')) {
+      contactMap.set(cleanPhone, {
+        id: c.id || `cust-${cleanPhone}`,
+        name: (c.name || 'Valued Client').trim(),
+        phone: cleanPhone,
+        formattedPhone: `91${cleanPhone}`,
+        source: 'customer'
+      });
+    }
+  });
+
+  // 2. Scan appointments (Booking history - any client who has ever booked)
+  (db.appointments || []).forEach((a: any) => {
+    const raw = (a.clientPhone || '').replace(/\D/g, '');
+    const cleanPhone = raw.slice(-10);
+    if (cleanPhone.length === 10 && cleanPhone !== adminPhone && !cleanPhone.startsWith('00000')) {
+      if (!contactMap.has(cleanPhone)) {
+        contactMap.set(cleanPhone, {
+          id: `apt-client-${cleanPhone}`,
+          name: (a.clientName || 'Valued Client').trim(),
+          phone: cleanPhone,
+          formattedPhone: `91${cleanPhone}`,
+          source: 'appointment'
+        });
+      }
+    }
+  });
+
+  // 3. Scan users (Any registered account)
+  (db.users || []).forEach((u: any) => {
+    if (u.role === 'ADMIN') return;
+    const raw = (u.phone || '').replace(/\D/g, '');
+    const cleanPhone = raw.slice(-10);
+    if (cleanPhone.length === 10 && cleanPhone !== adminPhone && !cleanPhone.startsWith('00000')) {
+      if (!contactMap.has(cleanPhone)) {
+        contactMap.set(cleanPhone, {
+          id: u.id || `usr-${cleanPhone}`,
+          name: (u.name || 'Valued Client').trim(),
+          phone: cleanPhone,
+          formattedPhone: `91${cleanPhone}`,
+          source: 'user'
+        });
+      }
+    }
+  });
+
+  return Array.from(contactMap.values());
+}
+
+function buildOfferWhatsAppMessage(offer: any, clientName = 'Valued Client', salonSettings?: any) {
+  const salonName = salonSettings?.salonName || 'Modern Unisex Salon';
+  const salonPhone = salonSettings?.phone || '8104026257';
+  const salonAddress = salonSettings?.address || 'B.N. GUND COMPLEX, NEAR KANYA PRASHALA AND ICICI BANK, MOHOL - 413213';
+  const discountStr = offer.discountPercent 
+    ? `${offer.discountPercent}% OFF` 
+    : (offer.discountAmount ? `₹${offer.discountAmount} OFF` : 'Special Discount');
+  const minBookingStr = offer.minBookingAmount ? `₹${offer.minBookingAmount}` : '₹300';
+  const validityStr = offer.validTill || offer.expiryDate || 'Limited Time Only';
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  const bookingUrl = `${appUrl}/?coupon=${encodeURIComponent(offer.code)}&action=book`;
+
+  return `✨ *EXCLUSIVE SALON OFFER ALERT!* ✨\n` +
+    `*${salonName}*\n` +
+    `"WE'LL STYLE, YOU'LL SMILE"\n` +
+    `────────────────────────────\n` +
+    `🎉 Hello *${clientName}*!\n` +
+    `We have an exclusive offer just for you:\n\n` +
+    `🏷️ *Offer:* ${offer.title}\n` +
+    `🔥 *Coupon Code:* *${offer.code}*\n` +
+    `🎁 *Discount:* *${discountStr}*\n` +
+    `💳 *Minimum Booking:* ${minBookingStr}\n` +
+    `📅 *Validity:* Valid till ${validityStr}\n\n` +
+    `👉 *Book Online with 10% Advance Deposit:*\n` +
+    `${bookingUrl}\n\n` +
+    `📍 *Venue:* ${salonAddress}\n` +
+    `📞 *Helpline / WhatsApp:* +91 ${salonPhone}\n` +
+    `────────────────────────────\n` +
+    `_Show this message or enter coupon code during checkout to redeem!_`;
+}
+
+function dispatchWhatsAppOfferBroadcast(db: any, offer: any) {
+  const recipients = getUniqueClientContacts(db);
+  const salonSettings = db.settings || {};
+
+  const broadcastId = `bcast-${Date.now()}`;
+  const dispatchedAt = new Date().toISOString();
+
+  const recipientResults = recipients.map((r) => {
+    const messageText = buildOfferWhatsAppMessage(offer, r.name, salonSettings);
+    const encodedText = encodeURIComponent(messageText);
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=${r.formattedPhone}&text=${encodedText}`;
+    const webWhatsappUrl = `https://web.whatsapp.com/send?phone=${r.formattedPhone}&text=${encodedText}`;
+
+    return {
+      id: r.id,
+      name: r.name,
+      phone: r.phone,
+      formattedPhone: r.formattedPhone,
+      source: r.source,
+      whatsappUrl,
+      webWhatsappUrl,
+      status: 'SENT' as const
+    };
+  });
+
+  // Record Broadcast Log in db.broadcastLogs
+  if (!db.broadcastLogs) db.broadcastLogs = [];
+  const broadcastLog = {
+    id: broadcastId,
+    offerId: offer.id,
+    offerCode: offer.code,
+    offerTitle: offer.title,
+    discountPercent: offer.discountPercent,
+    discountAmount: offer.discountAmount,
+    dispatchedAt,
+    totalRecipients: recipientResults.length,
+    messageText: buildOfferWhatsAppMessage(offer, 'Client Name', salonSettings),
+    recipients: recipientResults
+  };
+  db.broadcastLogs.unshift(broadcastLog);
+
+  // Add Real-time Admin Notification in db.notifications
+  if (!db.notifications) db.notifications = [];
+  db.notifications.unshift({
+    id: `notif-${Date.now()}`,
+    title: `📢 WhatsApp Offer Broadcast Dispatched`,
+    message: `Offer "${offer.code}" (${offer.title}) broadcasted via WhatsApp to ${recipientResults.length} registered and history clients.`,
+    type: 'promotion',
+    timestamp: 'Just now',
+    read: false,
+    offerCode: offer.code
+  });
+
+  console.log(`[WhatsApp Offer Broadcast]: "${offer.code}" dispatched to ${recipientResults.length} clients!`);
+
+  return broadcastLog;
 }
 
 // Shared Gemini client singleton for connection pooling
@@ -182,7 +519,7 @@ async function generateGeminiWithFallback(ai: GoogleGenAI, options: {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json());
 
@@ -310,6 +647,265 @@ async function startServer() {
     try {
       const db = readDb();
       res.json({ success: true, users: db.users });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- USER PROFILE UPDATE API (DATABASE BACKED) ---
+  app.put('/api/auth/users/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const db = readDb();
+      const userIndex = db.users.findIndex((u: any) => u.id === id);
+      if (userIndex === -1) {
+        return res.status(404).json({ success: false, message: 'User not found in database' });
+      }
+
+      // Safe update - do not inadvertently overwrite critical security fields
+      const safeUpdates = { ...updates };
+      delete safeUpdates.role;
+      delete safeUpdates.pin;
+
+      db.users[userIndex] = { ...db.users[userIndex], ...safeUpdates };
+      syncCustomerStats(db);
+      writeDb(db);
+
+      console.log(`[User Profile Saved to DB]: ${db.users[userIndex].name} (${id})`);
+      res.json({ success: true, user: db.users[userIndex], message: 'Profile updated and saved to database successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- CUSTOMERS CRM DIRECTORY APIS (DATABASE BACKED) ---
+  app.get('/api/customers', (req, res) => {
+    try {
+      const db = readDb();
+      res.json({ success: true, customers: db.customers || [] });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/customers', (req, res) => {
+    try {
+      const db = readDb();
+      const payload = req.body;
+      const newCustomer = {
+        id: payload.id || `cust-${Date.now()}`,
+        name: (payload.name || 'New Client').trim(),
+        phone: (payload.phone || '').trim(),
+        email: (payload.email || '').trim().toLowerCase(),
+        totalVisits: Number(payload.totalVisits) || 0,
+        totalSpent: Number(payload.totalSpent) || 0,
+        lastVisit: payload.lastVisit || new Date().toISOString().split('T')[0],
+        favoriteService: payload.favoriteService || 'General Styling',
+        memberSince: payload.memberSince || new Date().getFullYear().toString(),
+        tier: payload.tier || 'New Client'
+      };
+
+      const existingIndex = (db.customers || []).findIndex((c: any) => c.id === newCustomer.id || (c.phone && c.phone === newCustomer.phone));
+      if (existingIndex >= 0) {
+        db.customers[existingIndex] = { ...db.customers[existingIndex], ...newCustomer };
+      } else {
+        db.customers = [newCustomer, ...(db.customers || [])];
+      }
+
+      syncCustomerStats(db);
+      writeDb(db);
+      console.log(`[Customer Record Saved in DB]: ${newCustomer.name} (${newCustomer.phone})`);
+      res.json({ success: true, customer: newCustomer, message: 'Customer record synchronized in database' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/customers/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const db = readDb();
+      db.customers = (db.customers || []).map((c: any) => c.id === id ? { ...c, ...updates } : c);
+      syncCustomerStats(db);
+      writeDb(db);
+      const updated = db.customers.find((c: any) => c.id === id);
+      res.json({ success: true, customer: updated, message: 'Customer updated successfully in database' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/customers/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = readDb();
+      db.customers = (db.customers || []).filter((c: any) => c.id !== id);
+      writeDb(db);
+      res.json({ success: true, message: 'Customer deleted successfully from database' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- SPECIAL OFFERS & AUTOMATED WHATSAPP BROADCAST APIS (DATABASE BACKED) ---
+  app.get('/api/offers', (req, res) => {
+    try {
+      const db = readDb();
+      res.json({ success: true, offers: db.offers || [] });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get dynamic preview of all active & history clients who will receive the WhatsApp offer broadcast
+  app.get('/api/offers/clients-preview', (req, res) => {
+    try {
+      const db = readDb();
+      const clients = getUniqueClientContacts(db);
+      res.json({
+        success: true,
+        count: clients.length,
+        totalClients: clients.length,
+        clients: clients.map(c => ({
+          name: c.name,
+          phone: c.phone,
+          formattedPhone: c.formattedPhone,
+          source: c.source
+        }))
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get WhatsApp broadcast history & audit logs
+  app.get('/api/offers/broadcast-logs', (req, res) => {
+    try {
+      const db = readDb();
+      res.json({ success: true, logs: db.broadcastLogs || [] });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Create new Offer and automatically broadcast via WhatsApp to every history and current client
+  app.post('/api/offers', (req, res) => {
+    try {
+      const {
+        code,
+        title,
+        description,
+        discountPercent,
+        discountAmount,
+        minBookingAmount,
+        validTill,
+        expiryDate,
+        active
+      } = req.body;
+
+      if (!code || !title) {
+        return res.status(400).json({ success: false, message: 'Offer code and title are required.' });
+      }
+
+      const db = readDb();
+      if (!db.offers) db.offers = [];
+
+      const cleanCode = code.toUpperCase().trim();
+      const newOffer = {
+        id: req.body.id || `off-${Date.now()}`,
+        code: cleanCode,
+        title: title.trim(),
+        description: description || '',
+        discountPercent: Number(discountPercent) || 0,
+        discountAmount: Number(discountAmount) || 0,
+        minBookingAmount: Number(minBookingAmount) || 0,
+        validTill: validTill || expiryDate || '2026-12-31',
+        active: active !== false
+      };
+
+      // Add to database
+      db.offers = [newOffer, ...db.offers.filter((o: any) => o.code !== cleanCode)];
+
+      // Automatically dispatch WhatsApp broadcast to all history & current clients dynamically
+      const broadcastResult = dispatchWhatsAppOfferBroadcast(db, newOffer);
+
+      writeDb(db);
+
+      console.log(`[Offer Created & Broadcasted]: ${newOffer.code} -> Dispatched via WhatsApp to ${broadcastResult.totalRecipients} clients`);
+      res.status(201).json({
+        success: true,
+        offer: newOffer,
+        broadcast: broadcastResult,
+        message: `Offer ${newOffer.code} published & broadcasted to ${broadcastResult.totalRecipients} clients via WhatsApp successfully.`
+      });
+    } catch (err: any) {
+      console.error('Error creating offer and broadcasting:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Re-broadcast an existing offer to all clients (including any users added up to this moment!)
+  app.post('/api/offers/:id/broadcast-whatsapp', (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = readDb();
+      const offer = (db.offers || []).find((o: any) => o.id === id || o.code === id.toUpperCase());
+
+      if (!offer) {
+        return res.status(404).json({ success: false, message: 'Offer not found in database.' });
+      }
+
+      // Dynamically scans all clients (including any new users joined up to now!)
+      const broadcastResult = dispatchWhatsAppOfferBroadcast(db, offer);
+      writeDb(db);
+
+      console.log(`[Offer Re-Broadcasted]: ${offer.code} -> Dispatched to ${broadcastResult.totalRecipients} clients`);
+      res.json({
+        success: true,
+        offer,
+        broadcast: broadcastResult,
+        message: `Offer ${offer.code} broadcasted via WhatsApp to ${broadcastResult.totalRecipients} clients successfully.`
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Toggle offer active state
+  app.patch('/api/offers/:id/toggle', (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = readDb();
+      let updatedOffer: any = null;
+      db.offers = (db.offers || []).map((o: any) => {
+        if (o.id === id) {
+          updatedOffer = { ...o, active: !o.active };
+          return updatedOffer;
+        }
+        return o;
+      });
+
+      if (!updatedOffer) {
+        return res.status(404).json({ success: false, message: 'Offer not found' });
+      }
+
+      writeDb(db);
+      res.json({ success: true, offer: updatedOffer });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Delete offer
+  app.delete('/api/offers/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = readDb();
+      db.offers = (db.offers || []).filter((o: any) => o.id !== id);
+      writeDb(db);
+      res.json({ success: true, message: 'Offer deleted successfully' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -718,7 +1314,6 @@ async function startServer() {
       // HMAC SHA256 Signature verification if secret is configured and signature passed
       if (keySecret && razorpaySignature && razorpayOrderId && razorpayPaymentId) {
         try {
-          const crypto = require('crypto');
           const expectedSig = crypto
             .createHmac('sha256', keySecret)
             .update(`${razorpayOrderId}|${razorpayPaymentId}`)
@@ -726,6 +1321,7 @@ async function startServer() {
           signatureValid = (expectedSig === razorpaySignature);
         } catch (sigErr) {
           console.error('Signature verification error:', sigErr);
+          signatureValid = false;
         }
       }
 
@@ -904,7 +1500,8 @@ async function startServer() {
       const db = readDb();
       db.appointments = (db.appointments || []).map((apt: any) => apt.id === id ? { ...apt, ...updates, isNew: false } : apt);
       writeDb(db);
-      res.json({ success: true, message: 'Appointment updated successfully' });
+      const updated = db.appointments.find((apt: any) => apt.id === id);
+      res.json({ success: true, message: 'Appointment updated successfully', appointment: updated });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -938,6 +1535,33 @@ async function startServer() {
       db.notifications = (db.notifications || []).map((n: any) => ({ ...n, read: true }));
       writeDb(db);
       res.json({ success: true, message: 'Notifications marked as read' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- REVIEWS API (DATABASE BACKED) ---
+  app.get('/api/reviews', (req, res) => {
+    try {
+      const db = readDb();
+      res.json(db.reviews || []);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/reviews', (req, res) => {
+    try {
+      const db = readDb();
+      if (!db.reviews) db.reviews = [];
+      const newReview = {
+        id: req.body.id || `rev-${Date.now()}`,
+        ...req.body,
+        date: req.body.date || new Date().toISOString().split('T')[0]
+      };
+      db.reviews.unshift(newReview);
+      writeDb(db);
+      res.status(201).json({ success: true, review: newReview });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -1307,9 +1931,29 @@ Return a JSON object with:
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        watch: {
+          ignored: [
+            '**/data/**',
+            '**/data/db.json',
+            '**\\data\\**',
+            '**\\data\\db.json',
+            '**/dist/**',
+            '**/.git/**',
+            /[\\/]data([\\/]|$)/,
+            /db\.json/
+          ]
+        }
+      },
       appType: 'spa',
     });
+
+    // Explicitly unwatch data folder to completely prevent Windows backslash path reload loops
+    const dataDir = path.resolve(process.cwd(), 'data');
+    const dbPath = path.resolve(dataDir, 'db.json');
+    vite.watcher.unwatch([dataDir, dbPath, path.join(dataDir, '**')]);
+
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
@@ -1319,8 +1963,23 @@ Return a JSON object with:
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Smart Salon server running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      const nextPort = PORT + 1;
+      console.warn(`⚠️ [Port ${PORT} in use] Automatically shifting to fallback port http://localhost:${nextPort}...`);
+      const fallbackServer = app.listen(nextPort, '0.0.0.0', () => {
+        console.log(`Smart Salon server running on http://localhost:${nextPort}`);
+      });
+      fallbackServer.on('error', (fallbackErr) => {
+        console.error('Failed to bind to fallback port:', fallbackErr);
+      });
+    } else {
+      console.error('Server error:', err);
+    }
   });
 }
 

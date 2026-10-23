@@ -53,15 +53,18 @@ import {
   AlertCircle,
   Receipt,
   Printer,
-  Compass
+  Compass,
+  Radio,
+  Send
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
-import { ServiceItem, Appointment, GalleryItem, OfferCoupon, AppointmentStatus, StaffMember } from '../types';
+import { ServiceItem, Appointment, GalleryItem, OfferCoupon, AppointmentStatus, StaffMember, WhatsAppBroadcastLog } from '../types';
 import { AdminCharts } from '../components/AdminCharts';
 import { AdminReviewsTrends } from '../components/AdminReviewsTrends';
 import { AdminSmsEmailHubModal } from '../components/AdminSmsEmailHubModal';
 import { AdminTermsPolicies } from '../components/AdminTermsPolicies';
 import { ReceiptModal } from '../components/ReceiptModal';
+import { AdminOfferBroadcastModal } from '../components/AdminOfferBroadcastModal';
 
 export const AdminSuite: React.FC = () => {
   const {
@@ -84,6 +87,8 @@ export const AdminSuite: React.FC = () => {
     updateGalleryItem,
     deleteGalleryItem,
     addOffer,
+    broadcastOfferWhatsApp,
+    toggleOfferActive,
     deleteOffer,
     updateAppointmentStatus,
     deleteAppointment,
@@ -115,6 +120,10 @@ export const AdminSuite: React.FC = () => {
   const [editingGalleryItem, setEditingGalleryItem] = useState<GalleryItem | null>(null);
 
   const [showAddOfferModal, setShowAddOfferModal] = useState(false);
+  const [broadcastOffer, setBroadcastOffer] = useState<OfferCoupon | null>(null);
+  const [broadcastResult, setBroadcastResult] = useState<WhatsAppBroadcastLog | null>(null);
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [isBroadcastingOffer, setIsBroadcastingOffer] = useState(false);
   const [showSmsHubModal, setShowSmsHubModal] = useState(false);
   const [selectedAppForMessaging, setSelectedAppForMessaging] = useState<Appointment | null>(null);
 
@@ -385,23 +394,45 @@ export const AdminSuite: React.FC = () => {
     setEditingGalleryItem(null);
   };
 
-  const handleCreateOffer = (e: React.FormEvent) => {
+  const handleCreateOffer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newOfferCode || !newOfferTitle) return;
 
-    addOffer({
+    setIsBroadcastingOffer(true);
+    const offerPayload = {
       code: newOfferCode.toUpperCase().trim(),
-      title: newOfferTitle,
-      description: newOfferDesc,
-      discountPercent: Number(newOfferDiscount),
-      minBookingAmount: Number(newOfferMin),
-      expiryDate: '2026-12-31',
+      title: newOfferTitle.trim(),
+      description: newOfferDesc || 'Special promotional discount for our valued salon clients.',
+      discountPercent: Number(newOfferDiscount) || 0,
+      minBookingAmount: Number(newOfferMin) || 0,
+      validTill: '2026-12-31',
       active: true
-    });
+    };
+
+    const res = await addOffer(offerPayload);
+    setIsBroadcastingOffer(false);
 
     setShowAddOfferModal(false);
     setNewOfferCode('');
     setNewOfferTitle('');
+    setNewOfferDesc('');
+
+    if (res && res.broadcast) {
+      setBroadcastOffer(res.offer || { id: `off-${Date.now()}`, ...offerPayload });
+      setBroadcastResult(res.broadcast);
+      setIsBroadcastModalOpen(true);
+    }
+  };
+
+  const handleBroadcastExistingOffer = async (offer: OfferCoupon) => {
+    setIsBroadcastingOffer(true);
+    const res = await broadcastOfferWhatsApp(offer.id);
+    setIsBroadcastingOffer(false);
+    if (res && res.broadcast) {
+      setBroadcastOffer(offer);
+      setBroadcastResult(res.broadcast);
+      setIsBroadcastModalOpen(true);
+    }
   };
 
   const filteredAppointments = appointments.filter(a => {
@@ -1420,14 +1451,29 @@ export const AdminSuite: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {offers.map(offer => (
-                  <div key={offer.id} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-3">
+                  <div key={offer.id} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-3.5 hover:border-zinc-700 transition">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-base font-bold text-amber-400 bg-zinc-950 px-2.5 py-1 rounded-lg border border-amber-500/30">
-                        {offer.code}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-base font-bold text-amber-400 bg-zinc-950 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                          {offer.code}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => toggleOfferActive(offer.id)}
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold border transition cursor-pointer ${
+                            offer.active !== false
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                              : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700'
+                          }`}
+                          title="Click to toggle active status"
+                        >
+                          {offer.active !== false ? '● Active' : '○ Inactive'}
+                        </button>
+                      </div>
                       <button
                         onClick={() => deleteOffer(offer.id)}
-                        className="text-zinc-500 hover:text-red-400"
+                        className="text-zinc-500 hover:text-red-400 p-1 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
+                        title="Delete offer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -1441,6 +1487,18 @@ export const AdminSuite: React.FC = () => {
                     <div className="pt-2 border-t border-zinc-800 text-[11px] text-zinc-400 flex justify-between">
                       <span>Discount: {offer.discountPercent ? `${offer.discountPercent}%` : `₹${offer.discountAmount}`}</span>
                       <span>Min Booking: ₹{offer.minBookingAmount}</span>
+                    </div>
+
+                    <div className="pt-2 border-t border-zinc-800/80">
+                      <button
+                        type="button"
+                        onClick={() => handleBroadcastExistingOffer(offer)}
+                        disabled={isBroadcastingOffer}
+                        className="w-full py-2 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-sm disabled:opacity-50"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Broadcast to All via WhatsApp</span>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -2838,6 +2896,16 @@ export const AdminSuite: React.FC = () => {
                   className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
                 />
               </div>
+              <div>
+                <label className="text-zinc-300 block mb-1">Description (Promotional Message)</label>
+                <textarea
+                  rows={2}
+                  value={newOfferDesc}
+                  onChange={(e) => setNewOfferDesc(e.target.value)}
+                  placeholder="e.g. Enjoy 20% OFF on all hair styling & facial packages this week!"
+                  className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white placeholder-zinc-600 resize-none"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-zinc-300 block mb-1">Discount (%)</label>
@@ -2858,11 +2926,34 @@ export const AdminSuite: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* WhatsApp Broadcast Notice */}
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Dynamic WhatsApp Broadcast</span>
+                </div>
+                <p className="text-zinc-400 leading-relaxed text-[11px]">
+                  When published, personalized WhatsApp promo messages with 1-click booking links are dynamically prepared for all salon clients!
+                </p>
+              </div>
+
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs cursor-pointer"
+                disabled={isBroadcastingOffer}
+                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                Publish Coupon
+                {isBroadcastingOffer ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Publishing & Preparing Broadcast...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Publish & Broadcast via WhatsApp</span>
+                  </>
+                )}
               </button>
             </form>
           </div>
@@ -3205,6 +3296,14 @@ export const AdminSuite: React.FC = () => {
           appointment={receiptAppointment}
         />
       )}
+
+      {/* ADMIN WHATSAPP OFFER BROADCAST MODAL */}
+      <AdminOfferBroadcastModal
+        isOpen={isBroadcastModalOpen}
+        onClose={() => setIsBroadcastModalOpen(false)}
+        offer={broadcastOffer}
+        broadcastResult={broadcastResult}
+      />
 
       {/* Floating Action Feedback Toast */}
       {actionFeedbackToast && (
