@@ -235,7 +235,8 @@ export interface User {
   password?: string;
   pin?: string;
   avatarUrl?: string;
-  memberTier?: 'Standard' | 'VIP Member' | 'New Client';
+  googleId?: string;
+  memberTier?: 'Standard' | 'VIP Member' | 'New Client' | 'Silver VIP' | 'Owner Admin';
   loyaltyPoints?: number;
   totalVisits?: number;
   memberSince?: string;

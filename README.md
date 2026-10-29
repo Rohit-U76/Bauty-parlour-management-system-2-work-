@@ -23,8 +23,18 @@ The application will start automatically at:
 
 *(Note: If port 3000 is occupied by another application, the server will automatically fall back to `http://localhost:3001` without crashing!)*
 
-### 3. Verify Health & Tests
-To run the automated 22-test validation suite:
+### 3. Database Migration & Status (MySQL)
+To run or re-sync the full database migration to MySQL:
+```bash
+npm run db:migrate
+```
+To inspect live MySQL table records and connection health:
+```bash
+npm run db:status
+```
+
+### 4. Verify Health & Tests
+To run the automated 24-test validation suite:
 ```bash
 npm test
 ```
@@ -41,7 +51,14 @@ npm run check
 | :--- | :--- | :--- | :--- |
 | **Salon Owner (Admin)** | Quick PIN: `9999` *(or Phone: `8104026257`)* | Admin PIN: `9999` *(or `admin`)* | Full admin control, appointments, CRM, billing, & broadcasts |
 | **Registered Client** | `9822012345` | `password123` | Priya Sharma (VIP Member) |
+| **Sign in with Google** | Any Google Account | One-click OAuth | Instant profile creation + 100 bonus loyalty points |
 | **New Client Registration** | Any 10-digit mobile number | Any chosen password | Instant account creation + 100 bonus loyalty points |
+
+---
+
+## 📖 Production Deployment Guide
+
+For complete production server setup, MySQL database export/import, and client handover instructions, refer to **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)**.
 
 ---
 
@@ -74,10 +91,12 @@ npm run check
 - Supports online 10% advance deposit via Razorpay with fallback UPI QR code generation (`NPCI UPI deep links`).
 - Salon owner UPI VPA configurable in Salon Settings.
 
-### 7. 🛡️ System Robustness & Stability
+### 7. 🛡️ System Robustness & Database Engine
+- Native MySQL 8.0+ relational persistence layer with automated migration tools (`npm run db:migrate`).
+- Resilient fallback to local JSON database (`data/db.json`) during offline development.
 - Cross-platform LF line-ending normalization via `.gitattributes`.
-- Vite file-watcher exclusions for database writes (`data/db.json`) preventing reload flickers.
-- In-memory database persistence with clean JSON schema.
+- Vite file-watcher exclusions for database writes preventing reload flickers.
+- Google OAuth 2.0 and Owner PIN terminal authentication.
 
 ---
 
@@ -86,14 +105,18 @@ npm run check
 ```text
 ├── src/
 │   ├── components/            # UI components (Modals, Passes, Reminders, Bundles, Broadcasts)
-│   ├── context/               # SalonContext state management
+│   ├── context/               # SalonContext state management & Google Auth
+│   ├── db/                    # MySQL connection pooling & relational queries (mysql.ts)
 │   ├── utils/                 # Time-slot, availability, & reminder calculations
 │   └── views/                 # Customer and Admin views
-├── server.ts                  # Express backend with Vite integration & REST APIs
-├── data/                      # Local JSON persistence database
-├── backend-java/              # Spring Boot backend controller (optional enterprise mode)
-├── scripts/                   # Automated test scripts (npm test)
-└── GIT_WORKFLOW.md            # Guidelines for conflict-free Git collaboration
+├── server.ts                  # Express backend with MySQL integration & REST APIs
+├── schema.sql                 # Complete MySQL schema & all migrated records
+├── data/
+│   ├── db.json                # Local JSON snapshot
+│   └── mysql-dump.sql         # Production MySQL SQL dump for one-click import
+├── backend-java/              # Spring Boot backend with MySQL configuration
+├── scripts/                   # Automated test scripts & database migration tools
+└── DEPLOYMENT_GUIDE.md        # Comprehensive production deployment & client handover guide
 ```
 
 ---

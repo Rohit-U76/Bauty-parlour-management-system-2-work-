@@ -8,7 +8,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Relational Database Store Helper (MySQL-compatible persistence file)
+import {
+  initMySQLPool,
+  loadDbFromMySQL,
+  getMySQLStatus,
+  isMySQLConnected,
+  saveUserToMySQL,
+  saveCustomerToMySQL,
+  saveAppointmentToMySQL,
+  saveSettingsToMySQL,
+  saveReviewToMySQL,
+  saveInquiryToMySQL,
+  deleteInquiryFromMySQL
+} from './src/db/mysql';
+
+// Relational Database Store Helper (MySQL Primary with Resilient Local Snapshot)
 const DB_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_DIR, 'db.json');
 
@@ -537,14 +551,37 @@ async function generateGeminiWithFallback(ai: GoogleGenAI, options: {
 }
 
 async function startServer() {
+  // Initialize MySQL Relational Database Layer
+  await initMySQLPool();
+  try {
+    const mysqlState = await loadDbFromMySQL();
+    if (mysqlState && mysqlState.users && mysqlState.users.length > 0) {
+      writeDb(mysqlState);
+      console.log('🌟 [MySQL Database]: Successfully synchronized latest salon state from MySQL.');
+    }
+  } catch (err: any) {
+    console.warn('[MySQL Initial Sync Warning]:', err.message);
+  }
+
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json());
 
-  // Health check endpoint
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', service: 'Smart Salon Backend & Payment API' });
+  // Health check endpoint with database status
+  app.get('/api/health', async (req, res) => {
+    const dbStatus = await getMySQLStatus();
+    res.json({
+      status: 'ok',
+      service: 'Smart Salon Backend & Payment API',
+      database: dbStatus
+    });
+  });
+
+  // Dedicated DB status endpoint for production verification
+  app.get('/api/db/status', async (req, res) => {
+    const dbStatus = await getMySQLStatus();
+    res.json(dbStatus);
   });
 
   // --- AUTHENTICATION & USER REGISTRATION APIs (DATABASE BACKED) ---
@@ -662,6 +699,94 @@ async function startServer() {
     }
   });
 
+  // --- GOOGLE OAUTH / ONE-TAP SIGN IN API (DATABASE & MYSQL BACKED) ---
+  app.post('/api/auth/google', async (req, res) => {
+    try {
+      const { credential, profile } = req.body;
+      let email = '';
+      let name = '';
+      let avatarUrl = '';
+      let googleId = '';
+
+      if (profile && profile.email) {
+        email = profile.email.toLowerCase().trim();
+        name = profile.name || email.split('@')[0];
+        avatarUrl = profile.picture || '';
+        googleId = profile.sub || `g_${Date.now()}`;
+      } else if (credential) {
+        // Decode JWT payload (standard base64url decode of token payload)
+        try {
+          const parts = credential.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+            email = (payload.email || '').toLowerCase().trim();
+            name = payload.name || payload.given_name || email.split('@')[0];
+            avatarUrl = payload.picture || '';
+            googleId = payload.sub || '';
+          }
+        } catch (e) {
+          console.warn('Could not parse Google credential JWT:', e);
+        }
+      }
+
+      if (!email) {
+        return res.status(400).json({ success: false, message: 'Google account email could not be verified.' });
+      }
+
+      const db = readDb();
+      let user = db.users.find((u: any) => 
+        (u.email && u.email.toLowerCase() === email) || 
+        (googleId && u.googleId === googleId)
+      );
+
+      let isNewUser = false;
+      if (!user) {
+        // Create new customer account with bonus loyalty points
+        const cleanUsername = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_');
+        user = {
+          id: `usr-google-${Date.now()}`,
+          name: name || 'Google User',
+          username: cleanUsername,
+          email: email,
+          phone: '',
+          role: 'CUSTOMER',
+          memberTier: 'Silver VIP',
+          loyaltyPoints: 100, // 100 reward points bonus on registration
+          totalVisits: 0,
+          memberSince: new Date().getFullYear().toString(),
+          preferredServices: [],
+          avatarUrl: avatarUrl,
+          googleId: googleId,
+          password: `google_oauth_${googleId || Date.now()}`
+        };
+        db.users.push(user);
+        isNewUser = true;
+        console.log(`[Google Auth - New User Created]: ${user.name} (${user.email})`);
+      } else {
+        if (googleId && !user.googleId) user.googleId = googleId;
+        if (avatarUrl && !user.avatarUrl) user.avatarUrl = avatarUrl;
+        console.log(`[Google Auth - Existing User Login]: ${user.name} (${user.email})`);
+      }
+
+      writeDb(db);
+      if (isMySQLConnected()) {
+        await saveUserToMySQL(user);
+      }
+
+      return res.json({
+        success: true,
+        user,
+        isNewUser,
+        message: isNewUser
+          ? `Welcome to Modern Unisex Salon, ${user.name}! 100 reward points credited to your account.`
+          : `Welcome back, ${user.name}! Signed in with Google.`
+      });
+    } catch (err: any) {
+      console.error('Error during Google authentication:', err);
+      res.status(500).json({ success: false, message: 'Google sign-in failed due to server error' });
+    }
+  });
+
   app.get('/api/auth/users', (req, res) => {
     try {
       const db = readDb();
@@ -671,13 +796,26 @@ async function startServer() {
     }
   });
 
-  // --- USER PROFILE UPDATE API (DATABASE BACKED) ---
-  app.put('/api/auth/users/:id', (req, res) => {
+  // --- USER PROFILE UPDATE API (DATABASE & MYSQL BACKED) ---
+  app.put('/api/auth/users/:id', async (req, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;
       const db = readDb();
-      const userIndex = db.users.findIndex((u: any) => u.id === id);
+      let userIndex = db.users.findIndex((u: any) => u.id === id);
+      
+      // Resilient Fallback: If ID differs (e.g. session vs custom id), match by phone or email
+      if (userIndex === -1 && updates) {
+        const cleanPhone = (updates.phone || '').replace(/[^0-9]/g, '');
+        const cleanEmail = (updates.email || '').toLowerCase().trim();
+        userIndex = db.users.findIndex((u: any) => {
+          const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
+          const uEmail = (u.email || '').toLowerCase().trim();
+          return (cleanPhone && uPhone && cleanPhone === uPhone) ||
+                 (cleanEmail && uEmail && cleanEmail === uEmail);
+        });
+      }
+
       if (userIndex === -1) {
         return res.status(404).json({ success: false, message: 'User not found in database' });
       }
@@ -687,13 +825,45 @@ async function startServer() {
       delete safeUpdates.role;
       delete safeUpdates.pin;
 
-      db.users[userIndex] = { ...db.users[userIndex], ...safeUpdates };
+      const updatedUser = { ...db.users[userIndex], ...safeUpdates };
+      db.users[userIndex] = updatedUser;
+
+      // Also sync customer in CRM list
+      const cleanPhone = (updatedUser.phone || '').replace(/[^0-9]/g, '');
+      const cleanEmail = (updatedUser.email || '').toLowerCase().trim();
+      const custIndex = (db.customers || []).findIndex((c: any) => {
+        const cPhone = (c.phone || '').replace(/[^0-9]/g, '');
+        const cEmail = (c.email || '').toLowerCase().trim();
+        return c.id === updatedUser.id || (cleanPhone && cPhone && cleanPhone === cPhone) || (cleanEmail && cEmail && cleanEmail === cEmail);
+      });
+
+      let updatedCust: any = null;
+      if (custIndex >= 0) {
+        db.customers[custIndex] = {
+          ...db.customers[custIndex],
+          name: updatedUser.name || db.customers[custIndex].name,
+          phone: updatedUser.phone || db.customers[custIndex].phone,
+          email: updatedUser.email || db.customers[custIndex].email,
+          favoriteService: (updatedUser.preferredServices && updatedUser.preferredServices[0]) || db.customers[custIndex].favoriteService
+        };
+        updatedCust = db.customers[custIndex];
+      }
+
       syncCustomerStats(db);
       writeDb(db);
 
-      console.log(`[User Profile Saved to DB]: ${db.users[userIndex].name} (${id})`);
-      res.json({ success: true, user: db.users[userIndex], message: 'Profile updated and saved to database successfully' });
+      // Persist directly to MySQL relational database
+      if (isMySQLConnected()) {
+        await saveUserToMySQL(updatedUser);
+        if (updatedCust) {
+          await saveCustomerToMySQL(updatedCust);
+        }
+      }
+
+      console.log(`[User Profile Saved to DB & MySQL]: ${updatedUser.name} (${updatedUser.id})`);
+      res.json({ success: true, user: updatedUser, message: 'Profile updated and saved to database successfully' });
     } catch (err: any) {
+      console.error('Error saving user profile:', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
@@ -708,7 +878,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/customers', (req, res) => {
+  app.post('/api/customers', async (req, res) => {
     try {
       const db = readDb();
       const payload = req.body;
@@ -734,14 +904,19 @@ async function startServer() {
 
       syncCustomerStats(db);
       writeDb(db);
-      console.log(`[Customer Record Saved in DB]: ${newCustomer.name} (${newCustomer.phone})`);
+
+      if (isMySQLConnected()) {
+        await saveCustomerToMySQL(newCustomer);
+      }
+
+      console.log(`[Customer Record Saved in DB & MySQL]: ${newCustomer.name} (${newCustomer.phone})`);
       res.json({ success: true, customer: newCustomer, message: 'Customer record synchronized in database' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  app.put('/api/customers/:id', (req, res) => {
+  app.put('/api/customers/:id', async (req, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -750,6 +925,11 @@ async function startServer() {
       syncCustomerStats(db);
       writeDb(db);
       const updated = db.customers.find((c: any) => c.id === id);
+
+      if (updated && isMySQLConnected()) {
+        await saveCustomerToMySQL(updated);
+      }
+
       res.json({ success: true, customer: updated, message: 'Customer updated successfully in database' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });

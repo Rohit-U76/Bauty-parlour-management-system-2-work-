@@ -217,6 +217,36 @@ async function runSuite() {
     assert(json.success === false, 'Success should be false for duplicate');
   });
 
+  await runTest('API: Auth', 'POST /api/auth/google handles Google OAuth sign-in and credits 100 points', async () => {
+    const testGoogleEmail = `google_tester_${Date.now()}@gmail.com`;
+    const res = await fetch(`${BASE_URL}/api/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profile: {
+          email: testGoogleEmail,
+          name: 'Google Test Client',
+          picture: 'https://lh3.googleusercontent.com/test-avatar',
+          sub: `google_test_${Date.now()}`
+        }
+      })
+    });
+    assertEqual(res.status, 200, 'Google sign-in responds with 200 OK');
+    const json = await res.json();
+    assert(json.success === true, 'Google auth should succeed');
+    assert(json.user?.email === testGoogleEmail, 'User email matches Google profile');
+    assertEqual(json.user?.loyaltyPoints, 100, 'New Google user gets 100 bonus loyalty points');
+    assertEqual(json.user?.role, 'CUSTOMER', 'New Google user has CUSTOMER role');
+  });
+
+  await runTest('API: Database', 'GET /api/db/status returns database connectivity and table stats', async () => {
+    const res = await fetch(`${BASE_URL}/api/db/status`);
+    assertEqual(res.status, 200, 'Database status responds with 200 OK');
+    const json = await res.json();
+    assert(json.type !== undefined, 'Database type must be returned');
+    assert(json.connected !== undefined, 'Connection status boolean must be returned');
+  });
+
   await runTest('API: Settings', 'GET and PUT /api/settings manages salon configurations', async () => {
     const getRes = await fetch(`${BASE_URL}/api/settings`);
     assertEqual(getRes.status, 200, 'GET /api/settings should return 200');

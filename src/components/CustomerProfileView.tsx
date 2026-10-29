@@ -38,6 +38,8 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
 
   const [isEditing, setIsEditing] = useState(true);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedNotice, setSavedNotice] = useState('');
   const [guestSuccessMsg, setGuestSuccessMsg] = useState('');
 
   // Client profile form data
@@ -109,39 +111,48 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
       return;
     }
 
-    if (currentUser) {
-      updateCurrentUser({
-        name: formData.name.trim(),
-        phone: formData.phone.trim(),
-        email: formData.email.trim(),
-        gender: formData.gender,
-        birthDate: formData.birthDate,
-        anniversaryDate: formData.anniversaryDate,
-        preferredStylist: formData.preferredStylist,
-        skinOrHairType: formData.skinOrHairType,
-        specialNotes: formData.specialNotes,
-        address: formData.address,
-        city: formData.city,
-        emergencyContact: formData.emergencyContact,
-        allergies: formData.allergies,
-        preferredSlot: formData.preferredSlot,
-        preferredServices: formData.skinOrHairType ? [formData.skinOrHairType] : []
-      });
-      setProfileSaved(true);
-      setTimeout(() => setProfileSaved(false), 3500);
-    } else {
-      // Guest registering directly from profile view
-      const res = await registerCustomer({
-        name: formData.name.trim(),
-        phone: formData.phone.trim(),
-        email: formData.email.trim() || `${formData.name.toLowerCase().replace(/\s+/g, '')}@example.com`,
-        preferredServices: formData.skinOrHairType ? [formData.skinOrHairType] : []
-      });
-      if (res.success) {
-        setGuestSuccessMsg('Profile created successfully! You are now signed in with 100 Welcome Points.');
+    setIsSaving(true);
+    try {
+      if (currentUser) {
+        const res = await updateCurrentUser({
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          email: formData.email.trim(),
+          gender: formData.gender,
+          birthDate: formData.birthDate,
+          anniversaryDate: formData.anniversaryDate,
+          preferredStylist: formData.preferredStylist,
+          skinOrHairType: formData.skinOrHairType,
+          specialNotes: formData.specialNotes,
+          address: formData.address,
+          city: formData.city,
+          emergencyContact: formData.emergencyContact,
+          allergies: formData.allergies,
+          preferredSlot: formData.preferredSlot,
+          preferredServices: formData.skinOrHairType ? [formData.skinOrHairType] : []
+        });
+        setIsSaving(false);
+        setSavedNotice(res.message || 'Profile saved and synchronized with database!');
         setProfileSaved(true);
-        setTimeout(() => setProfileSaved(false), 3500);
+        setTimeout(() => setProfileSaved(false), 4000);
+      } else {
+        // Guest registering directly from profile view
+        const res = await registerCustomer({
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          email: formData.email.trim() || `${formData.name.toLowerCase().replace(/\s+/g, '')}@example.com`,
+          preferredServices: formData.skinOrHairType ? [formData.skinOrHairType] : []
+        });
+        setIsSaving(false);
+        if (res.success) {
+          setGuestSuccessMsg('Profile created successfully! You are now signed in with 100 Welcome Points.');
+          setProfileSaved(true);
+          setTimeout(() => setProfileSaved(false), 4000);
+        }
       }
+    } catch (err: any) {
+      setIsSaving(false);
+      alert('Failed to save profile. Please check connection and try again.');
     }
   };
 
@@ -232,15 +243,44 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
 
       {/* Success Notification Banner */}
       {profileSaved && (
-        <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center gap-2.5 shadow-sm animate-in fade-in duration-200">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span>{guestSuccessMsg || 'Client profile and styling preferences updated successfully!'}</span>
+        <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center justify-between gap-3 shadow-md animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>{savedNotice || guestSuccessMsg || 'Client profile and styling preferences updated & synchronized with MySQL database successfully!'}</span>
+          </div>
+          <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">✓ Saved</span>
         </div>
       )}
 
       {/* Main Profile Form */}
       <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm">
         <form onSubmit={handleSaveProfile} className="space-y-6">
+          {/* Top Quick-Save Bar */}
+          <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800 gap-3">
+            <div>
+              <h2 className="text-base font-serif font-bold text-zinc-900 dark:text-white">Customer Profile &amp; Preferences</h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Keep personal, skin, and styling details updated for personalized salon sessions.</p>
+            </div>
+            <button
+              id="btn-top-save-client-profile"
+              type="submit"
+              disabled={isSaving}
+              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-purple-600/20 transition cursor-pointer shrink-0"
+            >
+              {isSaving ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Changes</span>
+                </>
+              )}
+            </button>
+          </div>
+
           {/* Section 1: Contact & Personal Details */}
           <div className="space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400 flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800">

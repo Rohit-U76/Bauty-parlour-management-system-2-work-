@@ -85,6 +85,7 @@ interface SalonContextType {
 
   // Actions
   login: (usernameOrEmailOrPhone: string, passwordOrPin: string, role?: UserRole) => Promise<{ success: boolean; message: string; user?: User }>;
+  loginWithGoogle: (googleCredentialOrProfile: any) => Promise<{ success: boolean; message: string; user?: User }>;
   registerCustomer: (data: { name: string; username?: string; email: string; phone: string; password?: string; preferredServices?: string[] }) => Promise<{ success: boolean; message: string; user?: User }>;
   logout: () => void;
   openAuthModal: (initialTab?: 'customer' | 'admin', mode?: 'login' | 'register') => void;
@@ -102,8 +103,7 @@ interface SalonContextType {
   closeQuizModal: () => void;
   toggleAiChat: () => void;
   toggleAiWidget: () => void;
-  closeAiChat: () => void;
-  updateCurrentUser: (updates: Partial<User>) => void;
+  updateCurrentUser: (updates: Partial<User>) => Promise<{ success: boolean; user?: User; message?: string }>;
 
   // Booking & Razorpay
   createAppointment: (payload: BookingPayload) => Promise<Appointment>;
@@ -266,22 +266,16 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return INITIAL_USERS;
   });
 
-  // One-time cleanup of legacy localStorage session keys to guarantee standard session isolation across tabs
-  useEffect(() => {
-    try {
-      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
-      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`);
-    } catch {}
-  }, []);
-
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
-      const saved = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
-      return saved ? JSON.parse(saved) : null;
+      const sessionUser = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      if (sessionUser) return JSON.parse(sessionUser);
+      const localUser = localStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      if (localUser) return JSON.parse(localUser);
     } catch {
       return null;
     }
+    return null;
   });
 
   const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
@@ -441,6 +435,21 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       .then(data => {
         if (data.success && Array.isArray(data.users) && data.users.length > 0) {
           setUsers(data.users);
+          setCurrentUser(prev => {
+            if (!prev) return prev;
+            const fresh = data.users.find((u: any) => 
+              u.id === prev.id || 
+              (u.phone && prev.phone && u.phone === prev.phone) || 
+              (u.email && prev.email && u.email === prev.email)
+            );
+            if (fresh) {
+              const merged = { ...prev, ...fresh };
+              sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(merged));
+              localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(merged));
+              return merged;
+            }
+            return prev;
+          });
         }
       })
       .catch(() => {});
@@ -743,6 +752,72 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   };
 
+  const loginWithGoogle = async (
+    googleCredentialOrProfile: any
+  ): Promise<{ success: boolean; message: string; user?: User }> => {
+    try {
+      const payload = typeof googleCredentialOrProfile === 'string'
+        ? { credential: googleCredentialOrProfile }
+        : googleCredentialOrProfile;
+
+      const response = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        setIsGuestMode(false);
+        sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(data.user));
+        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
+        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+
+        if (data.user.role === 'ADMIN') {
+          setIsAdminMode(true);
+        } else {
+          setIsAdminMode(false);
+          setActiveNavTab('home');
+        }
+        setIsAuthModalOpen(false);
+
+        // Add welcome notification
+        setNotifications((prev) => [
+          {
+            id: `notif-${Date.now()}`,
+            title: data.isNewUser ? 'Welcome to Modern Unisex Salon! 🎉' : 'Signed in with Google',
+            message: data.isNewUser 
+              ? 'Your account was created via Google Sign-In with 100 bonus loyalty points.'
+              : `Welcome back, ${data.user.name}!`,
+            type: 'system',
+            timestamp: 'Just now',
+            read: false
+          },
+          ...prev
+        ]);
+
+        return {
+          success: true,
+          message: data.message || `Welcome, ${data.user.name}!`,
+          user: data.user
+        };
+      }
+
+      return {
+        success: false,
+        message: data.message || 'Google sign-in could not be completed.'
+      };
+    } catch (err: any) {
+      console.error('Google Sign-In Error:', err);
+      return {
+        success: false,
+        message: 'Could not connect to authentication server. Please check your network.'
+      };
+    }
+  };
+
   const registerCustomer = async (data: {
     name: string;
     username?: string;
@@ -899,33 +974,60 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_is_admin_mode`);
   };
 
-  const updateCurrentUser = (updates: Partial<User>) => {
-    if (!currentUser) return;
+  const updateCurrentUser = async (updates: Partial<User>): Promise<{ success: boolean; user?: User; message?: string }> => {
+    if (!currentUser) return { success: false, message: 'No active session' };
     const updatedUser: User = { ...currentUser, ...updates };
     setCurrentUser(updatedUser);
-    setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+    setUsers(prev => {
+      const nextUsers = prev.map(u => u.id === updatedUser.id ? updatedUser : u);
+      try {
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_users`, JSON.stringify(nextUsers));
+      } catch {}
+      return nextUsers;
+    });
     sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(updatedUser));
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(updatedUser));
     
-    // Also update in customer directory if fields match
-    setCustomers(prev => prev.map(c => {
-      if (c.phone === updatedUser.phone || (updatedUser.email && c.email === updatedUser.email) || c.id === updatedUser.id) {
-        return {
-          ...c,
-          name: updatedUser.name || c.name,
-          phone: updatedUser.phone || c.phone,
-          email: updatedUser.email || c.email
-        };
-      }
-      return c;
-    }));
+    // Also update in customer CRM directory if fields match
+    setCustomers(prev => {
+      const nextCusts = prev.map(c => {
+        if (c.phone === updatedUser.phone || (updatedUser.email && c.email === updatedUser.email) || c.id === updatedUser.id) {
+          return {
+            ...c,
+            name: updatedUser.name || c.name,
+            phone: updatedUser.phone || c.phone,
+            email: updatedUser.email || c.email,
+            favoriteService: (updatedUser.preferredServices && updatedUser.preferredServices[0]) || c.favoriteService
+          };
+        }
+        return c;
+      });
+      try {
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_customers`, JSON.stringify(nextCusts));
+      } catch {}
+      return nextCusts;
+    });
 
-    // Persist profile updates directly to backend database
-    fetch(`/api/auth/users/${updatedUser.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedUser)
-    }).catch(err => console.log('Profile update database sync notice:', err));
+    // Persist profile updates directly to backend database & MySQL
+    try {
+      const res = await fetch(`/api/auth/users/${updatedUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedUser)
+      });
+      const data = await res.json();
+      if (data && data.success && data.user) {
+        const mergedUser = { ...updatedUser, ...data.user };
+        setCurrentUser(mergedUser);
+        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(mergedUser));
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(mergedUser));
+        return { success: true, user: mergedUser, message: data.message || 'Profile saved successfully!' };
+      }
+      return { success: true, user: updatedUser, message: 'Profile updated successfully.' };
+    } catch (err: any) {
+      console.warn('Profile update database sync notice:', err?.message);
+      return { success: true, user: updatedUser, message: 'Profile saved locally.' };
+    }
   };
 
   // Modal open/close helpers
@@ -1695,6 +1797,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         authModalInitialTab,
         authModalMode,
         login,
+        loginWithGoogle,
         registerCustomer,
         logout,
         openAuthModal,
