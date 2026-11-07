@@ -29,6 +29,12 @@ export function isMySQLConnected(): boolean {
 }
 
 export async function initMySQLPool(): Promise<boolean> {
+  if (process.env.USE_MYSQL === 'false') {
+    isConnected = false;
+    console.log('📦 [Database]: Local JSON database active (data/db.json). MySQL is disabled.');
+    return false;
+  }
+
   try {
     pool = mysql.createPool({
       host: DB_HOST,
@@ -53,7 +59,7 @@ export async function initMySQLPool(): Promise<boolean> {
     return true;
   } catch (err: any) {
     isConnected = false;
-    console.warn(`[MySQL Database]: Could not connect to MySQL at ${DB_HOST}:${DB_PORT} (${err.message}). Operating in resilient fallback mode.`);
+    console.log(`📦 [Database]: Local JSON database active (data/db.json). (MySQL connection not active: ${err.message})`);
     return false;
   }
 }

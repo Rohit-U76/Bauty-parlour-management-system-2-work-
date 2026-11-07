@@ -40,6 +40,19 @@ export interface ServiceItem {
 export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
 export type PaymentStatus = 'PAID' | 'PENDING' | 'REFUNDED';
 
+export interface VerifiedBankDeposit {
+  id: string;
+  utr: string;
+  amount: number;
+  sender: string;
+  bankName: string;
+  rawMessage: string;
+  receivedAt: string;
+  matchedAppointmentId?: string;
+  matchedBookingRef?: string;
+  status: 'UNCLAIMED' | 'MATCHED';
+}
+
 export interface Appointment {
   id: string;
   userId?: string;
@@ -59,6 +72,9 @@ export interface Appointment {
   paymentStatus: PaymentStatus;
   bookingStatus: AppointmentStatus;
   status?: AppointmentStatus;
+  upiTransactionId?: string; // 12-digit UPI UTR Reference Number
+  paymentMethod?: string; // e.g. "Direct Bank UPI / Scanner"
+  scannerUsed?: string; // e.g. "MODERN JENTS PARLOUR" or "DINESH VITTHAL GHODAKE"
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
   createdAt: string;
@@ -66,6 +82,10 @@ export interface Appointment {
   isNew?: boolean;
   whatsappUrl?: string;
   ownerWhatsappUrl?: string;
+  bankVerifiedAt?: string;
+  bankVerifiedSource?: 'SMS_WEBHOOK' | 'ADMIN_MANUAL' | 'SIMULATOR';
+  bankName?: string;
+  holdExpiresAt?: string;
 }
 
 export type InquiryStatus = 'NEW' | 'IN PROGRESS' | 'RESOLVED';
@@ -193,6 +213,19 @@ export interface NotificationItem {
   read: boolean;
 }
 
+export interface BlockedSlotWindow {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  allDay: boolean;
+  startTime?: string; // e.g. "01:30 PM"
+  endTime?: string; // e.g. "06:00 PM"
+  specificSlots?: string[];
+  active: boolean;
+  reason?: string;
+  createdAt: string;
+}
+
 export interface SalonSettings {
   salonName: string;
   tagline: string;
@@ -202,17 +235,25 @@ export interface SalonSettings {
   openingHours: string;
   advancePercentage: number; // default 10
   currencySymbol: string;
-  razorpayKeyId: string;
-  razorpayKeySecret?: string;
-  paymentGatewayMode?: 'live' | 'test';
-  merchantUpiId?: string;
+  accountHolder?: string;
+  bankName?: string;
   bankAccountNumber?: string;
   bankIfsc?: string;
+  bankBranch?: string;
+  bankAccountType?: string;
+  merchantUpiId?: string; // Scanner 1 VPA (e.g. ghodakedinesh@ybl)
+  secondaryUpiId?: string; // Scanner 2 VPA (e.g. 8104026257@axl)
+  razorpayKeyId?: string;
+  razorpayKeySecret?: string;
+  paymentGatewayMode?: 'live' | 'test';
   bookingAutoConfirm: boolean;
   instagramUrl?: string;
   mapsUrl?: string;
   gstNumber?: string;
   staffType?: string;
+  blockedWindows?: BlockedSlotWindow[];
+  isOwnerOnBreakToday?: boolean;
+  breakNoticeMessage?: string;
 }
 
 export interface SalonPolicyItem {

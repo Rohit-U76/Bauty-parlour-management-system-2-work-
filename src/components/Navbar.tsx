@@ -117,7 +117,7 @@ export const Navbar: React.FC = () => {
             </a>
             <span className="text-zinc-700">|</span>
             <span className="text-emerald-400 flex items-center gap-1 font-mono text-[11px]">
-              <ShieldCheck className="w-3.5 h-3.5" /> Razorpay {settings.advancePercentage || 10}% Advance
+              <ShieldCheck className="w-3.5 h-3.5" /> Direct Bank UPI {settings.advancePercentage || 10}% Advance
             </span>
           </div>
         </div>

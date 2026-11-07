@@ -16,7 +16,8 @@ import {
   User,
   UserRole,
   StaffMember,
-  WhatsAppBroadcastLog
+  WhatsAppBroadcastLog,
+  BlockedSlotWindow
 } from '../types';
 import {
   INITIAL_SERVICES,
@@ -48,8 +49,18 @@ interface BookingPayload {
   totalAmount: number;
   advanceAmount: number;
   balanceDue: number;
-  razorpayPaymentId: string;
-  razorpayOrderId: string;
+  upiTransactionId?: string;
+  paymentMethod?: string;
+  scannerUsed?: string;
+  razorpayPaymentId?: string;
+  razorpayOrderId?: string;
+  paymentStatus?: 'PAID' | 'PENDING' | 'REFUNDED';
+  bookingStatus?: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+  status?: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+  bankVerifiedAt?: string;
+  bankVerifiedSource?: 'SMS_WEBHOOK' | 'ADMIN_MANUAL' | 'SIMULATOR';
+  bankName?: string;
+  holdExpiresAt?: string;
 }
 
 interface SalonContextType {
@@ -151,8 +162,14 @@ interface SalonContextType {
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsRead: () => void;
 
-  // Settings
+  // Settings & Schedule Blackout
   updateSettings: (newSettings: Partial<SalonSettings>) => void;
+  toggleOwnerBreakToday: (forcedState?: boolean) => void;
+  addBlockedSlotWindow: (window: Omit<BlockedSlotWindow, 'id' | 'createdAt'>) => void;
+  updateBlockedSlotWindow: (id: string, updates: Partial<BlockedSlotWindow>) => void;
+  deleteBlockedSlotWindow: (id: string) => void;
+  isOwnerOnBreakToday: boolean;
+  blockedWindows: BlockedSlotWindow[];
 
   // Staff Management
   staffMembers: StaffMember[];
@@ -173,7 +190,7 @@ interface SalonContextType {
 
 const SalonContext = createContext<SalonContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'modern_salon_data_v2';
+const LOCAL_STORAGE_KEY = 'modern_salon_data_v3';
 
 export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Try loading from localStorage or fallback to initial constants
@@ -268,9 +285,9 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
-      const sessionUser = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      const sessionUser = sessionStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`) || sessionStorage.getItem('modern_salon_data_v2_current_user');
       if (sessionUser) return JSON.parse(sessionUser);
-      const localUser = localStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      const localUser = localStorage.getItem(`${LOCAL_STORAGE_KEY}_current_user`) || localStorage.getItem('modern_salon_data_v2_current_user');
       if (localUser) return JSON.parse(localUser);
     } catch {
       return null;
@@ -513,6 +530,20 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         .then(data => {
           if (data.success && Array.isArray(data.customers) && data.customers.length > 0) {
             setCustomers(data.customers);
+          }
+        })
+        .catch(() => {});
+
+      fetch('/api/settings')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.settings) {
+            setSettings(prev => ({
+              ...prev,
+              ...data.settings,
+              blockedWindows: data.settings.blockedWindows !== undefined ? data.settings.blockedWindows : (prev.blockedWindows || []),
+              isOwnerOnBreakToday: data.settings.isOwnerOnBreakToday !== undefined ? data.settings.isOwnerOnBreakToday : (prev.isOwnerOnBreakToday || false)
+            }));
           }
         })
         .catch(() => {});
@@ -1054,12 +1085,14 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const toggleAiChat = () => setIsAiChatOpen(!isAiChatOpen);
   const closeAiChat = () => setIsAiChatOpen(false);
 
-  // Create confirmed appointment upon 10% Razorpay payment
+  // Create confirmed appointment upon 10% Direct Bank UPI / Scanner payment
   const createAppointment = async (payload: BookingPayload): Promise<Appointment> => {
-    const bookingRef = `SS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    const bookingRef = `MS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
     const ownerPhone = '8104026257';
     const cleanClientPhone = (payload.clientPhone || '').replace(/[^0-9]/g, '');
     const formattedClientPhone = cleanClientPhone.length === 10 ? `91${cleanClientPhone}` : cleanClientPhone;
+    const utr = payload.upiTransactionId || `UTR-${Date.now().toString().slice(-8)}`;
+    const scannerUsed = payload.scannerUsed || 'MODERN JENTS PARLOUR (HDFC Bank)';
     
     const waText = `✨ *NEW APPOINTMENT CONFIRMED* ✨\n*Modern Unisex Salon, Mohol*\n` +
       `────────────────────\n` +
@@ -1070,7 +1103,9 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       `📅 *Date & Slot:* ${payload.date} at ${payload.timeSlot}\n` +
       `✂️ *Stylist:* ${payload.stylistName || 'Master Stylist'}\n` +
       `💰 *Total Bill:* ₹${payload.totalAmount}\n` +
-      `✅ *10% Advance Deposit Paid:* ₹${payload.advanceAmount} (Verified via Razorpay)\n` +
+      `✅ *10% Advance Deposit Paid:* ₹${payload.advanceAmount} (Verified Direct Bank UPI)\n` +
+      `🔢 *UPI Ref / UTR No:* ${utr}\n` +
+      `🏦 *Payment Destination:* ${scannerUsed}\n` +
       `💵 *Balance at Salon Counter:* ₹${payload.balanceDue}\n` +
       `────────────────────\n` +
       `📍 *Salon Address:* B.N. Gund Complex, Near Kanya Prashala & ICICI Bank, Mohol (413213)\n` +
@@ -1098,11 +1133,18 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       totalAmount: payload.totalAmount,
       advancePaid: payload.advanceAmount,
       balanceDue: payload.balanceDue,
-      paymentStatus: 'PAID',
-      bookingStatus: 'CONFIRMED',
-      status: 'CONFIRMED',
-      razorpayPaymentId: payload.razorpayPaymentId,
-      razorpayOrderId: payload.razorpayOrderId,
+      paymentStatus: payload.paymentStatus || 'PAID',
+      bookingStatus: payload.bookingStatus || 'CONFIRMED',
+      status: payload.status || payload.bookingStatus || 'CONFIRMED',
+      upiTransactionId: utr,
+      paymentMethod: payload.paymentMethod || 'Direct Bank UPI / Scanner',
+      scannerUsed,
+      razorpayPaymentId: payload.razorpayPaymentId || utr,
+      razorpayOrderId: payload.razorpayOrderId || `upi_${Date.now()}`,
+      bankVerifiedAt: payload.bankVerifiedAt,
+      bankVerifiedSource: payload.bankVerifiedSource,
+      bankName: payload.bankName,
+      holdExpiresAt: payload.holdExpiresAt,
       createdAt: new Date().toISOString(),
       notes: payload.notes || '',
       isNew: true,
@@ -1688,6 +1730,59 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }).catch(err => console.error('Failed to sync settings to API:', err));
   };
 
+  // Schedule Blackout & Owner Break Methods
+  const isOwnerOnBreakToday = !!settings.isOwnerOnBreakToday;
+  const blockedWindows = settings.blockedWindows || [];
+
+  const toggleOwnerBreakToday = (forcedState?: boolean) => {
+    const newState = forcedState !== undefined ? forcedState : !settings.isOwnerOnBreakToday;
+    updateSettings({ isOwnerOnBreakToday: newState });
+
+    const newNotif: NotificationItem = {
+      id: `notif-${Date.now()}`,
+      title: newState ? '🔴 Owner Break Active (Today Locked)' : '🟢 Salon Reopened for Bookings',
+      message: newState
+        ? 'All appointment booking slots for today are now unavailable to customers until you turn this off.'
+        : 'Appointment booking slots for today are now open for customers.',
+      type: 'system',
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  };
+
+  const addBlockedSlotWindow = (rule: Omit<BlockedSlotWindow, 'id' | 'createdAt'>) => {
+    const newRule: BlockedSlotWindow = {
+      ...rule,
+      id: `block-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      createdAt: new Date().toISOString()
+    };
+    const updated = [newRule, ...(settings.blockedWindows || [])];
+    updateSettings({ blockedWindows: updated });
+
+    const newNotif: NotificationItem = {
+      id: `notif-${Date.now()}`,
+      title: '📅 Appointment Slot Blackout Created',
+      message: `Slots on ${newRule.date} (${newRule.allDay ? 'All Day' : (newRule.startTime + ' - ' + newRule.endTime)}) are now marked unavailable.`,
+      type: 'system',
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  };
+
+  const updateBlockedSlotWindow = (id: string, updates: Partial<BlockedSlotWindow>) => {
+    const currentList = settings.blockedWindows || [];
+    const updated = currentList.map(item => item.id === id ? { ...item, ...updates } : item);
+    updateSettings({ blockedWindows: updated });
+  };
+
+  const deleteBlockedSlotWindow = (id: string) => {
+    const currentList = settings.blockedWindows || [];
+    const updated = currentList.filter(item => item.id !== id);
+    updateSettings({ blockedWindows: updated });
+  };
+
   // Staff CRUD
   const addStaffMember = (member: Omit<StaffMember, 'id'>) => {
     const newMember: StaffMember = {
@@ -1846,6 +1941,12 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         markNotificationAsRead,
         markAllNotificationsRead,
         updateSettings,
+        toggleOwnerBreakToday,
+        addBlockedSlotWindow,
+        updateBlockedSlotWindow,
+        deleteBlockedSlotWindow,
+        isOwnerOnBreakToday,
+        blockedWindows,
         staffMembers,
         staff: staffMembers,
         addStaffMember,

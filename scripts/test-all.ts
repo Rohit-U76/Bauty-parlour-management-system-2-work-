@@ -1,12 +1,17 @@
 import { 
   normalizeTimeSlot, 
   parseSlotTimeToMinutes, 
-  SALON_TIME_SLOTS 
+  SALON_TIME_SLOTS,
+  isSlotBlockedByAdmin,
+  isSlotAvailableForDate,
+  getSlotAvailability,
+  getLocalDateString
 } from '../src/utils/availability';
 import { 
   parseAppointmentDateTime, 
   getAppointmentReminderInfo 
 } from '../src/utils/appointmentReminderUtils';
+import { BlockedSlotWindow } from '../src/types';
 
 const BASE_URL = 'http://localhost:3000';
 
@@ -69,10 +74,10 @@ async function runSuite() {
     assertEqual(parseSlotTimeToMinutes('12:15 AM'), 15, '12:15 AM should be 15 mins');
   });
 
-  await runTest('Utilities', 'SALON_TIME_SLOTS covers complete salon working hours', () => {
-    assert(SALON_TIME_SLOTS.length >= 8, `Expected at least 8 slots, got ${SALON_TIME_SLOTS.length}`);
-    assert(SALON_TIME_SLOTS.includes('09:30 AM'), 'Should include morning slot 09:30 AM');
-    assert(SALON_TIME_SLOTS.includes('07:30 PM'), 'Should include evening slot 07:30 PM');
+  await runTest('Utilities', 'SALON_TIME_SLOTS covers complete salon working hours (9 AM - 10 PM in 3hr/4hr batches)', () => {
+    assertEqual(SALON_TIME_SLOTS.length, 4, `Expected 4 slots (3-4hr batches), got ${SALON_TIME_SLOTS.length}`);
+    assert(SALON_TIME_SLOTS.includes('09:00 AM - 12:00 PM'), 'Should include morning slot 09:00 AM - 12:00 PM');
+    assert(SALON_TIME_SLOTS.includes('06:00 PM - 10:00 PM'), 'Should include night slot 06:00 PM - 10:00 PM');
   });
 
   await runTest('Utilities', 'parseAppointmentDateTime correctly parses date and time slots', () => {
@@ -128,6 +133,68 @@ async function runSuite() {
     assertEqual(tomorrowInfo.isTomorrow, true, 'Should be detected as tomorrow');
     assertEqual(tomorrowInfo.isUpcoming, true, 'Tomorrow appointment should be upcoming');
     assertEqual(tomorrowInfo.headingLabel, 'Upcoming Appointment Tomorrow', 'Heading should say Upcoming Appointment Tomorrow');
+  });
+
+  await runTest('Utilities', 'isSlotBlockedByAdmin accurately enforces owner break and scheduled blackout windows', () => {
+    const todayIso = getLocalDateString();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowIso = getLocalDateString(tomorrow);
+
+    // 1. Quick Master Toggle: isOwnerOnBreakToday
+    const checkTodayBreak = isSlotBlockedByAdmin('01:30 PM', todayIso, [], true);
+    assertEqual(checkTodayBreak.isBlocked, true, 'isOwnerOnBreakToday must block today slots');
+    const checkTomorrowWithTodayBreak = isSlotBlockedByAdmin('01:30 PM', tomorrowIso, [], true);
+    assertEqual(checkTomorrowWithTodayBreak.isBlocked, false, 'isOwnerOnBreakToday must not block tomorrow');
+
+    // 2. Full Day Scheduled Blackout
+    const rules: BlockedSlotWindow[] = [
+      {
+        id: 'rule-full-tomorrow',
+        title: 'Full Day Off',
+        date: tomorrowIso,
+        allDay: true,
+        active: true,
+        reason: 'Owner holiday',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'rule-range-today',
+        title: 'Afternoon Break',
+        date: todayIso,
+        allDay: false,
+        startTime: '01:30 PM',
+        endTime: '05:30 PM',
+        active: true,
+        reason: 'Staff training',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'rule-paused',
+        title: 'Paused Leave',
+        date: tomorrowIso,
+        allDay: true,
+        active: false,
+        createdAt: new Date().toISOString()
+      }
+    ];
+
+    // Check tomorrow with full day block
+    const tomorrowSlotCheck = isSlotBlockedByAdmin('11:45 AM', tomorrowIso, rules, false);
+    assertEqual(tomorrowSlotCheck.isBlocked, true, 'Full day rule must block 11:45 AM');
+
+    // Check time range block on today (01:30 PM to 05:30 PM)
+    const inRangeCheck = isSlotBlockedByAdmin('02:45 PM', todayIso, rules, false);
+    assertEqual(inRangeCheck.isBlocked, true, '02:45 PM falls within 01:30 PM - 05:30 PM');
+
+    const outRangeMorningCheck = isSlotBlockedByAdmin('09:30 AM', todayIso, rules, false);
+    assertEqual(outRangeMorningCheck.isBlocked, false, '09:30 AM is outside 01:30 PM - 05:30 PM');
+
+    // Verify slot availability status
+    const slotInfoBlocked = getSlotAvailability([], tomorrowIso, '10:30 AM', 3, rules, false);
+    assertEqual(slotInfoBlocked.status, 'SOLD_OUT', 'Blocked slot must have status SOLD_OUT');
+    assertEqual(slotInfoBlocked.isBlockedByAdmin, true, 'Slot info should indicate isBlockedByAdmin: true');
+    assertEqual(slotInfoBlocked.remainingSeats, 0, 'Blocked slot remaining seats must be 0');
   });
 
   // ==========================================

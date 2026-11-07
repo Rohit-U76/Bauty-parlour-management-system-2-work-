@@ -25,10 +25,10 @@ import {
   Eye
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
-import { RazorpayModal } from './RazorpayModal';
+import { DirectUpiPaymentModal } from './DirectUpiPaymentModal';
 import { ServiceItem, Appointment, PriceTierVariant } from '../types';
 import { ModernSalonLogo } from './ModernSalonLogo';
-import { SALON_TIME_SLOTS, getSlotAvailability, getDayAvailabilitySummary, isSlotAvailableForDate } from '../utils/availability';
+import { SALON_TIME_SLOTS, SALON_SLOT_DETAILS, getSlotAvailability, getDayAvailabilitySummary, isSlotAvailableForDate, getLocalDateString } from '../utils/availability';
 import { printSalonReceipt, downloadReceiptFile } from '../utils/receiptPrinter';
 import { ReceiptModal } from './ReceiptModal';
 import { AppointmentPassModal } from './AppointmentPassModal';
@@ -43,7 +43,9 @@ export const BookingModal: React.FC = () => {
     createAppointment,
     settings,
     currentUser,
-    appointments
+    appointments,
+    isOwnerOnBreakToday,
+    blockedWindows
   } = useSalon();
 
   // Wizard steps: 1 = Service & Tier Variant, 2 = Date & Slot, 3 = Client Details & Advance Payment, 4 = Confirmation Receipt
@@ -52,7 +54,7 @@ export const BookingModal: React.FC = () => {
   const [selectedTier, setSelectedTier] = useState<PriceTierVariant | null>(null);
   const [selectedStylist, setSelectedStylist] = useState<string>('Self-Employed (Master Stylist & Founder)');
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('11:45 AM');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>(SALON_TIME_SLOTS[0]);
   
   // Client details
   const [clientName, setClientName] = useState<string>('');
@@ -67,7 +69,7 @@ export const BookingModal: React.FC = () => {
   const [couponError, setCouponError] = useState<string>('');
 
   // Payment modal state
-  const [showRazorpayModal, setShowRazorpayModal] = useState<boolean>(false);
+  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [confirmedBooking, setConfirmedBooking] = useState<Appointment | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [showPassModal, setShowPassModal] = useState<boolean>(false);
@@ -80,10 +82,9 @@ export const BookingModal: React.FC = () => {
   ];
 
   const resetBookingForm = (targetService?: ServiceItem | null) => {
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0];
+    const dateStr = getLocalDateString();
     setSelectedDate(dateStr);
-    setSelectedTimeSlot('11:45 AM');
+    setSelectedTimeSlot(SALON_TIME_SLOTS[0]);
     setSelectedStylist('Self-Employed (Master Stylist & Founder)');
     const srv = targetService !== undefined ? targetService : (selectedServiceForBooking || services[0] || null);
     setSelectedService(srv);
@@ -106,8 +107,7 @@ export const BookingModal: React.FC = () => {
   // Set default date (today or tomorrow) and fresh state on modal open
   useEffect(() => {
     if (isBookingModalOpen) {
-      const today = new Date();
-      const dateStr = today.toISOString().split('T')[0];
+      const dateStr = getLocalDateString();
       setSelectedDate(dateStr);
       const targetService = selectedServiceForBooking || services[0] || null;
       setSelectedService(targetService);
@@ -129,23 +129,16 @@ export const BookingModal: React.FC = () => {
     }
   }, [isBookingModalOpen, selectedServiceForBooking, currentUser]);
 
-  // Enforce 7:00 PM evening constraint: If today and past 7:00 PM, ensure slot is strictly after 7:00 PM
+  // Enforce available slots based on time constraints & admin blackout / owner breaks
   useEffect(() => {
     if (!selectedDate) return;
-    const todayStr = new Date().toISOString().split('T')[0];
-    if (selectedDate === todayStr) {
-      const now = new Date();
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      if (currentMinutes >= 19 * 60) {
-        if (!isSlotAvailableForDate(selectedTimeSlot, selectedDate)) {
-          setSelectedTimeSlot('07:30 PM');
-        }
-      } else if (!isSlotAvailableForDate(selectedTimeSlot, selectedDate)) {
-        const firstAvail = SALON_TIME_SLOTS.find(s => isSlotAvailableForDate(s, selectedDate));
-        if (firstAvail) setSelectedTimeSlot(firstAvail);
+    if (!isSlotAvailableForDate(selectedTimeSlot, selectedDate, blockedWindows, isOwnerOnBreakToday)) {
+      const firstAvail = SALON_TIME_SLOTS.find(s => isSlotAvailableForDate(s, selectedDate, blockedWindows, isOwnerOnBreakToday));
+      if (firstAvail) {
+        setSelectedTimeSlot(firstAvail);
       }
     }
-  }, [selectedDate, selectedTimeSlot]);
+  }, [selectedDate, selectedTimeSlot, blockedWindows, isOwnerOnBreakToday]);
 
   const handleSelectService = (srv: ServiceItem) => {
     setSelectedService(srv);
@@ -201,21 +194,28 @@ export const BookingModal: React.FC = () => {
     setCouponError('');
   };
 
-  const handleProceedToRazorpay = () => {
+  const handleProceedToPayment = () => {
     setFormError('');
     if (!clientName.trim() || !clientPhone.trim()) {
       setFormError('Please provide your full name and 10-digit mobile number to confirm your booking pass.');
       return;
     }
-    if (!isSlotAvailableForDate(selectedTimeSlot, selectedDate)) {
-      setFormError('The selected time slot is closed for today. Appointments before 7:00 PM cannot be booked. Please select an available slot after 7:00 PM.');
+    if (!isSlotAvailableForDate(selectedTimeSlot, selectedDate, blockedWindows, isOwnerOnBreakToday)) {
+      setFormError('The selected time slot is currently unavailable, already passed, or the salon is closed. Please select an upcoming open slot.');
       return;
     }
-    setShowRazorpayModal(true);
+    setShowPaymentModal(true);
   };
 
-  const handlePaymentSuccess = async (paymentId: string, orderId: string) => {
-    setShowRazorpayModal(false);
+  const handlePaymentSuccess = async (
+    paymentId: string,
+    utr: string,
+    scannerUsed?: string,
+    isBankVerified: boolean = true,
+    bankVerifiedSource: 'SMS_WEBHOOK' | 'ADMIN_MANUAL' | 'NONE' = 'SMS_WEBHOOK',
+    bankName?: string
+  ) => {
+    setShowPaymentModal(false);
     if (!selectedService) return;
 
     const serviceTitle = selectedTier 
@@ -238,8 +238,18 @@ export const BookingModal: React.FC = () => {
         totalAmount: netTotal,
         advanceAmount: advanceDeposit,
         balanceDue: balanceAtSalon,
-        razorpayPaymentId: paymentId,
-        razorpayOrderId: orderId
+        upiTransactionId: utr,
+        paymentMethod: 'Direct Bank UPI / Scanner',
+        scannerUsed: scannerUsed || 'MODERN JENTS PARLOUR',
+        razorpayPaymentId: utr,
+        razorpayOrderId: paymentId,
+        paymentStatus: isBankVerified ? 'PAID' : 'PENDING',
+        bookingStatus: isBankVerified ? 'CONFIRMED' : 'PENDING',
+        status: isBankVerified ? 'CONFIRMED' : 'PENDING',
+        bankVerifiedAt: isBankVerified ? new Date().toISOString() : undefined,
+        bankVerifiedSource: isBankVerified ? bankVerifiedSource : undefined,
+        bankName,
+        holdExpiresAt: !isBankVerified ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : undefined
       });
 
       setConfirmedBooking(created);
@@ -472,17 +482,17 @@ export const BookingModal: React.FC = () => {
                 </label>
                 <input
                   type="date"
-                  min={new Date().toISOString().split('T')[0]}
+                  min={getLocalDateString()}
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-white dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-amber-500/40"
+                  className="w-full px-4 py-2.5 rounded-2xl bg-white dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 text-sm text-zinc-900 dark:white focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-amber-500/40"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-bold text-zinc-700 dark:text-zinc-400 uppercase tracking-wider">
-                    Select Time Slot (Mohol Salon Hours: 9:00 AM - 9:00 PM)
+                    Select Time Slot (Salon Hours: 9:00 AM - 10:00 PM)
                   </label>
                   <span className="text-[11px] text-purple-700 dark:text-amber-400 font-medium flex items-center gap-1">
                     <Zap className="w-3 h-3 text-amber-500" />
@@ -490,19 +500,18 @@ export const BookingModal: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Evening 7:00 PM Constraint Alert */}
+                {/* Admin Owner Break / Blackout Alert Banner */}
                 {(() => {
-                  const todayStr = new Date().toISOString().split('T')[0];
-                  const now = new Date();
-                  const isToday = selectedDate === todayStr;
-                  const isPastSevenPm = isToday && (now.getHours() * 60 + now.getMinutes() >= 19 * 60);
-                  if (isPastSevenPm) {
+                  const daySummary = getDayAvailabilitySummary(appointments, selectedDate, blockedWindows, isOwnerOnBreakToday);
+                  if (daySummary.isFullyBlockedByAdmin) {
                     return (
-                      <div className="mb-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300">
-                        <Clock className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <div className="mb-3 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 flex items-start gap-2.5 text-xs text-rose-800 dark:text-rose-200 animate-in fade-in duration-200">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
                         <div>
-                          <strong className="block font-bold">Evening Schedule Active (Past 7:00 PM)</strong>
-                          <span className="text-[11px] opacity-90">Appointments before 7:00 PM are closed for today. Please select an available slot after 7:00 PM below.</span>
+                          <strong className="block font-bold">Salon Owner Break Active • Slots Unavailable</strong>
+                          <span className="text-[11px] leading-relaxed">
+                            {daySummary.adminBlockReason || 'The salon owner is taking a break for this date. All appointment slots are unavailable. Please select another date for booking.'}
+                          </span>
                         </div>
                       </div>
                     );
@@ -510,12 +519,60 @@ export const BookingModal: React.FC = () => {
                   return null;
                 })()}
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {/* Salon Hours & Today Availability Status Banner */}
+                {(() => {
+                  const todayStr = getLocalDateString();
+                  const isToday = selectedDate === todayStr;
+                  const daySummary = getDayAvailabilitySummary(appointments, selectedDate, blockedWindows, isOwnerOnBreakToday);
+                  
+                  if (daySummary.isFullyBlockedByAdmin) {
+                    return (
+                      <div className="mb-3 p-3 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-300 dark:border-rose-500/30 flex items-center gap-2.5 text-xs text-rose-800 dark:text-rose-300">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                        <div>
+                          <strong className="block font-bold">Studio Closed / Holiday</strong>
+                          <span className="text-[11px] opacity-90">{daySummary.adminBlockReason || 'The salon is closed on this date. Please choose another date.'}</span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isToday && daySummary.availableSlots.length === 0) {
+                    return (
+                      <div className="mb-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300">
+                        <Clock className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <div>
+                          <strong className="block font-bold">All Slots Concluded For Today</strong>
+                          <span className="text-[11px] opacity-90">All 3-hour appointment batches for today (9:00 AM - 10:00 PM) have either started or finished. Please select tomorrow to book your chair.</span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="mb-3 p-2.5 rounded-2xl bg-purple-50/60 dark:bg-zinc-900 border border-purple-200/60 dark:border-zinc-800 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
+                        <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400 shrink-0" />
+                        <span className="text-[11px]">
+                          <strong>Salon Operating Hours:</strong> 9:00 AM – 10:00 PM • Max 3 clients per slot
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                        {daySummary.availableSlots.length} Slots Open
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {SALON_TIME_SLOTS.map((slot) => {
-                    const slotInfo = getSlotAvailability(appointments, selectedDate, slot);
+                    const slotInfo = getSlotAvailability(appointments, selectedDate, slot, undefined, blockedWindows, isOwnerOnBreakToday);
+                    const slotMeta = SALON_SLOT_DETAILS[slot];
                     const isSoldOut = slotInfo.status === 'SOLD_OUT';
                     const isFast = slotInfo.isFillingFast && !isSoldOut;
                     const isSelected = selectedTimeSlot === slot;
+                    const isBlocked = !!slotInfo.isBlockedByAdmin;
+                    const isTimePassed = isSoldOut && slotInfo.statusLabel === 'Time Passed';
 
                     return (
                       <button
@@ -523,37 +580,68 @@ export const BookingModal: React.FC = () => {
                         type="button"
                         disabled={isSoldOut}
                         onClick={() => setSelectedTimeSlot(slot)}
-                        className={`p-2.5 rounded-xl border text-left transition relative flex flex-col justify-between cursor-pointer ${
-                          isSoldOut
-                            ? 'border-purple-100 dark:border-zinc-800 bg-zinc-100/80 dark:bg-[#121216] opacity-50 cursor-not-allowed text-zinc-400 dark:text-zinc-500'
+                        className={`p-3 rounded-2xl border text-left transition relative flex flex-col justify-between cursor-pointer ${
+                          isBlocked
+                            ? 'border-rose-200 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/20 opacity-60 cursor-not-allowed text-rose-500'
+                            : isTimePassed
+                            ? 'border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/70 dark:bg-[#111115] opacity-50 cursor-not-allowed text-zinc-400'
+                            : isSoldOut
+                            ? 'border-purple-100 dark:border-zinc-800 bg-zinc-100/80 dark:bg-[#121216] opacity-50 cursor-not-allowed text-zinc-400'
                             : isSelected
                             ? 'border-purple-600 dark:border-amber-500 bg-purple-600 dark:bg-amber-500 text-white dark:text-zinc-950 shadow-md ring-2 ring-purple-600/40 dark:ring-amber-500/40 font-bold'
                             : isFast
-                            ? 'border-amber-400 bg-amber-50 dark:bg-amber-500/10 text-zinc-900 dark:text-zinc-200 hover:border-amber-500'
+                            ? 'border-amber-400 bg-amber-50/70 dark:bg-amber-500/10 text-zinc-900 dark:text-zinc-200 hover:border-amber-500'
                             : 'border-purple-100 dark:border-zinc-800 bg-white dark:bg-[#181820] text-zinc-900 dark:text-zinc-300 hover:border-purple-300 dark:hover:border-zinc-700'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-mono font-bold">{slot}</span>
-                          {isSoldOut ? (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
-                              Full
-                            </span>
-                          ) : isFast ? (
-                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500 text-zinc-950 flex items-center gap-0.5 animate-pulse">
-                              <Flame className="w-2.5 h-2.5 fill-zinc-950" />
-                              <span>Fast</span>
-                            </span>
-                          ) : (
-                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-bold">
-                              Open
-                            </span>
-                          )}
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-mono font-bold">{slot}</span>
+                            </div>
+                            <div className={`text-[10px] mt-0.5 font-medium ${
+                              isSelected ? 'text-white/90 dark:text-zinc-950/90' : 'text-zinc-500 dark:text-zinc-400'
+                            }`}>
+                              {slotMeta ? `${slotMeta.periodLabel} (${slotMeta.durationHours} hrs)` : 'Batch Slot'}
+                            </div>
+                          </div>
+
+                          <div>
+                            {isBlocked ? (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-200 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300">
+                                Holiday
+                              </span>
+                            ) : isTimePassed ? (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                                Time Passed
+                              </span>
+                            ) : isSoldOut ? (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                                Fully Booked
+                              </span>
+                            ) : isFast ? (
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500 text-zinc-950 flex items-center gap-0.5 animate-pulse">
+                                <Flame className="w-2.5 h-2.5 fill-zinc-950" />
+                                <span>1 Left</span>
+                              </span>
+                            ) : (
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                isSelected ? 'bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950' : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                              }`}>
+                                Open
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-600 dark:text-zinc-400">
-                          <span className={isSelected ? 'text-white dark:text-zinc-950 font-bold' : isFast ? 'text-amber-700 dark:text-amber-300/90 font-medium' : 'text-zinc-600 dark:text-zinc-400'}>
+                        <div className="mt-2.5 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[10px]">
+                          <span className={isSelected ? 'text-white dark:text-zinc-950 font-bold' : isBlocked ? 'text-rose-500 font-medium' : isTimePassed ? 'text-zinc-400 italic' : isFast ? 'text-amber-700 dark:text-amber-300 font-bold' : 'text-zinc-600 dark:text-zinc-400 font-medium'}>
                             {slotInfo.urgencyText}
+                          </span>
+                          <span className={`text-[9px] font-mono ${
+                            isSelected ? 'text-white/80 dark:text-zinc-950/80 font-bold' : 'text-zinc-400'
+                          }`}>
+                            {slotInfo.remainingSeats}/3 Chairs
                           </span>
                         </div>
                       </button>
@@ -563,7 +651,17 @@ export const BookingModal: React.FC = () => {
 
                 {/* Selected Slot Real-Time Note */}
                 {selectedTimeSlot && (() => {
-                  const activeSlotInfo = getSlotAvailability(appointments, selectedDate, selectedTimeSlot);
+                  const activeSlotInfo = getSlotAvailability(appointments, selectedDate, selectedTimeSlot, undefined, blockedWindows, isOwnerOnBreakToday);
+                  if (activeSlotInfo.isBlockedByAdmin) {
+                    return (
+                      <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                        <div>
+                          <strong>Selected slot is currently unavailable:</strong> {activeSlotInfo.urgencyText}. Please choose another open slot.
+                        </div>
+                      </div>
+                    );
+                  }
                   if (activeSlotInfo.isFillingFast && activeSlotInfo.status !== 'SOLD_OUT') {
                     return (
                       <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
@@ -745,9 +843,15 @@ export const BookingModal: React.FC = () => {
                       {confirmedBooking.bookingRef}
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    DEPOSIT VERIFIED
-                  </span>
+                  {confirmedBooking.paymentStatus === 'PAID' ? (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      BANK DEPOSIT VERIFIED
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                      15-MIN HOLD • AWAITING OWNER SMS
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
@@ -919,10 +1023,10 @@ export const BookingModal: React.FC = () => {
             ) : (
               <button
                 type="button"
-                onClick={handleProceedToRazorpay}
+                onClick={handleProceedToPayment}
                 className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-gradient-to-r dark:from-amber-500 dark:via-yellow-400 dark:to-amber-500 dark:hover:from-amber-400 dark:hover:to-yellow-300 text-white dark:text-zinc-950 font-extrabold text-xs inline-flex items-center gap-1.5 transition shadow-xl active:scale-95 cursor-pointer"
               >
-                <span>Pay ₹{advanceDeposit} Advance with Razorpay</span>
+                <span>Pay ₹{advanceDeposit} Advance via UPI / Scanner</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             )}
@@ -931,11 +1035,11 @@ export const BookingModal: React.FC = () => {
 
       </div>
 
-      {/* Razorpay Checkout Simulation / Real Modal */}
-      {showRazorpayModal && selectedService && (
-        <RazorpayModal
-          isOpen={showRazorpayModal}
-          onClose={() => setShowRazorpayModal(false)}
+      {/* Direct Bank UPI & PhonePe QR Scanner Modal */}
+      {showPaymentModal && selectedService && (
+        <DirectUpiPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
           onSuccess={handlePaymentSuccess}
           advanceAmount={advanceDeposit}
           totalAmount={netTotal}

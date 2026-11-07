@@ -288,7 +288,7 @@ export const AdminCharts: React.FC = () => {
             ₹{totalAdvanceSum.toLocaleString()}
           </div>
           <div className="text-[11px] text-zinc-400 mt-1">
-            100% Razorpay verified capture
+            100% Direct Bank UPI verified capture
           </div>
         </div>
 

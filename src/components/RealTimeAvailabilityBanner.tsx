@@ -32,7 +32,7 @@ export const RealTimeAvailabilityBanner: React.FC<RealTimeAvailabilityBannerProp
   selectedFilterSlot,
   onFilterBySlot
 }) => {
-  const { appointments, openBookingModal, services } = useSalon();
+  const { appointments, openBookingModal, services, blockedWindows, isOwnerOnBreakToday } = useSalon();
 
   // Selected date for availability inspection
   const todayIso = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -53,8 +53,8 @@ export const RealTimeAvailabilityBanner: React.FC<RealTimeAvailabilityBannerProp
 
   // Compute live day summary
   const daySummary = useMemo(() => {
-    return getDayAvailabilitySummary(appointments, selectedDate);
-  }, [appointments, selectedDate]);
+    return getDayAvailabilitySummary(appointments, selectedDate, blockedWindows, isOwnerOnBreakToday);
+  }, [appointments, selectedDate, blockedWindows, isOwnerOnBreakToday]);
 
   const handleSlotClick = (slotInfo: SlotAvailabilityInfo) => {
     if (slotInfo.status === 'SOLD_OUT') return;
@@ -263,7 +263,7 @@ export const RealTimeAvailabilityBanner: React.FC<RealTimeAvailabilityBannerProp
           </div>
 
           {/* Slots matrix */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
             {daySummary.allSlots.map((slotInfo) => {
               const isSoldOut = slotInfo.status === 'SOLD_OUT';
               const isFast = slotInfo.isFillingFast && !isSoldOut;

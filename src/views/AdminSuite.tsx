@@ -65,6 +65,8 @@ import { AdminSmsEmailHubModal } from '../components/AdminSmsEmailHubModal';
 import { AdminTermsPolicies } from '../components/AdminTermsPolicies';
 import { ReceiptModal } from '../components/ReceiptModal';
 import { AdminOfferBroadcastModal } from '../components/AdminOfferBroadcastModal';
+import { AdminSlotBlackoutManager } from '../components/AdminSlotBlackoutManager';
+import { AdminBankSmsHub } from '../components/AdminBankSmsHub';
 
 export const AdminSuite: React.FC = () => {
   const {
@@ -101,6 +103,7 @@ export const AdminSuite: React.FC = () => {
     openBookingModal,
     currentUser,
     logout,
+    isOwnerOnBreakToday,
     staffMembers,
     addStaffMember,
     updateStaffMember,
@@ -469,6 +472,7 @@ export const AdminSuite: React.FC = () => {
   const navTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'appointments', label: 'Appointments', icon: Calendar, badge: confirmedCount },
+    { id: 'bank-hub', label: 'Bank SMS & UPI Ledger', icon: Smartphone, badge: appointments.filter(a => (a.bookingStatus === 'PENDING' || a.paymentStatus === 'PENDING') && a.bookingStatus !== 'CANCELLED').length },
     { id: 'services', label: 'Services & Pricing', icon: Scissors },
     { id: 'staff', label: 'Staff & Team', icon: UserCheck, badge: staffMembers.length },
     { id: 'gallery', label: 'Gallery Manager', icon: ImageIcon },
@@ -494,8 +498,15 @@ export const AdminSuite: React.FC = () => {
                 <Scissors className="w-4 h-4" />
               </div>
               <div>
-                <div className="font-serif text-sm font-bold text-zinc-100">Modern Salon</div>
-                <div className="text-[10px] text-zinc-400">Admin Control Panel</div>
+                <div className="font-serif text-sm font-bold text-zinc-100 flex items-center gap-1.5">
+                  <span>Modern Salon</span>
+                  {isOwnerOnBreakToday && (
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" title="Owner Break Active" />
+                  )}
+                </div>
+                <div className="text-[10px] text-zinc-400">
+                  {isOwnerOnBreakToday ? <span className="text-rose-400 font-bold">Owner On Break (Today)</span> : 'Admin Control Panel'}
+                </div>
               </div>
             </div>
           </div>
@@ -738,6 +749,9 @@ export const AdminSuite: React.FC = () => {
                 <p className="text-xs text-zinc-400">Overview of bookings, deposits, and salon operations in Mohol.</p>
               </div>
 
+              {/* Owner Break & Schedule Blackout Control Hub */}
+              <AdminSlotBlackoutManager onShowToast={(msg) => setActionFeedbackToast(msg)} />
+
               {/* 4 Stat Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2">
@@ -755,7 +769,7 @@ export const AdminSuite: React.FC = () => {
                     <DollarSign className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div className="text-2xl font-bold font-mono text-emerald-400">₹{totalAdvanceCollected.toLocaleString()}</div>
-                  <div className="text-[11px] text-zinc-400">Verified via Razorpay</div>
+                  <div className="text-[11px] text-zinc-400">Direct Bank UPI Verified</div>
                 </div>
 
                 <div className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2">
@@ -787,6 +801,13 @@ export const AdminSuite: React.FC = () => {
                   >
                     <Calendar className="w-3.5 h-3.5" />
                     <span>View Appointments ({confirmedCount})</span>
+                  </button>
+                  <button
+                    onClick={() => setAdminTab('bank-hub' as any)}
+                    className="px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-emerald-500/30"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Bank SMS Ledger &amp; Simulator</span>
                   </button>
                   <button
                     onClick={openAddStaffModal}
@@ -968,6 +989,11 @@ export const AdminSuite: React.FC = () => {
             </div>
           )}
 
+          {/* BANK SMS & UPI LEDGER TAB */}
+          {adminTab === 'bank-hub' && (
+            <AdminBankSmsHub onShowToast={(msg) => setActionFeedbackToast(msg)} />
+          )}
+
           {/* APPOINTMENTS TAB */}
           {adminTab === 'appointments' && (
             <div className="space-y-5">
@@ -984,6 +1010,9 @@ export const AdminSuite: React.FC = () => {
                   <span>New Appointment</span>
                 </button>
               </div>
+
+              {/* Owner Break & Schedule Blackout Control Hub */}
+              <AdminSlotBlackoutManager onShowToast={(msg) => setActionFeedbackToast(msg)} />
 
               {/* Filters */}
               <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col sm:flex-row items-center gap-3">
@@ -1055,6 +1084,12 @@ export const AdminSuite: React.FC = () => {
                           <div className="text-emerald-400 font-mono text-[11px]">
                             {settings.advancePercentage || 10}% Adv: ₹{app.advancePaid}
                           </div>
+                          {(app.upiTransactionId || app.razorpayPaymentId) && (
+                            <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1 mt-0.5" title="UPI Reference / UTR Number">
+                              <span className="text-amber-400 font-bold">UTR:</span>
+                              <span className="truncate max-w-[130px]">{app.upiTransactionId || app.razorpayPaymentId}</span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -2006,291 +2041,174 @@ export const AdminSuite: React.FC = () => {
               <div>
                 <h1 className="font-serif text-2xl font-bold text-zinc-100 flex items-center gap-2.5">
                   <Settings className="w-6 h-6 text-amber-400" />
-                  <span>Salon Settings &amp; Real-World Payment Setup</span>
+                  <span>Salon Settings &amp; Direct Bank UPI Payment Setup</span>
                 </h1>
                 <p className="text-xs text-zinc-400">
-                  Configure live Razorpay gateway credentials, UPI merchant accounts, counter policies, and salon profile.
+                  Manage confidential salon bank accounts, QR scanners, 10% advance deposit rules, and operational settings with 0% platform deductions.
                 </p>
               </div>
 
               {/* Status Header Banner */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-zinc-900 via-purple-950/20 to-zinc-900 border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-zinc-900 via-amber-950/20 to-zinc-900 border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg ${
-                    settings.paymentGatewayMode === 'live' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                  }`}>
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center font-bold text-lg">
                     ₹
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-zinc-100">Gateway Status:</span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider ${
-                        settings.paymentGatewayMode === 'live'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                      }`}>
-                        {settings.paymentGatewayMode === 'live' ? '🟢 Live Production Mode' : '🟡 Test Sandbox Mode'}
+                      <span className="font-bold text-sm text-zinc-100">Payment Routing:</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        🟢 Direct Bank &amp; UPI Active (0% Gateway Cut)
                       </span>
                     </div>
                     <p className="text-xs text-zinc-400 mt-0.5">
-                      Merchant UPI: <span className="font-mono text-zinc-200 font-semibold">{settings.merchantUpiId || '8104026257@okicici'}</span> • Key: <span className="font-mono text-zinc-200">{settings.razorpayKeyId ? (settings.razorpayKeyId.startsWith('rzp_live') ? 'Active (Live)' : settings.razorpayKeyId.slice(0, 14) + '...') : 'Not Configured'}</span>
+                      Account: <span className="font-mono text-zinc-200 font-semibold">{settings.accountHolder || 'MODERN JENTS PARLOUR'}</span> • HDFC Bank A/C: <span className="font-mono text-zinc-200">{settings.bankAccountNumber || '50200072074441'}</span>
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={handleTestGatewayConnection}
-                    disabled={isTestingGateway}
-                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold flex items-center justify-center gap-2 border border-zinc-700 transition cursor-pointer disabled:opacity-50"
-                  >
-                    {isTestingGateway ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                    ) : (
-                      <Zap className="w-3.5 h-3.5 text-amber-400" />
-                    )}
-                    <span>Test Gateway Connection</span>
-                  </button>
+                  <div className="px-3 py-1.5 rounded-xl bg-zinc-800 border border-zinc-700 text-xs font-mono text-amber-400">
+                    IFSC: {settings.bankIfsc || 'HDFC0000635'}
+                  </div>
                 </div>
               </div>
 
-              {/* Gateway Test Feedback Toast */}
-              {gatewayTestResult && (
-                <div className={`p-4 rounded-2xl border text-xs font-semibold flex items-center gap-3 animate-in fade-in ${
-                  gatewayTestResult.success
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-                }`}>
-                  {gatewayTestResult.success ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-                  )}
-                  <span>{gatewayTestResult.message}</span>
-                </div>
-              )}
-
-              {/* CARD 1: REAL-WORLD PAYMENT GATEWAY SETTINGS */}
+              {/* CARD 1: DIRECT BANK UPI & QR SCANNERS SETTINGS */}
               <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-5 text-xs shadow-sm">
                 <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                   <div className="space-y-0.5">
                     <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
                       <CreditCard className="w-4 h-4 text-amber-400" />
-                      <span>1. Real-World Razorpay &amp; UPI Payment Gateway</span>
+                      <span>1. Official Salon Bank &amp; UPI Scanners (Confidential)</span>
                     </h3>
                     <p className="text-[11px] text-zinc-400">
-                      Configure your production keys to accept real 10% online deposits from Google Pay, PhonePe, Paytm, and Cards.
+                      All advance customer deposits are routed directly into these accounts without third-party fees.
                     </p>
                   </div>
                 </div>
 
-                {/* Operating Mode Selector */}
-                <div className="space-y-2">
-                  <label className="font-semibold text-zinc-300 block">
-                    Payment Gateway Operating Mode *
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => updateSettings({ paymentGatewayMode: 'live' })}
-                      className={`p-3.5 rounded-xl border text-left transition flex items-start gap-3 cursor-pointer ${
-                        settings.paymentGatewayMode === 'live'
-                          ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-sm'
-                          : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                      }`}
-                    >
-                      <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 mt-0.5">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-xs text-zinc-100 flex items-center gap-1.5">
-                          <span>Live Production Mode</span>
-                          <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500 text-zinc-950 font-extrabold uppercase">Real Money</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
-                          Real payments processed via Razorpay API. Funds automatically settle into your Mohol salon bank account.
-                        </p>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => updateSettings({ paymentGatewayMode: 'test' })}
-                      className={`p-3.5 rounded-xl border text-left transition flex items-start gap-3 cursor-pointer ${
-                        settings.paymentGatewayMode === 'test'
-                          ? 'bg-amber-500/15 border-amber-500 text-white shadow-sm'
-                          : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                      }`}
-                    >
-                      <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 mt-0.5">
-                        <Zap className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-xs text-zinc-100 flex items-center gap-1.5">
-                          <span>Test Sandbox Mode</span>
-                          <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500 text-zinc-950 font-extrabold uppercase">Demo</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
-                          Simulated deposits for staff demonstration and system testing without debiting real bank accounts.
-                        </p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* API Key ID & Secret */}
+                {/* Scanners 1 & 2 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="font-semibold text-zinc-300">
-                        Razorpay Key ID *
+                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-xs text-zinc-200">
+                        Scanner 1 (Primary Salon QR)
                       </label>
-                      <span className="text-[10px] text-zinc-500 font-mono">
-                        (e.g. rzp_live_... or rzp_test_...)
-                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold uppercase">PhonePe UPI</span>
                     </div>
+                    <div className="text-[11px] text-zinc-400">Payee: <strong className="text-zinc-200">MODERN JENTS PARLOUR</strong></div>
                     <input
                       type="text"
-                      placeholder="rzp_live_xxxxxxxxxxxxxx"
-                      value={settings.razorpayKeyId || ''}
-                      onChange={(e) => updateSettings({ razorpayKeyId: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                      value={settings.merchantUpiId || 'ghodakedinesh@ybl'}
+                      onChange={(e) => updateSettings({ merchantUpiId: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
                     />
+                    <span className="text-[10px] text-zinc-500 block">
+                      PhonePe UPI ID used for generating exact service deposit QR codes
+                    </span>
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="font-semibold text-zinc-300">
-                        Razorpay Key Secret *
+                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-xs text-zinc-200">
+                        Scanner 2 (Secondary / Personal QR)
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowRazorpaySecret(!showRazorpaySecret)}
-                        className="text-[10px] text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        {showRazorpaySecret ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        <span>{showRazorpaySecret ? 'Hide Secret' : 'Show Secret'}</span>
-                      </button>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold uppercase">PhonePe UPI</span>
                     </div>
+                    <div className="text-[11px] text-zinc-400">Payee: <strong className="text-zinc-200">DINESH VITTHAL GHODAKE</strong></div>
                     <input
-                      type={showRazorpaySecret ? 'text' : 'password'}
-                      placeholder="Enter 20-character secret key"
-                      value={settings.razorpayKeySecret || ''}
-                      onChange={(e) => updateSettings({ razorpayKeySecret: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                      type="text"
+                      value={settings.secondaryUpiId || '8104026257@axl'}
+                      onChange={(e) => updateSettings({ secondaryUpiId: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
                     />
+                    <span className="text-[10px] text-zinc-500 block">
+                      Secondary backup UPI handle for customer scanning
+                    </span>
                   </div>
                 </div>
 
-                {/* Business UPI ID & Bank Account */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                  <div>
-                    <label className="font-semibold text-zinc-300 block mb-1">
-                      Merchant UPI ID (VPA) *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="8104026257@okicici"
-                      value={settings.merchantUpiId || '8104026257@okicici'}
-                      onChange={(e) => updateSettings({ merchantUpiId: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
-                    />
-                    <span className="text-[10px] text-zinc-500 mt-1 block">
-                      Direct mobile UPI deep-link destination (PhonePe, GPay, Paytm)
-                    </span>
+                {/* HDFC Bank Details */}
+                <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+                  <div className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4" />
+                    <span>HDFC Bank Account Details</span>
                   </div>
 
-                  <div>
-                    <label className="font-semibold text-zinc-300 block mb-1">
-                      Settlement Account Number
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="025701509988"
-                      value={settings.bankAccountNumber || ''}
-                      onChange={(e) => updateSettings({ bankAccountNumber: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
-                    />
-                    <span className="text-[10px] text-zinc-500 mt-1 block">
-                      Salon business bank account for daily settlements
-                    </span>
-                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="font-semibold text-zinc-400 block mb-1">Account Holder</label>
+                      <input
+                        type="text"
+                        value={settings.accountHolder || 'MODERN JENTS PARLOUR'}
+                        onChange={(e) => updateSettings({ accountHolder: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs font-semibold focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="font-semibold text-zinc-300 block mb-1">
-                      Bank IFSC Code
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="ICIC0000257"
-                      value={settings.bankIfsc || ''}
-                      onChange={(e) => updateSettings({ bankIfsc: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
-                    />
-                    <span className="text-[10px] text-zinc-500 mt-1 block">
-                      ICICI Bank, Mohol Branch IFSC
-                    </span>
+                    <div>
+                      <label className="font-semibold text-zinc-400 block mb-1">Account Number</label>
+                      <input
+                        type="text"
+                        value={settings.bankAccountNumber || '50200072074441'}
+                        onChange={(e) => updateSettings({ bankAccountNumber: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-zinc-400 block mb-1">IFSC Code &amp; Branch</label>
+                      <input
+                        type="text"
+                        value={settings.bankIfsc || 'HDFC0000635'}
+                        onChange={(e) => updateSettings({ bankIfsc: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* CARD 2: STEP-BY-STEP PRODUCTION REAL-WORLD PAYMENT GUIDE */}
+              {/* CARD 2: DIRECT BANK UPI & SETTLEMENT GUIDE */}
               <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4 text-xs shadow-sm">
                 <div className="flex items-center gap-2 text-sm font-bold text-amber-400">
                   <Building2 className="w-4 h-4" />
-                  <span>2. Production Deployment Guide: How to Accept Real Money in India</span>
+                  <span>2. Direct Bank &amp; UPI Settlement Workflow</span>
                 </div>
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  To receive real customer money directly in your Indian bank account for Modern Unisex Salon, follow these 5 straightforward steps:
+                  How direct customer booking payments flow without third-party commission deductions:
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
                   <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
                     <div className="flex items-center gap-2 font-bold text-zinc-200">
                       <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">1</span>
-                      <span>Register Merchant Account</span>
+                      <span>Customer Scans QR</span>
                     </div>
                     <p className="text-[11px] text-zinc-400 leading-relaxed">
-                      Visit <a href="https://razorpay.com" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline font-semibold">razorpay.com</a> and sign up with your Salon Business or Individual PAN card.
+                      Customer scans either Scanner 1 (Modern Jents Parlour) or Scanner 2 (Dinesh Ghodake). The exact 10% advance amount is pre-filled.
                     </p>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
                     <div className="flex items-center gap-2 font-bold text-zinc-200">
                       <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">2</span>
-                      <span>Add Bank Account (Mohol Branch)</span>
+                      <span>12-Digit UTR Verification</span>
                     </div>
                     <p className="text-[11px] text-zinc-400 leading-relaxed">
-                      Add your ICICI or any Indian bank account details in the Razorpay dashboard for automated T+1 day settlements.
+                      Customer enters the unique 12-digit UTR from their PhonePe/GPay receipt. The system verifies uniqueness to prevent duplicates.
                     </p>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
                     <div className="flex items-center gap-2 font-bold text-zinc-200">
                       <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">3</span>
-                      <span>Generate Live API Keys</span>
+                      <span>Instant Pass &amp; WhatsApp</span>
                     </div>
                     <p className="text-[11px] text-zinc-400 leading-relaxed">
-                      Switch Razorpay toggle to <strong>"Live Mode"</strong>. Go to <em>Settings &gt; API Keys</em> and click <em>Generate Key</em> to get your <code className="text-amber-300">rzp_live_...</code> Key ID &amp; Key Secret.
+                      100% of the deposit settles straight in your HDFC account. Booking Pass is generated and WhatsApp notification is sent to +91 8104026257.
                     </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
-                    <div className="flex items-center gap-2 font-bold text-zinc-200">
-                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">4</span>
-                      <span>Paste Keys &amp; Switch to Live</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 leading-relaxed">
-                      Paste the Key ID and Key Secret above, select <strong>Live Production Mode</strong>, and click <em>Test Gateway Connection</em>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-3">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="text-[11px] text-zinc-300 leading-relaxed">
-                    <strong className="text-emerald-300">How Customer Payments Work:</strong> When a customer books any hair, skin, or bridal treatment, the system securely collects the 10% advance deposit via Razorpay UPI / Cards. The deposit is credited to your bank account, and an instant booking pass and WhatsApp notification are dispatched to <strong className="text-white">+91 81040 26257</strong>.
                   </div>
                 </div>
               </div>

@@ -43,11 +43,12 @@ export const AppointmentReminderToast: React.FC = () => {
   const [manualTriggerAppointmentId, setManualTriggerAppointmentId] = useState<string | null>(null);
   const [hasPlayedChime, setHasPlayedChime] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
+  const [isSimTriggerDismissed, setIsSimTriggerDismissed] = useState<boolean>(false);
 
-  // Draggable position state (movable popup across screen)
+  // Draggable position state (movable popup across screen on Desktop & Mobile)
   const [position, setPosition] = useState<{ x: number; y: number } | null>(() => {
     try {
-      const saved = sessionStorage.getItem('appointment_reminder_pos');
+      const saved = localStorage.getItem('salon_notification_pos');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
     return null;
@@ -74,13 +75,13 @@ export const AppointmentReminderToast: React.FC = () => {
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('a') || target.closest('input')) return;
+    if (target.closest('button:not([data-drag-handle])') || target.closest('a') || target.closest('input')) return;
     handleStartDrag(e.clientX, e.clientY);
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('a') || target.closest('input')) return;
+    if (target.closest('button:not([data-drag-handle])') || target.closest('a') || target.closest('input')) return;
     if (e.touches[0]) {
       handleStartDrag(e.touches[0].clientX, e.touches[0].clientY);
     }
@@ -91,11 +92,13 @@ export const AppointmentReminderToast: React.FC = () => {
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!dragRef.current) return;
+      const elemWidth = toastRef.current?.offsetWidth || 320;
+      const elemHeight = toastRef.current?.offsetHeight || 80;
       const deltaX = e.clientX - dragRef.current.startX;
       const deltaY = e.clientY - dragRef.current.startY;
       
-      const newX = Math.max(10, Math.min(window.innerWidth - 380, dragRef.current.initialX + deltaX));
-      const newY = Math.max(10, Math.min(window.innerHeight - 150, dragRef.current.initialY + deltaY));
+      const newX = Math.max(8, Math.min(window.innerWidth - elemWidth - 8, dragRef.current.initialX + deltaX));
+      const newY = Math.max(8, Math.min(window.innerHeight - elemHeight - 8, dragRef.current.initialY + deltaY));
 
       const newPos = { x: newX, y: newY };
       setPosition(newPos);
@@ -103,11 +106,16 @@ export const AppointmentReminderToast: React.FC = () => {
 
     const handleTouchMove = (e: TouchEvent) => {
       if (!dragRef.current || !e.touches[0]) return;
+      if (e.cancelable) {
+        e.preventDefault(); // Stop mobile screen scrolling while dragging popup
+      }
+      const elemWidth = toastRef.current?.offsetWidth || 320;
+      const elemHeight = toastRef.current?.offsetHeight || 80;
       const deltaX = e.touches[0].clientX - dragRef.current.startX;
       const deltaY = e.touches[0].clientY - dragRef.current.startY;
 
-      const newX = Math.max(10, Math.min(window.innerWidth - 320, dragRef.current.initialX + deltaX));
-      const newY = Math.max(10, Math.min(window.innerHeight - 150, dragRef.current.initialY + deltaY));
+      const newX = Math.max(8, Math.min(window.innerWidth - elemWidth - 8, dragRef.current.initialX + deltaX));
+      const newY = Math.max(8, Math.min(window.innerHeight - elemHeight - 8, dragRef.current.initialY + deltaY));
 
       const newPos = { x: newX, y: newY };
       setPosition(newPos);
@@ -118,14 +126,14 @@ export const AppointmentReminderToast: React.FC = () => {
       dragRef.current = null;
       if (position) {
         try {
-          sessionStorage.setItem('appointment_reminder_pos', JSON.stringify(position));
+          localStorage.setItem('salon_notification_pos', JSON.stringify(position));
         } catch (e) {}
       }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleEndDrag);
-    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('touchend', handleEndDrag);
 
     return () => {
@@ -139,7 +147,7 @@ export const AppointmentReminderToast: React.FC = () => {
   const handleResetPosition = () => {
     setPosition(null);
     try {
-      sessionStorage.removeItem('appointment_reminder_pos');
+      localStorage.removeItem('salon_notification_pos');
     } catch (e) {}
   };
 
@@ -268,20 +276,76 @@ export const AppointmentReminderToast: React.FC = () => {
   };
 
   if (upcomingReminders.length === 0 || !activeAppointment || !reminderInfo) {
+    if (isSimTriggerDismissed) {
+      return (
+        <AppointmentPassModal
+          appointment={selectedPassAppointment}
+          isOpen={!!selectedPassAppointment}
+          onClose={() => setSelectedPassAppointment(null)}
+        />
+      );
+    }
+
     return (
       <>
-        {/* Floating Mini Simulator Trigger for Demo / Evaluation */}
-        <div className="fixed bottom-4 left-4 z-40">
-          <button
-            id="simulate-24h-reminder-btn"
-            onClick={() => handleTestReminder()}
-            className="px-3.5 py-2 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-yellow-400 border border-yellow-500/40 text-[11px] font-bold flex items-center gap-2 shadow-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer group"
-            title="Test 24-hour in-app appointment reminder notification"
-          >
-            <div className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
-            <Bell className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
-            <span>Test 24-Hr Reminder Alert</span>
-          </button>
+        {/* Floating Movable Mini Simulator Trigger for Demo / Evaluation (Movable on Desktop & Mobile) */}
+        <div
+          ref={toastRef}
+          style={position ? {
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+            position: 'fixed'
+          } : undefined}
+          className={`fixed z-40 flex items-center gap-1.5 select-none ${
+            position
+              ? ''
+              : isAdmin
+                ? 'bottom-4 left-4 sm:bottom-6 sm:left-6 md:left-72'
+                : 'bottom-20 left-4 sm:bottom-6 sm:left-6'
+          }`}
+        >
+          <div className="flex items-center rounded-2xl bg-zinc-900/95 border border-yellow-500/40 shadow-2xl backdrop-blur-md p-1 pl-1.5 gap-1 text-[11px] font-bold text-yellow-400 group">
+            {/* Dedicated Movable Touch & Mouse Grip Handle */}
+            <div
+              onMouseDown={handleMouseDown}
+              onTouchStart={handleTouchStart}
+              className="cursor-grab active:cursor-grabbing p-1.5 text-zinc-400 hover:text-yellow-400 flex items-center justify-center touch-none select-none rounded-lg hover:bg-zinc-800"
+              title="Click & drag anywhere on screen (Desktop & Mobile)"
+            >
+              <Move className="w-3.5 h-3.5 text-yellow-500/80" />
+            </div>
+
+            <button
+              id="simulate-24h-reminder-btn"
+              onClick={() => handleTestReminder()}
+              className="px-2.5 py-1.5 rounded-xl hover:bg-zinc-800 text-yellow-400 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+              title="Test 24-hour in-app appointment reminder notification"
+            >
+              <div className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
+              <Bell className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
+              <span>Test 24-Hr Reminder Alert</span>
+            </button>
+
+            {position && (
+              <button
+                type="button"
+                onClick={handleResetPosition}
+                className="p-1 text-[10px] text-zinc-500 hover:text-yellow-400 cursor-pointer"
+                title="Reset position to default"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsSimTriggerDismissed(true)}
+              className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 cursor-pointer"
+              title="Close notification trigger"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Appointment Pass Modal */}
@@ -294,27 +358,64 @@ export const AppointmentReminderToast: React.FC = () => {
     );
   }
 
-  // If user dismissed or snoozed, render the subtle floating reminder badge / icon on the LEFT side (away from AI assistant)
+  // If user dismissed or snoozed, render the subtle floating reminder badge / icon (Movable on Desktop & Mobile)
   if (isDismissed || isSnoozed) {
     return (
       <>
-        <div className="fixed bottom-20 left-4 sm:bottom-6 sm:left-6 z-40 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <button
-            id="restore-appointment-reminder-btn"
-            onClick={() => {
-              setIsDismissed(false);
-              setSnoozeUntil(null);
-              setIsCollapsed(false);
-            }}
-            className="px-3.5 py-2 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white dark:bg-yellow-500 dark:hover:bg-yellow-400 dark:text-zinc-950 font-bold text-xs flex items-center gap-2 shadow-2xl border border-purple-300 dark:border-yellow-300 transition-all transform hover:scale-105 active:scale-95 cursor-pointer"
-            title="View Upcoming Appointment Reminder"
-          >
-            <div className="relative">
-              <Bell className="w-4 h-4 text-white dark:text-zinc-950 animate-bounce" />
-              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-600" />
+        <div
+          ref={toastRef}
+          style={position ? {
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+            position: 'fixed'
+          } : undefined}
+          className={`fixed z-40 flex items-center gap-1.5 select-none animate-in fade-in slide-in-from-bottom-2 duration-300 ${
+            position
+              ? ''
+              : isAdmin
+                ? 'bottom-20 left-4 sm:bottom-6 sm:left-6 md:left-72'
+                : 'bottom-20 left-4 sm:bottom-6 sm:left-6'
+          }`}
+        >
+          <div className="flex items-center rounded-2xl bg-purple-600 dark:bg-yellow-500 text-white dark:text-zinc-950 font-bold text-xs shadow-2xl border border-purple-300 dark:border-yellow-300 p-1 pl-1.5 gap-1">
+            {/* Movable Touch & Mouse Grip Handle */}
+            <div
+              onMouseDown={handleMouseDown}
+              onTouchStart={handleTouchStart}
+              className="cursor-grab active:cursor-grabbing p-1.5 text-purple-200 dark:text-zinc-800 hover:text-white dark:hover:text-black flex items-center justify-center touch-none select-none rounded-lg"
+              title="Click & drag anywhere on screen (Desktop & Mobile)"
+            >
+              <Move className="w-3.5 h-3.5" />
             </div>
-            <span>Upcoming Appointment ({upcomingReminders.length})</span>
-          </button>
+
+            <button
+              id="restore-appointment-reminder-btn"
+              onClick={() => {
+                setIsDismissed(false);
+                setSnoozeUntil(null);
+                setIsCollapsed(false);
+              }}
+              className="px-2.5 py-1.5 flex items-center gap-2 cursor-pointer active:scale-95 transition"
+              title="View Upcoming Appointment Reminder"
+            >
+              <div className="relative">
+                <Bell className="w-4 h-4 animate-bounce" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-600" />
+              </div>
+              <span>Upcoming Appointment ({upcomingReminders.length})</span>
+            </button>
+
+            {position && (
+              <button
+                type="button"
+                onClick={handleResetPosition}
+                className="p-1 text-purple-200 dark:text-zinc-800 hover:text-white dark:hover:text-black cursor-pointer"
+                title="Reset position"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
 
         <AppointmentPassModal
@@ -352,7 +453,7 @@ export const AppointmentReminderToast: React.FC = () => {
           <div
             onMouseDown={handleMouseDown}
             onTouchStart={handleTouchStart}
-            className="bg-white/95 dark:bg-[#141419]/95 backdrop-blur-md border-2 border-purple-400 dark:border-amber-500/50 rounded-2xl p-3 shadow-2xl flex items-center justify-between gap-3 text-left animate-in slide-in-from-top-4 duration-300 cursor-grab active:cursor-grabbing select-none"
+            className="bg-white/95 dark:bg-[#141419]/95 backdrop-blur-md border-2 border-purple-400 dark:border-amber-500/50 rounded-2xl p-3 shadow-2xl flex items-center justify-between gap-3 text-left animate-in slide-in-from-top-4 duration-300 cursor-grab active:cursor-grabbing select-none touch-none"
             title="Click and drag anywhere to move"
           >
             <div className="flex items-center gap-2.5 truncate">
@@ -397,7 +498,7 @@ export const AppointmentReminderToast: React.FC = () => {
             <div
               onMouseDown={handleMouseDown}
               onTouchStart={handleTouchStart}
-              className="px-4 py-1.5 bg-zinc-100/90 dark:bg-zinc-800/90 border-b border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between cursor-grab active:cursor-grabbing select-none text-[10px] text-zinc-500 font-semibold"
+              className="px-4 py-1.5 bg-zinc-100/90 dark:bg-zinc-800/90 border-b border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between cursor-grab active:cursor-grabbing select-none touch-none text-[10px] text-zinc-500 font-semibold"
               title="Click and drag to move this alert anywhere on your screen"
             >
               <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">

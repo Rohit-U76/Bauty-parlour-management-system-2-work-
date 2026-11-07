@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { ModernSalonLogo } from './ModernSalonLogo';
+import { GoogleAccountSelectModal } from './GoogleAccountSelectModal';
 
 export const AuthModal: React.FC = () => {
   const {
@@ -34,6 +35,7 @@ export const AuthModal: React.FC = () => {
   } = useSalon();
 
   const [activeTab, setActiveTab] = useState<'customer_login' | 'customer_register' | 'admin_login'>('customer_login');
+  const [showGoogleModal, setShowGoogleModal] = useState<boolean>(false);
 
   // Customer Form State
   const [customerIdentifier, setCustomerIdentifier] = useState('');
@@ -131,40 +133,31 @@ export const AuthModal: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setErrorMsg('');
     setSuccessMsg('');
+
+    // Check if official Google Identity Services library is loaded with a real configured Client ID
+    const win = window as any;
+    const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '';
+    const isRealClientId = clientId && !clientId.includes('your_google_client_id');
+    if (win.google && win.google.accounts && win.google.accounts.id && isRealClientId) {
+      try {
+        win.google.accounts.id.prompt();
+        return;
+      } catch (e) {
+        console.warn('GIS prompt error, opening standard account modal:', e);
+      }
+    }
+
+    // Standard Google Account Select Modal
+    setShowGoogleModal(true);
+  };
+
+  const handleSelectGoogleAccount = async (profile: { email: string; name: string; picture: string; sub: string }) => {
+    setErrorMsg('');
+    setSuccessMsg('');
     setIsLoading(true);
 
     try {
-      // Check if official Google Identity Services library is loaded
-      const win = window as any;
-      if (win.google && win.google.accounts && win.google.accounts.id && process.env.VITE_GOOGLE_CLIENT_ID) {
-        win.google.accounts.id.prompt();
-        setIsLoading(false);
-        return;
-      }
-
-      // Seamless and reliable Google Account sign-in interaction
-      const promptEmail = window.prompt(
-        'Sign in with Google:\nEnter your Google Email address (or press OK to sign in with default Google Account):',
-        'rohitumdale@gmail.com'
-      );
-
-      if (promptEmail === null) {
-        setIsLoading(false);
-        return;
-      }
-
-      const emailToUse = (promptEmail.trim() || 'rohitumdale@gmail.com').toLowerCase();
-      const extractedName = emailToUse.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-      const res = await loginWithGoogle({
-        profile: {
-          email: emailToUse,
-          name: extractedName,
-          picture: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(extractedName)}`,
-          sub: `google_oauth_${Date.now()}`
-        }
-      });
-
+      const res = await loginWithGoogle({ profile });
       setIsLoading(false);
       if (res.success) {
         setSuccessMsg(res.message);
@@ -710,6 +703,14 @@ export const AuthModal: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Standard Google Account Chooser Modal */}
+      <GoogleAccountSelectModal
+        isOpen={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        onSelectAccount={handleSelectGoogleAccount}
+        isRegistering={activeTab === 'customer_register'}
+      />
     </div>
   );
 };

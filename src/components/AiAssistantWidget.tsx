@@ -201,7 +201,7 @@ export const AiAssistantWidget: React.FC = () => {
           <div className="bg-purple-100/70 dark:bg-yellow-500/10 border-b border-purple-200 dark:border-yellow-500/20 px-3 py-1.5 text-[11px] text-purple-950 dark:text-yellow-300/90 flex items-center justify-between">
             <span className="flex items-center gap-1 font-medium">
               <ShieldCheck className="w-3.5 h-3.5 text-purple-700 dark:text-yellow-400" />
-              {advPct}% Advance Deposit Razorpay Gateway
+              {advPct}% Advance Deposit Direct UPI Scanner
             </span>
             <button
               onClick={() => {

@@ -34,7 +34,7 @@ export const RescheduleModal: React.FC<RescheduleModalProps> = ({
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split('T')[0];
   });
-  const [selectedSlot, setSelectedSlot] = useState('11:45 AM');
+  const [selectedSlot, setSelectedSlot] = useState(SALON_TIME_SLOTS[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -177,7 +177,7 @@ export const RescheduleModal: React.FC<RescheduleModalProps> = ({
             <label className="block text-xs font-bold text-zinc-800 dark:text-zinc-200">
               Select Preferred Time Slot
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
               {SALON_TIME_SLOTS.map(slot => {
                 const slotInfo = getSlotAvailability(appointments, selectedDate, slot);
                 const isSoldOut = slotInfo.status === 'SOLD_OUT';
@@ -189,7 +189,7 @@ export const RescheduleModal: React.FC<RescheduleModalProps> = ({
                     type="button"
                     disabled={isSoldOut}
                     onClick={() => setSelectedSlot(slot)}
-                    className={`p-2 rounded-xl text-xs font-bold transition flex flex-col justify-between text-left ${
+                    className={`p-2.5 rounded-xl text-xs font-bold transition flex flex-col justify-between text-left ${
                       isSoldOut
                         ? 'opacity-40 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed border border-transparent'
                         : isSelected
@@ -206,8 +206,13 @@ export const RescheduleModal: React.FC<RescheduleModalProps> = ({
                           ? 'bg-zinc-950 text-amber-400'
                           : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                       }`}>
-                        {isSoldOut ? 'Full' : 'Open'}
+                        {isSoldOut ? slotInfo.statusLabel : `${slotInfo.remainingSeats} Seats`}
                       </span>
+                    </div>
+                    <div className={`text-[10px] mt-1 font-normal ${
+                      isSelected ? 'text-zinc-950/80 font-semibold' : 'text-zinc-500 dark:text-zinc-400'
+                    }`}>
+                      {slotInfo.urgencyText}
                     </div>
                   </button>
                 );

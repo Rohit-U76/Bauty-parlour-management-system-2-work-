@@ -772,11 +772,14 @@ export const INITIAL_SERVICES: ServiceItem[] = [
   }
 ];
 
-// Helper to get relative ISO date string (e.g. today, tomorrow, etc.)
+// Helper to get relative ISO date string using local date (avoids UTC timezone shift bug)
 const getRelativeDate = (offsetDays: number = 0) => {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().split('T')[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 export const INITIAL_APPOINTMENTS: Appointment[] = [
@@ -790,8 +793,8 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceId: 'srv-sk-6',
     serviceName: 'O3 Prof. Facial',
     category: 'Skin Services',
-    date: getRelativeDate(0), // Today
-    timeSlot: '05:30 PM',
+    date: getRelativeDate(-2), // Past Appointment Record
+    timeSlot: '03:00 PM - 06:00 PM',
     stylistName: 'Self-Employed (Master Stylist & Founder)',
     totalAmount: 2500,
     advancePaid: 250,
@@ -799,8 +802,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'CONFIRMED',
     status: 'CONFIRMED',
-    razorpayPaymentId: 'pay_rzp_9841289410',
-    razorpayOrderId: 'order_891024',
+    upiTransactionId: '431092841021',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'MODERN JENTS PARLOUR',
     createdAt: new Date().toISOString(),
     notes: 'Sensitive skin near cheekbones, requested O3+ brightening treatment.'
   },
@@ -814,8 +818,8 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceId: 'srv-mu-2',
     serviceName: 'HD Make Up',
     category: 'Make Up',
-    date: getRelativeDate(0), // Today
-    timeSlot: '05:30 PM',
+    date: getRelativeDate(-2), // Past Appointment Record
+    timeSlot: '03:00 PM - 06:00 PM',
     stylistName: 'Senior Beauty & Skin Specialist',
     totalAmount: 5000,
     advancePaid: 500,
@@ -823,8 +827,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'PENDING',
     status: 'PENDING',
-    razorpayPaymentId: 'pay_rzp_9841289411',
-    razorpayOrderId: 'order_891025',
+    upiTransactionId: '431092841022',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'MODERN JENTS PARLOUR',
     createdAt: new Date().toISOString(),
     notes: 'Family function evening makeup. Pending deposit verification.'
   },
@@ -838,8 +843,8 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceId: 'srv-hr-5',
     serviceName: 'Advance Hair Cut & Blow Dry',
     category: 'Hair Services',
-    date: getRelativeDate(0), // Today
-    timeSlot: '11:45 AM',
+    date: getRelativeDate(-2), // Past Appointment Record
+    timeSlot: '09:00 AM - 12:00 PM',
     stylistName: 'Self-Employed (Master Stylist & Founder)',
     totalAmount: 550,
     advancePaid: 55,
@@ -847,8 +852,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'CONFIRMED',
     status: 'CONFIRMED',
-    razorpayPaymentId: 'pay_rzp_773412998',
-    razorpayOrderId: 'order_773412',
+    upiTransactionId: '431092841023',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'DINESH VITTHAL GHODAKE',
     createdAt: new Date().toISOString(),
     notes: 'Fade cut with textured top volume.'
   },
@@ -862,8 +868,8 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceId: 'srv-men-1',
     serviceName: "Men's Fade & Beard Sculpt",
     category: "Men's Executive Grooming",
-    date: getRelativeDate(0), // Today
-    timeSlot: '11:45 AM',
+    date: getRelativeDate(-2), // Past Appointment Record
+    timeSlot: '09:00 AM - 12:00 PM',
     stylistName: 'Certified Hair & Chemical Treatment Expert',
     totalAmount: 450,
     advancePaid: 45,
@@ -871,8 +877,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'PENDING',
     status: 'PENDING',
-    razorpayPaymentId: 'pay_rzp_773412999',
-    razorpayOrderId: 'order_773413',
+    upiTransactionId: '431092841024',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'MODERN JENTS PARLOUR',
     createdAt: new Date().toISOString(),
     notes: 'Beard line-up with steam & hot towel.'
   },
@@ -886,8 +893,8 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceId: 'srv-ch-3',
     serviceName: 'Keratin Treatment',
     category: 'Hair Chemical Services',
-    date: getRelativeDate(0), // Today
-    timeSlot: '06:45 PM',
+    date: getRelativeDate(-3), // Past Appointment Record
+    timeSlot: '06:00 PM - 10:00 PM',
     stylistName: 'Certified Hair & Chemical Treatment Expert',
     totalAmount: 4000,
     advancePaid: 400,
@@ -895,8 +902,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'CONFIRMED',
     status: 'CONFIRMED',
-    razorpayPaymentId: 'pay_rzp_773413000',
-    razorpayOrderId: 'order_773414',
+    upiTransactionId: '431092841025',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'MODERN JENTS PARLOUR',
     createdAt: new Date().toISOString(),
     notes: 'Keratin treatment.'
   },
@@ -910,8 +918,8 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceId: 'srv-men-2',
     serviceName: "Men's Charcoal D-Tan & Facial",
     category: "Men's Executive Grooming",
-    date: getRelativeDate(0), // Today
-    timeSlot: '06:45 PM',
+    date: getRelativeDate(-3), // Past Appointment Record
+    timeSlot: '06:00 PM - 10:00 PM',
     stylistName: 'Senior Beauty & Skin Specialist',
     totalAmount: 650,
     advancePaid: 65,
@@ -919,8 +927,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'PENDING',
     status: 'PENDING',
-    razorpayPaymentId: 'pay_rzp_773413001',
-    razorpayOrderId: 'order_773415',
+    upiTransactionId: '431092841026',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'DINESH VITTHAL GHODAKE',
     createdAt: new Date().toISOString(),
     notes: 'Charcoal facial post-work.'
   },
@@ -934,8 +943,8 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceId: 'srv-hr-3',
     serviceName: 'Hair Spa Intensive',
     category: 'Hair Services',
-    date: getRelativeDate(0), // Today
-    timeSlot: '02:45 PM',
+    date: getRelativeDate(-3), // Past Appointment Record
+    timeSlot: '12:00 PM - 03:00 PM',
     stylistName: 'Self-Employed (Master Stylist & Founder)',
     totalAmount: 850,
     advancePaid: 85,
@@ -943,8 +952,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'PENDING',
     status: 'PENDING',
-    razorpayPaymentId: 'pay_rzp_773413002',
-    razorpayOrderId: 'order_773416',
+    upiTransactionId: '431092841027',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'MODERN JENTS PARLOUR',
     createdAt: new Date().toISOString(),
     notes: 'Deep conditioning spa.'
   },
@@ -959,7 +969,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceName: 'HD Make Up',
     category: 'Make Up',
     date: getRelativeDate(1), // Tomorrow
-    timeSlot: '11:45 AM',
+    timeSlot: '09:00 AM - 12:00 PM',
     stylistName: 'Self-Employed (Master Stylist & Founder)',
     totalAmount: 5000,
     advancePaid: 500,
@@ -967,8 +977,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'CONFIRMED',
     status: 'CONFIRMED',
-    razorpayPaymentId: 'pay_rzp_664190112',
-    razorpayOrderId: 'order_664190',
+    upiTransactionId: '431092841028',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'MODERN JENTS PARLOUR',
     createdAt: new Date().toISOString(),
     notes: 'Family function evening makeup, requested golden eyes and matte lips.'
   },
@@ -983,7 +994,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceName: "Men's Fade & Beard Sculpt",
     category: "Men's Executive Grooming",
     date: getRelativeDate(1), // Tomorrow
-    timeSlot: '05:30 PM',
+    timeSlot: '03:00 PM - 06:00 PM',
     stylistName: 'Self-Employed (Master Stylist & Founder)',
     totalAmount: 450,
     advancePaid: 45,
@@ -991,8 +1002,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'PENDING',
     status: 'PENDING',
-    razorpayPaymentId: 'pay_rzp_551982341',
-    razorpayOrderId: 'order_551982',
+    upiTransactionId: '431092841029',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'DINESH VITTHAL GHODAKE',
     createdAt: new Date().toISOString(),
     notes: 'Skin fade with sharp razor beard edging.'
   },
@@ -1007,7 +1019,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceName: 'Keratin Treatment',
     category: 'Hair Chemical Services',
     date: getRelativeDate(-7),
-    timeSlot: '01:30 PM',
+    timeSlot: '12:00 PM - 03:00 PM',
     stylistName: 'Self-Employed (Master Stylist & Founder)',
     totalAmount: 4000,
     advancePaid: 400,
@@ -1015,8 +1027,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'COMPLETED',
     status: 'COMPLETED',
-    razorpayPaymentId: 'pay_rzp_448211098',
-    razorpayOrderId: 'order_448211',
+    upiTransactionId: '431092841030',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'MODERN JENTS PARLOUR',
     createdAt: '2026-08-02T11:45:00Z',
     notes: 'Keratin protein treatment for frizzy medium hair.'
   },
@@ -1031,7 +1044,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     serviceName: "Men's Charcoal D-Tan & Facial",
     category: "Men's Executive Grooming",
     date: getRelativeDate(-12),
-    timeSlot: '06:45 PM',
+    timeSlot: '06:00 PM - 10:00 PM',
     stylistName: 'Self-Employed (Master Stylist & Founder)',
     totalAmount: 650,
     advancePaid: 65,
@@ -1039,8 +1052,9 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     paymentStatus: 'PAID',
     bookingStatus: 'COMPLETED',
     status: 'COMPLETED',
-    razorpayPaymentId: 'pay_rzp_339870112',
-    razorpayOrderId: 'order_339870',
+    upiTransactionId: '431092841031',
+    paymentMethod: 'Direct Bank UPI / Scanner',
+    scannerUsed: 'MODERN JENTS PARLOUR',
     createdAt: '2026-07-29T15:20:00Z',
     notes: 'Charcoal d-tan post outdoor sports.'
   }
@@ -1398,22 +1412,27 @@ export const INITIAL_SETTINGS: SalonSettings = {
   salonName: 'Modern Unisex Salon',
   tagline: "WE'LL STYLE YOU'LL SMILE",
   phone: '8104026257',
-  email: 'modernsalon02@gmail.com',
+  email: 'dineshghodake941@gmail.com',
   address: 'B.N. GUND COMPLEX, NEAR KANYA PRASHALA AND ICICI BANK, MOHOL - 413213',
-  openingHours: 'Mon - Sun: 09:00 AM - 09:00 PM',
+  openingHours: 'Mon - Sun: 09:00 AM - 10:00 PM',
   advancePercentage: 10,
   currencySymbol: '₹',
-  razorpayKeyId: 'rzp_test_modern_salon_mohol',
-  razorpayKeySecret: '',
-  paymentGatewayMode: 'test',
-  merchantUpiId: '8104026257@okicici',
-  bankAccountNumber: '025701509988',
-  bankIfsc: 'ICIC0000257',
+  accountHolder: 'MODERN JENTS PARLOUR',
+  bankName: 'HDFC Bank',
+  bankAccountNumber: '50200072074441',
+  bankIfsc: 'HDFC0000635',
+  bankBranch: 'SOLAPUR',
+  bankAccountType: 'Current Account',
+  merchantUpiId: 'ghodakedinesh@ybl',
+  secondaryUpiId: '8104026257@axl',
   bookingAutoConfirm: false,
   instagramUrl: 'https://www.instagram.com/modern_unisex_salon_mohol',
   mapsUrl: 'https://maps.app.goo.gl/CraeBa6gAjWA8o818',
   gstNumber: '27AABCM8104M1Z2 (Available on Invoice)',
-  staffType: 'Self-Employed (Master Stylist & Founder)'
+  staffType: 'Self-Employed (Master Stylist & Founder)',
+  blockedWindows: [],
+  isOwnerOnBreakToday: false,
+  breakNoticeMessage: 'The salon owner is taking a short break. Booking slots are temporarily unavailable.'
 };
 
 export const INITIAL_USERS: import('../types').User[] = [

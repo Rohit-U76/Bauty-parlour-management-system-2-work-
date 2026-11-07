@@ -22,6 +22,7 @@ import {
 import { useSalon } from '../context/SalonContext';
 import { ModernSalonLogo } from './ModernSalonLogo';
 import { ThemeToggle } from './ThemeToggle';
+import { GoogleAccountSelectModal } from './GoogleAccountSelectModal';
 
 export const AuthGatewayScreen: React.FC = () => {
   const {
@@ -57,6 +58,7 @@ export const AuthGatewayScreen: React.FC = () => {
   // Feedback State
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [showGoogleModal, setShowGoogleModal] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const availableServicePicks = [
@@ -125,31 +127,31 @@ export const AuthGatewayScreen: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setErrorMsg('');
     setSuccessMsg('');
+
+    // Check if official Google Identity Services library is loaded with a real configured Client ID
+    const win = window as any;
+    const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '';
+    const isRealClientId = clientId && !clientId.includes('your_google_client_id');
+    if (win.google && win.google.accounts && win.google.accounts.id && isRealClientId) {
+      try {
+        win.google.accounts.id.prompt();
+        return;
+      } catch (e) {
+        console.warn('GIS prompt error, opening standard account modal:', e);
+      }
+    }
+
+    // Standard Google Account Select Modal
+    setShowGoogleModal(true);
+  };
+
+  const handleSelectGoogleAccount = async (profile: { email: string; name: string; picture: string; sub: string }) => {
+    setErrorMsg('');
+    setSuccessMsg('');
     setIsLoading(true);
 
     try {
-      const promptEmail = window.prompt(
-        'Sign in with Google:\nEnter your Google Email address (or press OK to sign in with default Google Account):',
-        'rohitumdale@gmail.com'
-      );
-
-      if (promptEmail === null) {
-        setIsLoading(false);
-        return;
-      }
-
-      const emailToUse = (promptEmail.trim() || 'rohitumdale@gmail.com').toLowerCase();
-      const extractedName = emailToUse.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-      const res = await loginWithGoogle({
-        profile: {
-          email: emailToUse,
-          name: extractedName,
-          picture: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(extractedName)}`,
-          sub: `google_oauth_${Date.now()}`
-        }
-      });
-
+      const res = await loginWithGoogle({ profile });
       setIsLoading(false);
       if (res.success) {
         setSuccessMsg(res.message);
@@ -613,7 +615,7 @@ export const AuthGatewayScreen: React.FC = () => {
                 <div className="p-3 rounded-2xl bg-purple-100/80 dark:bg-amber-500/10 border border-purple-200 dark:border-amber-500/30 flex items-center gap-2.5">
                   <Crown className="w-5 h-5 text-purple-700 dark:text-amber-400 shrink-0" />
                   <div className="text-xs text-zinc-700 dark:text-zinc-300">
-                    <span className="font-bold text-purple-900 dark:text-amber-300">Owner Access:</span> Manage appointments, edit rate cards, view Razorpay transactions, and handle inquiries.
+                    <span className="font-bold text-purple-900 dark:text-amber-300">Owner Access:</span> Manage appointments, edit rate cards, view Direct Bank UPI transactions, and handle inquiries.
                   </div>
                 </div>
 
@@ -731,6 +733,14 @@ export const AuthGatewayScreen: React.FC = () => {
           &copy; {new Date().getFullYear()} {settings.salonName} • {settings.address} • Contact: {settings.phone}
         </p>
       </footer>
+
+      {/* Standard Google Account Chooser Modal */}
+      <GoogleAccountSelectModal
+        isOpen={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        onSelectAccount={handleSelectGoogleAccount}
+        isRegistering={activeTab === 'customer_register'}
+      />
     </div>
   );
 };

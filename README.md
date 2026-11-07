@@ -87,11 +87,24 @@ For complete production server setup, MySQL database export/import, and client h
 ### 5. 🎁 Service Bundle Builder
 - Interactive multi-service package builder allowing clients to customize packages and get bundled discounts.
 
-### 6. 💳 Advance Deposit & Payment Gateways
-- Supports online 10% advance deposit via Razorpay with fallback UPI QR code generation (`NPCI UPI deep links`).
-- Salon owner UPI VPA configurable in Salon Settings.
+### 6. 💳 Direct Bank UPI & Automated Bank SMS Verification (0% Gateway Fee)
+- 100% direct deposit into Salon's HDFC Bank current account (`50200072074441`) and PhonePe Merchant (`ghodakedinesh@ybl`), eliminating 2% third-party gateway deductions.
+- Dynamic NPCI UPI QR code generation with exact advance deposit amount pre-locked.
+- Automated Bank SMS webhook engine (`/api/webhooks/bank-sms`) with 12-digit UTR regex parsing and instant auto-matching.
+- Live Webhook Testing Simulator in Admin Suite for presentations, college viva, and demo without real bank transfers.
+- 15-minute chair hold protection against telecom latency, plus 1-click admin manual approval/rejection.
 
-### 7. 🛡️ System Robustness & Database Engine
+### 7. ⏱️ 3-Hour Slot Batches & Real-Time Chair Capacity (9 AM - 10 PM)
+- Salon operates between 9:00 AM and 10:00 PM with 3-hour booking batches:
+  - `09:00 AM - 12:00 PM` (Morning Batch)
+  - `12:00 PM - 03:00 PM` (Afternoon Batch)
+  - `03:00 PM - 06:00 PM` (Late Afternoon Batch)
+  - `06:00 PM - 10:00 PM` (Evening & Night Batch - 4 hrs)
+- Strictly limited to a maximum of 3 clients per slot with dynamic real-time chair availability calculation.
+- Past slots on the current day are automatically marked as unavailable.
+- Owner Break / Blackout manager allows salon owner to block dates with reason banners.
+
+### 8. 🛡️ System Robustness & Database Engine
 - Native MySQL 8.0+ relational persistence layer with automated migration tools (`npm run db:migrate`).
 - Resilient fallback to local JSON database (`data/db.json`) during offline development.
 - Cross-platform LF line-ending normalization via `.gitattributes`.
