@@ -32,63 +32,7 @@ function initDb() {
   }
   if (!fs.existsSync(DB_FILE)) {
     const initialDb = {
-      users: [
-        {
-          id: 'usr-admin-1',
-          name: 'Salon Owner & Master Stylist',
-          username: 'admin',
-          email: 'admin@modernsalon.com',
-          phone: '8104026257',
-          role: 'ADMIN',
-          password: 'admin',
-          pin: '9999',
-          memberTier: 'Owner Admin',
-          loyaltyPoints: 5000,
-          memberSince: '2022'
-        },
-        {
-          id: 'usr-cust-1',
-          name: 'Priya Sharma',
-          username: 'priya',
-          email: 'priya.sharma@example.com',
-          phone: '9822012345',
-          role: 'CUSTOMER',
-          password: 'password123',
-          memberTier: 'VIP Member',
-          loyaltyPoints: 450,
-          totalVisits: 0,
-          memberSince: '2023',
-          preferredServices: ['HD Party Make Up', 'Cheryla’s Facial', 'Hair Spa']
-        },
-        {
-          id: 'usr-cust-2',
-          name: 'Rahul Kadam',
-          username: 'rahul',
-          email: 'rahul.kadam@gmail.com',
-          phone: '9423078901',
-          role: 'CUSTOMER',
-          password: 'password123',
-          memberTier: 'Standard',
-          loyaltyPoints: 180,
-          totalVisits: 0,
-          memberSince: '2024',
-          preferredServices: ["Men's Fade & Beard Sculpt", 'Face Clean Up']
-        },
-        {
-          id: 'usr-cust-3',
-          name: 'Rohit Umdale',
-          username: 'rohit',
-          email: 'rohitumdale@gmail.com',
-          phone: '8104026257',
-          role: 'CUSTOMER',
-          password: 'password123',
-          memberTier: 'VIP Member',
-          loyaltyPoints: 500,
-          totalVisits: 0,
-          memberSince: '2023',
-          preferredServices: ['3D/4D HD Bridal & Grooming', "Men's Fade & Beard Sculpt", "L'Oréal Hair Spa"]
-        }
-      ],
+      users: [],
       settings: {
         salonName: 'Modern Unisex Salon',
         tagline: "WE'LL STYLE YOU'LL SMILE",
@@ -653,13 +597,18 @@ async function startServer() {
       const cleanIdent = identifier.toLowerCase().trim();
       const cleanNum = identifier.replace(/[^0-9]/g, '');
 
-      // Special Owner PIN check for 9999
-      if ((cleanIdent === 'admin' || cleanNum === '8104026257' || role === 'ADMIN') && (password === '9999' || password === 'admin')) {
+      // Admin Master Password / PIN check against settings
+      const adminPass = (db.settings && db.settings.adminPassword) || 'Salon@Owner#2026';
+      const adminPin = (db.settings && db.settings.adminPin) || '8104';
+      const isMasterPassMatch = password === adminPass || (adminPin && password === adminPin);
+      const isRecognizedAdminIdent = cleanIdent === 'admin' || cleanIdent === 'owner' || cleanIdent === 'rohitumdale@gmail.com' || cleanNum === '8104026257';
+
+      if (role === 'ADMIN' && isMasterPassMatch && isRecognizedAdminIdent) {
         const adminUser = db.users.find((u: any) => u.role === 'ADMIN') || {
-          id: 'usr-admin-1',
-          name: 'Salon Owner & Master Stylist',
+          id: 'usr-admin-owner',
+          name: 'Salon Owner (Rohit Umdale)',
           username: 'admin',
-          email: 'admin@modernsalon.com',
+          email: 'rohitumdale@gmail.com',
           phone: '8104026257',
           role: 'ADMIN',
           memberTier: 'Owner Admin',

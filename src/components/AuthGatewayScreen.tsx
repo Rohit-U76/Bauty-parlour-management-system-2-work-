@@ -29,12 +29,17 @@ export const AuthGatewayScreen: React.FC = () => {
     login,
     loginWithGoogle,
     registerCustomer,
+    checkEmailVerification,
+    resendVerificationEmail,
+    resetPassword,
     setIsGuestMode,
     settings,
     currentUser
   } = useSalon();
 
-  const [activeTab, setActiveTab] = useState<'customer_login' | 'customer_register' | 'admin_login'>('customer_login');
+  const [activeTab, setActiveTab] = useState<
+    'customer_login' | 'customer_register' | 'admin_login' | 'pending_verification' | 'forgot_password' | 'admin_forgot_password'
+  >('customer_login');
 
   // Customer Login Form State
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -50,16 +55,22 @@ export const AuthGatewayScreen: React.FC = () => {
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
+  // Forgot Password State
+  const [forgotEmail, setForgotEmail] = useState('');
+
   // Admin Form State
-  const [adminIdentifier, setAdminIdentifier] = useState('admin');
+  const [adminIdentifier, setAdminIdentifier] = useState('rohitumdale@gmail.com');
   const [adminSecret, setAdminSecret] = useState('');
   const [showAdminSecret, setShowAdminSecret] = useState(false);
 
   // Feedback State
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [showGoogleModal, setShowGoogleModal] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [isCheckingVerification, setIsCheckingVerification] = useState(false);
 
   const availableServicePicks = [
     '3D/4D Bridal Makeup',
@@ -82,6 +93,10 @@ export const AuthGatewayScreen: React.FC = () => {
       setSuccessMsg(res.message);
     } else {
       setErrorMsg(res.message);
+      if (res.emailUnverified) {
+        setUnverifiedEmail(res.email || loginIdentifier);
+        setActiveTab('pending_verification');
+      }
     }
   };
 
@@ -101,6 +116,77 @@ export const AuthGatewayScreen: React.FC = () => {
     });
     setIsLoading(false);
 
+    if (res.success) {
+      setSuccessMsg(res.message);
+      setUnverifiedEmail(res.email || regEmail);
+      setActiveTab('pending_verification');
+    } else {
+      setErrorMsg(res.message);
+    }
+  };
+
+  const handleCheckVerification = async () => {
+    const targetEmail = unverifiedEmail || regEmail || loginIdentifier;
+    const targetPassword = regPassword || loginPassword;
+    setIsCheckingVerification(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const res = await checkEmailVerification(targetEmail, targetPassword);
+    setIsCheckingVerification(false);
+
+    if (res.verified) {
+      setSuccessMsg(res.message);
+      try {
+        const confetti = (await import('canvas-confetti')).default;
+        confetti({ particleCount: 70, spread: 60 });
+      } catch {}
+    } else {
+      setErrorMsg(res.message);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    setIsLoading(true);
+
+    const res = await resetPassword(forgotEmail);
+    setIsLoading(false);
+    if (res.success) {
+      setSuccessMsg(res.message);
+    } else {
+      setErrorMsg(res.message);
+    }
+  };
+
+  const handleAdminForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    setIsLoading(true);
+
+    const target = settings.adminEmails?.[0] || 'rohitumdale@gmail.com';
+    const res = await resetPassword(target);
+    setIsLoading(false);
+    if (res.success) {
+      setSuccessMsg(`Password reset link dispatched to authorized salon owner email (${target}). Please check your inbox.`);
+    } else {
+      setErrorMsg(res.message);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    const targetEmail = unverifiedEmail || regEmail || loginIdentifier;
+    const targetPassword = regPassword || loginPassword;
+    if (!targetEmail) {
+      setErrorMsg('Please enter your email to resend verification link.');
+      return;
+    }
+    setIsResending(true);
+    const res = await resendVerificationEmail(targetEmail, targetPassword);
+    setIsResending(false);
     if (res.success) {
       setSuccessMsg(res.message);
     } else {
@@ -124,25 +210,23 @@ export const AuthGatewayScreen: React.FC = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (role: 'ADMIN' | 'CUSTOMER' = 'CUSTOMER') => {
     setErrorMsg('');
     setSuccessMsg('');
+    setIsLoading(true);
 
-    // Check if official Google Identity Services library is loaded with a real configured Client ID
-    const win = window as any;
-    const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '';
-    const isRealClientId = clientId && !clientId.includes('your_google_client_id');
-    if (win.google && win.google.accounts && win.google.accounts.id && isRealClientId) {
-      try {
-        win.google.accounts.id.prompt();
-        return;
-      } catch (e) {
-        console.warn('GIS prompt error, opening standard account modal:', e);
+    try {
+      const res = await loginWithGoogle({ forRole: role });
+      setIsLoading(false);
+      if (res.success) {
+        setSuccessMsg(res.message);
+      } else {
+        setErrorMsg(res.message);
       }
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err.message || 'Google sign-in could not be completed.');
     }
-
-    // Standard Google Account Select Modal
-    setShowGoogleModal(true);
   };
 
   const handleSelectGoogleAccount = async (profile: { email: string; name: string; picture: string; sub: string }) => {
@@ -151,7 +235,7 @@ export const AuthGatewayScreen: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const res = await loginWithGoogle({ profile });
+      const res = await loginWithGoogle({ profile, forRole: activeTab === 'admin_login' ? 'ADMIN' : 'CUSTOMER' });
       setIsLoading(false);
       if (res.success) {
         setSuccessMsg(res.message);
@@ -162,18 +246,6 @@ export const AuthGatewayScreen: React.FC = () => {
       setIsLoading(false);
       setErrorMsg(err.message || 'Google sign-in error occurred.');
     }
-  };
-
-  const quickFill = (identifier: string, pass: string, tab: 'customer_login' | 'admin_login') => {
-    setActiveTab(tab);
-    if (tab === 'customer_login') {
-      setLoginIdentifier(identifier);
-      setLoginPassword(pass);
-    } else {
-      setAdminIdentifier(identifier);
-      setAdminSecret(pass);
-    }
-    setErrorMsg('');
   };
 
   const toggleService = (srv: string) => {
@@ -315,13 +387,47 @@ export const AuthGatewayScreen: React.FC = () => {
               </div>
             )}
 
+            {unverifiedEmail && (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-900 dark:text-amber-200 flex flex-col gap-2 animate-in fade-in">
+                <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+                  <Mail className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <span>Email Confirmation Link Required</span>
+                </div>
+                <p className="text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                  A verification link has been sent to <strong>{unverifiedEmail}</strong>. Please check your inbox &amp; spam folder. You must click the confirmation link before you can log in.
+                </p>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={isResending}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isResending ? 'Resending Link...' : 'Resend Verification Email'}
+                  </button>
+                  {activeTab !== 'customer_login' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('customer_login');
+                        setErrorMsg('');
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-purple-100 dark:bg-zinc-800 text-purple-900 dark:text-zinc-200 font-semibold text-xs transition cursor-pointer"
+                    >
+                      Go to Sign In
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* TAB 1: CUSTOMER LOGIN */}
             {activeTab === 'customer_login' && (
               <form onSubmit={handleCustomerLogin} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-purple-600 dark:text-amber-500" />
-                    <span>Username, Email, or Mobile Number</span>
+                    <span>Email, Username, or Mobile Number</span>
                   </label>
                   <input
                     type="text"
@@ -329,7 +435,7 @@ export const AuthGatewayScreen: React.FC = () => {
                     id="login-username-input"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="e.g. rohit / priya / rohitumdale@gmail.com / 8104026257"
+                    placeholder="e.g. rohit@gmail.com / 8104026257"
                     className="w-full px-4 py-3 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none transition"
                   />
                 </div>
@@ -340,9 +446,18 @@ export const AuthGatewayScreen: React.FC = () => {
                       <Lock className="w-3.5 h-3.5 text-purple-600 dark:text-amber-500" />
                       <span>Password</span>
                     </label>
-                    <span className="text-[11px] text-zinc-500 font-mono">
-                      (Default: password123)
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotEmail(loginIdentifier.includes('@') ? loginIdentifier : '');
+                        setActiveTab('forgot_password');
+                        setErrorMsg('');
+                        setSuccessMsg('');
+                      }}
+                      className="text-[11px] font-semibold text-purple-600 dark:text-amber-400 hover:underline cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
                   </div>
                   <div className="relative">
                     <input
@@ -391,7 +506,7 @@ export const AuthGatewayScreen: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={handleGoogleSignIn}
+                  onClick={() => handleGoogleSignIn('CUSTOMER')}
                   disabled={isLoading}
                   id="gateway-google-signin-btn"
                   className="w-full py-3 px-4 rounded-xl bg-white dark:bg-zinc-800 hover:bg-purple-50/50 dark:hover:bg-zinc-750 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 font-semibold text-xs transition flex items-center justify-center gap-2.5 shadow-sm hover:shadow cursor-pointer disabled:opacity-50"
@@ -577,7 +692,7 @@ export const AuthGatewayScreen: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={handleGoogleSignIn}
+                  onClick={() => handleGoogleSignIn('CUSTOMER')}
                   disabled={isLoading}
                   id="gateway-reg-google-btn"
                   className="w-full py-3 px-4 rounded-xl bg-white dark:bg-zinc-800 hover:bg-purple-50/50 dark:hover:bg-zinc-750 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 font-semibold text-xs transition flex items-center justify-center gap-2.5 shadow-sm hover:shadow cursor-pointer disabled:opacity-50"
@@ -622,7 +737,7 @@ export const AuthGatewayScreen: React.FC = () => {
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-purple-600 dark:text-amber-500" />
-                    <span>Admin Username or Email</span>
+                    <span>Admin Email or Username</span>
                   </label>
                   <input
                     type="text"
@@ -630,7 +745,7 @@ export const AuthGatewayScreen: React.FC = () => {
                     id="admin-identifier-input"
                     value={adminIdentifier}
                     onChange={(e) => setAdminIdentifier(e.target.value)}
-                    placeholder="e.g. admin or admin@modernsalon.com"
+                    placeholder="e.g. rohitumdale@gmail.com or admin"
                     className="w-full px-4 py-3 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                   />
                 </div>
@@ -639,11 +754,19 @@ export const AuthGatewayScreen: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                       <KeyRound className="w-3.5 h-3.5 text-purple-600 dark:text-amber-500" />
-                      <span>Owner PIN or Password</span>
+                      <span>Unique Admin Password or PIN</span>
                     </label>
-                    <span className="text-[11px] text-purple-700 dark:text-amber-400 font-mono font-bold">
-                      (PIN: 9999 or 'admin')
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('admin_forgot_password');
+                        setErrorMsg('');
+                        setSuccessMsg('');
+                      }}
+                      className="text-[11px] font-semibold text-purple-600 dark:text-amber-400 hover:underline cursor-pointer"
+                    >
+                      Forgot Password / Reset?
+                    </button>
                   </div>
                   <div className="relative">
                     <input
@@ -652,7 +775,7 @@ export const AuthGatewayScreen: React.FC = () => {
                       id="admin-secret-input"
                       value={adminSecret}
                       onChange={(e) => setAdminSecret(e.target.value)}
-                      placeholder="Enter 4-digit PIN (9999) or Master Password"
+                      placeholder="Enter unique Admin Password or PIN"
                       className="w-full px-4 py-3 pr-11 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                     />
                     <button
@@ -681,27 +804,217 @@ export const AuthGatewayScreen: React.FC = () => {
                   )}
                 </button>
 
-                <div className="pt-2">
+                <div className="relative my-2.5 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-purple-200/60 dark:border-zinc-800" />
+                  </div>
+                  <div className="relative bg-white dark:bg-zinc-900 px-3 text-[10px] text-zinc-500 uppercase tracking-wider font-bold">
+                    Or admin continue with
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleGoogleSignIn('ADMIN')}
+                  disabled={isLoading}
+                  id="gateway-admin-google-btn"
+                  className="w-full py-3 px-4 rounded-xl bg-white dark:bg-zinc-800 hover:bg-purple-50/50 dark:hover:bg-zinc-750 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs transition flex items-center justify-center gap-2.5 shadow-sm hover:shadow cursor-pointer disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                    <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                  </svg>
+                  <span>Continue with Google (Authorized Admin)</span>
+                </button>
+              </form>
+            )}
+
+            {/* ========================================================================= */}
+            {/* TAB 4: PENDING EMAIL VERIFICATION SCREEN */}
+            {/* ========================================================================= */}
+            {activeTab === 'pending_verification' && (
+              <div className="space-y-4 text-center py-4 animate-in fade-in">
+                <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/15 border-2 border-amber-500 flex items-center justify-center text-amber-500 shadow-lg shadow-amber-500/20 animate-pulse">
+                  <Mail className="w-8 h-8" />
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="font-serif text-xl font-bold text-zinc-900 dark:text-white">
+                    Confirm Your Email to Open Website
+                  </h3>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
+                    A confirmation link was sent to your registered email:
+                  </p>
+                  <div className="inline-block px-3.5 py-1.5 rounded-xl bg-purple-100 dark:bg-zinc-800 text-purple-900 dark:text-amber-300 font-mono text-xs font-bold border border-purple-200 dark:border-zinc-700">
+                    {unverifiedEmail || regEmail || loginIdentifier}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-left text-xs text-amber-900 dark:text-amber-200 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
+                    <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>Mandatory Verification Rule</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                    You cannot enter the dashboard or website until you click the confirmation link sent to your email. This ensures real appointment security and genuine client bookings.
+                  </p>
+                </div>
+
+                <div className="space-y-2.5 pt-2">
                   <button
                     type="button"
-                    onClick={() => quickFill('admin', '9999', 'admin_login')}
-                    className="w-full p-2.5 rounded-xl bg-purple-50/50 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-800 hover:border-purple-400 dark:hover:border-amber-500/50 text-left transition flex items-center justify-between cursor-pointer"
+                    onClick={handleCheckVerification}
+                    disabled={isCheckingVerification}
+                    className="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-50"
                   >
-                    <div>
-                      <div className="text-xs font-bold text-purple-800 dark:text-amber-400 flex items-center gap-1.5">
-                        <Crown className="w-3.5 h-3.5" />
-                        <span>1-Click Owner Auto-Fill</span>
-                      </div>
-                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
-                        user: admin | PIN: 9999
-                      </div>
-                    </div>
-                    <span className="text-xs font-semibold px-2.5 py-1 bg-purple-100 text-purple-800 dark:bg-amber-500/10 dark:text-amber-400 rounded-lg">
-                      Use Preset
-                    </span>
+                    {isCheckingVerification ? (
+                      <div className="w-5 h-5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>I've Confirmed My Email — Confirm &amp; Enter Website</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={isResending}
+                    className="w-full py-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-purple-50 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-amber-500" />
+                    <span>{isResending ? 'Resending Link...' : 'Resend Confirmation Email'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('customer_login');
+                      setErrorMsg('');
+                      setSuccessMsg('');
+                    }}
+                    className="text-xs text-purple-700 dark:text-amber-400 font-bold hover:underline cursor-pointer pt-1"
+                  >
+                    ← Back to Sign In
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* TAB 5: FORGOT PASSWORD (CUSTOMER) */}
+            {/* ========================================================================= */}
+            {activeTab === 'forgot_password' && (
+              <form onSubmit={handleForgotPassword} className="space-y-4 animate-in fade-in py-2">
+                <div className="space-y-1">
+                  <h3 className="font-serif text-lg font-bold text-zinc-900 dark:text-white">
+                    Reset Account Password
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    Enter your registered email address to receive password reset instructions.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-purple-600 dark:text-amber-500" />
+                    <span>Registered Email Address</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="e.g. yourname@gmail.com"
+                    className="w-full px-4 py-3 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-sm text-zinc-900 dark:text-white outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-zinc-950 font-bold text-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <div className="w-5 h-5 border-2 border-white dark:border-zinc-950 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4" />
+                      <span>Send Password Reset Link</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('customer_login');
+                      setErrorMsg('');
+                      setSuccessMsg('');
+                    }}
+                    className="text-xs text-purple-700 dark:text-amber-400 font-bold hover:underline cursor-pointer"
+                  >
+                    ← Back to Sign In
                   </button>
                 </div>
               </form>
+            )}
+
+            {/* ========================================================================= */}
+            {/* TAB 6: ADMIN FORGOT PASSWORD */}
+            {/* ========================================================================= */}
+            {activeTab === 'admin_forgot_password' && (
+              <div className="space-y-4 animate-in fade-in py-2">
+                <div className="space-y-1">
+                  <h3 className="font-serif text-lg font-bold text-zinc-900 dark:text-white">
+                    Reset Salon Owner Credentials
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    For owner security, a password reset link can be dispatched directly to the registered salon administrator email.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-purple-100/70 dark:bg-zinc-800/80 border border-purple-200 dark:border-zinc-700 text-xs space-y-1">
+                  <div className="text-zinc-500 dark:text-zinc-400 text-[11px]">Authorized Owner Email:</div>
+                  <div className="font-mono font-bold text-purple-900 dark:text-amber-300">
+                    {settings.adminEmails?.[0] || 'rohitumdale@gmail.com'}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAdminForgotPassword}
+                  disabled={isLoading}
+                  className="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-zinc-950 font-bold text-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <div className="w-5 h-5 border-2 border-white dark:border-zinc-950 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <KeyRound className="w-4 h-4" />
+                      <span>Send Reset Email to Owner</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('admin_login');
+                      setErrorMsg('');
+                      setSuccessMsg('');
+                    }}
+                    className="text-xs text-purple-700 dark:text-amber-400 font-bold hover:underline cursor-pointer"
+                  >
+                    ← Back to Admin Login
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Bottom Notice: Authorization Enforced */}

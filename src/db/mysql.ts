@@ -46,7 +46,8 @@ export async function initMySQLPool(): Promise<boolean> {
       connectionLimit: 10,
       queueLimit: 0,
       enableKeepAlive: true,
-      keepAliveInitialDelay: 10000
+      keepAliveInitialDelay: 10000,
+      connectTimeout: 2000
     });
 
     const conn = await pool.getConnection();
@@ -132,7 +133,7 @@ export async function loadDbFromMySQL(): Promise<any | null> {
       email: u.email || '',
       phone: u.phone || '',
       role: u.role || 'CUSTOMER',
-      password: u.password || 'password123',
+      password: u.password || '',
       pin: u.pin || undefined,
       memberTier: u.member_tier || 'New Client',
       loyaltyPoints: u.loyalty_points || 0,

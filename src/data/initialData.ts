@@ -1121,7 +1121,19 @@ export const INITIAL_GALLERY: GalleryItem[] = [
     subtitle: 'High-definition 4D bridal artistry and flawless glow.',
     category: 'Bridal',
     tag: 'Make Up',
-    imageUrl: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=800&q=80'
+    imageUrl: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=800&q=80',
+    mediaType: 'image'
+  },
+  {
+    id: 'gal-vid-1',
+    title: 'Bridal Hair & Makeup Transformation Reel',
+    subtitle: 'Full 360 degree reel showing the reception hairstyle & airbrush makeover.',
+    category: 'Bridal',
+    tag: 'Video Reel',
+    imageUrl: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=800&q=80',
+    mediaType: 'video',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    duration: '0:15 min'
   },
   {
     id: 'gal-2',
@@ -1129,7 +1141,19 @@ export const INITIAL_GALLERY: GalleryItem[] = [
     subtitle: 'B.N. Gund Complex, Near ICICI Bank, Mohol. Hygienic styling chairs and lighting.',
     category: 'Salon Interior',
     tag: 'Interior',
-    imageUrl: 'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop&w=800&q=80'
+    imageUrl: 'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop&w=800&q=80',
+    mediaType: 'image'
+  },
+  {
+    id: 'gal-vid-2',
+    title: 'Precision Fade & Beard Sculpting Video',
+    subtitle: 'Watch master stylist execute a sharp razor fade and hot towel styling.',
+    category: 'Men Grooming',
+    tag: 'Video Reel',
+    imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
+    mediaType: 'video',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+    duration: '0:15 min'
   },
   {
     id: 'gal-3',
@@ -1137,7 +1161,8 @@ export const INITIAL_GALLERY: GalleryItem[] = [
     subtitle: 'Dimensional honey blonde and caramel seamless gradation.',
     category: 'Hair Care',
     tag: 'Color',
-    imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80'
+    imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80',
+    mediaType: 'image'
   },
   {
     id: 'gal-4',
@@ -1145,7 +1170,8 @@ export const INITIAL_GALLERY: GalleryItem[] = [
     subtitle: 'Deep pore detox, active oxygen glow, and vortex hydro peel.',
     category: 'Skin Care',
     tag: 'Facial',
-    imageUrl: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80'
+    imageUrl: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80',
+    mediaType: 'image'
   },
   {
     id: 'gal-5',
@@ -1153,7 +1179,8 @@ export const INITIAL_GALLERY: GalleryItem[] = [
     subtitle: 'Frizz-free, silky straight glass hair with 4-month retention.',
     category: 'Hair Care',
     tag: 'Chemical',
-    imageUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80'
+    imageUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80',
+    mediaType: 'image'
   },
   {
     id: 'gal-6',
@@ -1161,7 +1188,8 @@ export const INITIAL_GALLERY: GalleryItem[] = [
     subtitle: 'Precision clipper fading, beard styling, and razor finish.',
     category: 'Men Grooming',
     tag: 'Grooming',
-    imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80'
+    imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
+    mediaType: 'image'
   }
 ];
 
@@ -1430,69 +1458,15 @@ export const INITIAL_SETTINGS: SalonSettings = {
   mapsUrl: 'https://maps.app.goo.gl/CraeBa6gAjWA8o818',
   gstNumber: '27AABCM8104M1Z2 (Available on Invoice)',
   staffType: 'Self-Employed (Master Stylist & Founder)',
+  adminPassword: 'Salon@Owner#2026',
+  adminPin: '8104',
+  adminEmails: ['rohitumdale@gmail.com', 'modernsalon02@gmail.com'],
   blockedWindows: [],
   isOwnerOnBreakToday: false,
   breakNoticeMessage: 'The salon owner is taking a short break. Booking slots are temporarily unavailable.'
 };
 
-export const INITIAL_USERS: import('../types').User[] = [
-  {
-    id: 'usr-admin-1',
-    name: 'Salon Owner & Master Stylist',
-    username: 'admin',
-    email: 'admin@modernsalon.com',
-    phone: '8104026257',
-    role: 'ADMIN',
-    password: 'admin',
-    pin: '9999',
-    memberTier: 'VIP Member',
-    loyaltyPoints: 5000,
-    totalVisits: 0,
-    memberSince: '2022'
-  },
-  {
-    id: 'usr-cust-1',
-    name: 'Priya Sharma',
-    username: 'priya',
-    email: 'priya.sharma@example.com',
-    phone: '9822012345',
-    role: 'CUSTOMER',
-    password: 'password123',
-    memberTier: 'VIP Member',
-    loyaltyPoints: 450,
-    totalVisits: 0,
-    memberSince: '2023',
-    preferredServices: ['HD Party Make Up', 'Cheryla’s Facial', 'Hair Spa']
-  },
-  {
-    id: 'usr-cust-2',
-    name: 'Rahul Kadam',
-    username: 'rahul',
-    email: 'rahul.kadam@gmail.com',
-    phone: '9423078901',
-    role: 'CUSTOMER',
-    password: 'password123',
-    memberTier: 'Standard',
-    loyaltyPoints: 180,
-    totalVisits: 0,
-    memberSince: '2024',
-    preferredServices: ["Men's Fade & Beard Sculpt", 'Face Clean Up']
-  },
-  {
-    id: 'usr-cust-3',
-    name: 'Rohit Umdale',
-    username: 'rohit',
-    email: 'rohitumdale@gmail.com',
-    phone: '8104026257',
-    role: 'CUSTOMER',
-    password: 'password123',
-    memberTier: 'VIP Member',
-    loyaltyPoints: 500,
-    totalVisits: 0,
-    memberSince: '2023',
-    preferredServices: ['3D/4D HD Bridal & Grooming', "Men's Fade & Beard Sculpt", "L'Oréal Hair Spa"]
-  }
-];
+export const INITIAL_USERS: import('../types').User[] = [];
 
 export const initialStaffMembers: StaffMember[] = [
   {

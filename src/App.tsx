@@ -21,6 +21,7 @@ import { AppointmentReminderToast } from './components/AppointmentReminderToast'
 import { ClientProfileModal } from './components/ClientProfileModal';
 import { CustomerTerms } from './views/CustomerTerms';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { EmailVerificationBanner } from './components/EmailVerificationBanner';
 
 function SalonAppContent() {
   const { isAdminMode, setIsAdminMode, currentUser, isGuestMode, activeNavTab } = useSalon();
@@ -65,6 +66,7 @@ function SalonAppContent() {
 
   return (
     <div className="min-h-screen bg-stone-50 dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors duration-200 selection:bg-amber-500 selection:text-black">
+      <EmailVerificationBanner />
       <Navbar />
 
       <main className="flex-1 pb-20 lg:pb-0">

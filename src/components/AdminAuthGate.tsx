@@ -16,8 +16,8 @@ import { useSalon } from '../context/SalonContext';
 import { ModernSalonLogo } from './ModernSalonLogo';
 
 export const AdminAuthGate: React.FC = () => {
-  const { login, setIsAdminMode, setActiveNavTab, settings } = useSalon();
-  const [adminIdentifier, setAdminIdentifier] = useState('admin@modernsalon.com');
+  const { login, loginWithGoogle, setIsAdminMode, setActiveNavTab, settings } = useSalon();
+  const [adminIdentifier, setAdminIdentifier] = useState('rohitumdale@gmail.com');
   const [adminSecret, setAdminSecret] = useState('');
   const [showSecret, setShowSecret] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -36,10 +36,19 @@ export const AdminAuthGate: React.FC = () => {
     }
   };
 
-  const quickFill = (identifier: string, secret: string) => {
-    setAdminIdentifier(identifier);
-    setAdminSecret(secret);
+  const handleGoogleAdminLogin = async () => {
     setErrorMsg('');
+    setIsLoading(true);
+    try {
+      const res = await loginWithGoogle({ forRole: 'ADMIN' });
+      setIsLoading(false);
+      if (!res.success) {
+        setErrorMsg(res.message);
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err.message || 'Google sign-in error occurred.');
+    }
   };
 
   return (
@@ -80,7 +89,7 @@ export const AdminAuthGate: React.FC = () => {
             Staff Security Clearance
           </h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto">
-            Please authenticate with your owner password or 4-digit PIN to access administrative controls.
+            Please authenticate with your unique owner password or PIN to access administrative controls.
           </p>
         </div>
 
@@ -103,7 +112,7 @@ export const AdminAuthGate: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="admin@modernsalon.com"
+                  placeholder="e.g. rohitumdale@gmail.com or admin"
                   value={adminIdentifier}
                   onChange={(e) => setAdminIdentifier(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-amber-500 transition font-mono"
@@ -114,16 +123,15 @@ export const AdminAuthGate: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Password or 4-Digit Security PIN
+                  Unique Admin Password or PIN
                 </label>
-                <span className="text-[10px] text-zinc-400 font-mono">PIN: 9999</span>
               </div>
               <div className="relative">
                 <KeyRound className="w-4 h-4 absolute left-3.5 top-3 text-zinc-400" />
                 <input
                   type={showSecret ? 'text' : 'password'}
                   required
-                  placeholder="Enter 'admin' or '9999'"
+                  placeholder="Enter unique Admin Password or PIN"
                   value={adminSecret}
                   onChange={(e) => setAdminSecret(e.target.value)}
                   className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-amber-500 transition font-mono"
@@ -149,15 +157,21 @@ export const AdminAuthGate: React.FC = () => {
             </button>
           </form>
 
-          {/* Quick Fill Button */}
-          <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
+          {/* Google Admin Login */}
+          <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
             <button
               type="button"
-              onClick={() => quickFill('admin@modernsalon.com', 'admin')}
-              className="w-full py-2 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 hover:bg-amber-500/15 text-amber-600 dark:text-amber-400 text-xs font-mono font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+              onClick={handleGoogleAdminLogin}
+              disabled={isLoading}
+              className="w-full py-2 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer border border-zinc-200 dark:border-zinc-700"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>1-Click Test Admin Login (admin / admin)</span>
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+              <span>Continue with Google (Admin Only)</span>
             </button>
           </div>
         </div>

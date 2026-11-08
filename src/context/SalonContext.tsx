@@ -33,6 +33,33 @@ import {
   SALON_TERMS_AND_POLICIES,
   initialStaffMembers
 } from '../data/initialData';
+import {
+  auth,
+  db,
+  googleProvider,
+  handleFirestoreError,
+  OperationType,
+  cleanFirestoreData
+} from '../firebase';
+import {
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  reload,
+  signOut,
+  updateProfile,
+  onAuthStateChanged
+} from 'firebase/auth';
+import {
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot
+} from 'firebase/firestore';
 
 interface BookingPayload {
   serviceId: string;
@@ -95,9 +122,12 @@ interface SalonContextType {
   authModalMode: 'login' | 'register';
 
   // Actions
-  login: (usernameOrEmailOrPhone: string, passwordOrPin: string, role?: UserRole) => Promise<{ success: boolean; message: string; user?: User }>;
-  loginWithGoogle: (googleCredentialOrProfile: any) => Promise<{ success: boolean; message: string; user?: User }>;
-  registerCustomer: (data: { name: string; username?: string; email: string; phone: string; password?: string; preferredServices?: string[] }) => Promise<{ success: boolean; message: string; user?: User }>;
+  login: (usernameOrEmailOrPhone: string, passwordOrPin: string, role?: UserRole) => Promise<{ success: boolean; message: string; user?: User; emailUnverified?: boolean; email?: string }>;
+  loginWithGoogle: (optionsOrRole?: { forRole?: 'ADMIN' | 'CUSTOMER'; credential?: any; profile?: any } | 'ADMIN' | 'CUSTOMER') => Promise<{ success: boolean; message: string; user?: User }>;
+  registerCustomer: (data: { name: string; username?: string; email: string; phone: string; password?: string; preferredServices?: string[] }) => Promise<{ success: boolean; message: string; user?: User; emailUnverified?: boolean; email?: string }>;
+  checkEmailVerification: (email?: string, password?: string) => Promise<{ verified: boolean; message: string; user?: User }>;
+  resendVerificationEmail: (email?: string, password?: string) => Promise<{ success: boolean; message: string }>;
+  resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   openAuthModal: (initialTab?: 'customer' | 'admin', mode?: 'login' | 'register') => void;
   closeAuthModal: () => void;
@@ -402,6 +432,151 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_services`, JSON.stringify(services));
   }, [services]);
 
+  // 1. Real-time Firebase Authentication state tracking
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        const isAdminUser = 
+          fbUser.email === 'rohitumdale@gmail.com' || 
+          fbUser.email === 'modernsalon02@gmail.com' ||
+          fbUser.email === 'admin@modernsalon.com';
+
+        const userDocRef = doc(db, 'users', fbUser.uid);
+        
+        // Listen to Firestore profile updates in real time
+        const unsubUserDoc = onSnapshot(userDocRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            const u: User = {
+              id: fbUser.uid,
+              name: data.name || fbUser.displayName || 'Client',
+              email: fbUser.email || '',
+              phone: data.phone || fbUser.phoneNumber || '',
+              role: isAdminUser ? 'ADMIN' : (data.role || 'CUSTOMER'),
+              memberTier: isAdminUser ? 'Owner Admin' : (data.memberTier || 'New Client'),
+              loyaltyPoints: data.loyaltyPoints ?? 100,
+              emailVerified: fbUser.emailVerified,
+              avatarUrl: fbUser.photoURL || data.avatarUrl || undefined,
+              preferredServices: data.preferredServices || []
+            };
+            setCurrentUser(u);
+            setIsGuestMode(false);
+          } else {
+            const newUserData: User = {
+              id: fbUser.uid,
+              name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Client',
+              email: fbUser.email || '',
+              phone: fbUser.phoneNumber || '',
+              role: isAdminUser ? 'ADMIN' : 'CUSTOMER',
+              memberTier: isAdminUser ? 'Owner Admin' : 'New Client',
+              loyaltyPoints: 100,
+              emailVerified: Boolean(fbUser.emailVerified),
+              ...(fbUser.photoURL ? { avatarUrl: fbUser.photoURL } : {}),
+              preferredServices: []
+            };
+            setDoc(userDocRef, cleanFirestoreData(newUserData)).catch((err) => handleFirestoreError(err, OperationType.WRITE, `users/${fbUser.uid}`));
+            setCurrentUser(newUserData);
+            setIsGuestMode(false);
+          }
+        }, (err) => {
+          console.warn('User document snapshot warning:', err.message);
+        });
+
+        return () => unsubUserDoc();
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  // 2. Real-time Firestore Database Synchronization for Collections
+  useEffect(() => {
+    // Real-time Appointments
+    const unsubApts = onSnapshot(collection(db, 'appointments'), (snapshot) => {
+      if (!snapshot.empty) {
+        const apts: Appointment[] = [];
+        snapshot.forEach((d) => {
+          apts.push({ id: d.id, ...(d.data() as any) });
+        });
+        apts.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setAppointments(apts);
+      }
+    }, (err) => {
+      console.warn('Real-time appointments snapshot notice:', err.message);
+    });
+
+    // Real-time Customer Reviews
+    const unsubReviews = onSnapshot(collection(db, 'reviews'), (snapshot) => {
+      if (!snapshot.empty) {
+        const revs: Review[] = [];
+        snapshot.forEach((d) => {
+          revs.push({ id: d.id, ...(d.data() as any) });
+        });
+        setReviews(revs);
+      }
+    }, (err) => {
+      console.warn('Real-time reviews snapshot notice:', err.message);
+    });
+
+    // Real-time Customer Inquiries
+    const unsubInquiries = onSnapshot(collection(db, 'inquiries'), (snapshot) => {
+      if (!snapshot.empty) {
+        const inqs: ContactInquiry[] = [];
+        snapshot.forEach((d) => {
+          inqs.push({ id: d.id, ...(d.data() as any) });
+        });
+        setInquiries(inqs);
+      }
+    }, (err) => {
+      console.warn('Real-time inquiries snapshot notice:', err.message);
+    });
+
+    // Real-time Offers
+    const unsubOffers = onSnapshot(collection(db, 'offers'), (snapshot) => {
+      if (!snapshot.empty) {
+        const offs: OfferCoupon[] = [];
+        snapshot.forEach((d) => {
+          offs.push({ id: d.id, ...(d.data() as any) });
+        });
+        setOffers(offs);
+      }
+    }, (err) => {
+      console.warn('Real-time offers snapshot notice:', err.message);
+    });
+
+    // Real-time Settings
+    const unsubSettings = onSnapshot(doc(db, 'salon_settings', 'main'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSettings((prev) => ({ ...prev, ...(data as any) }));
+      }
+    }, (err) => {
+      console.warn('Real-time settings snapshot notice:', err.message);
+    });
+
+    // Real-time Gallery & Videos
+    const unsubGallery = onSnapshot(collection(db, 'gallery_items'), (snapshot) => {
+      if (!snapshot.empty) {
+        const items: GalleryItem[] = [];
+        snapshot.forEach((d) => {
+          items.push({ id: d.id, ...(d.data() as any) });
+        });
+        setGallery(items);
+      }
+    }, (err) => {
+      console.warn('Real-time gallery snapshot notice:', err.message);
+    });
+
+    return () => {
+      unsubApts();
+      unsubReviews();
+      unsubInquiries();
+      unsubOffers();
+      unsubSettings();
+      unsubGallery();
+    };
+  }, []);
+
   // Sync with Backend Database API on mount
   useEffect(() => {
     fetch('/api/settings')
@@ -670,181 +845,341 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setIsAuthModalOpen(false);
   };
 
+  const checkEmailVerification = async (email?: string, password?: string): Promise<{ verified: boolean; message: string; user?: User }> => {
+    try {
+      // 1. If active Firebase user session exists, reload and check
+      if (auth.currentUser) {
+        await reload(auth.currentUser);
+        if (auth.currentUser.emailVerified) {
+          const verifiedUser: User = {
+            id: auth.currentUser.uid,
+            name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Client',
+            email: auth.currentUser.email || '',
+            phone: '',
+            role: 'CUSTOMER',
+            emailVerified: true,
+            memberTier: 'New Client',
+            loyaltyPoints: 100
+          };
+          updateDoc(doc(db, 'users', auth.currentUser.uid), { emailVerified: true }).catch(() => {});
+          setCurrentUser(verifiedUser);
+          setIsGuestMode(false);
+          setIsAuthModalOpen(false);
+          return { verified: true, message: 'Email confirmed! Your account is activated.', user: verifiedUser };
+        }
+      }
+
+      // 2. If email & password credentials provided, attempt sign in to verify status
+      if (email && password) {
+        const userCred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password.trim());
+        const fbUser = userCred.user;
+        if (fbUser.emailVerified) {
+          const verifiedUser: User = {
+            id: fbUser.uid,
+            name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Client',
+            email: fbUser.email || email,
+            phone: '',
+            role: 'CUSTOMER',
+            emailVerified: true,
+            memberTier: 'New Client',
+            loyaltyPoints: 100
+          };
+          updateDoc(doc(db, 'users', fbUser.uid), { emailVerified: true }).catch(() => {});
+          setCurrentUser(verifiedUser);
+          setIsGuestMode(false);
+          setIsAuthModalOpen(false);
+          return { verified: true, message: 'Email confirmed! Your account is activated.', user: verifiedUser };
+        } else {
+          // Still unconfirmed
+          await signOut(auth);
+          return {
+            verified: false,
+            message: `Email (${email}) is not yet confirmed. Please check your inbox & spam folder, click the verification link, and try again.`
+          };
+        }
+      }
+
+      return {
+        verified: false,
+        message: 'Email confirmation not yet detected. Please click the link in your email and try again.'
+      };
+    } catch (err: any) {
+      console.warn('Check email verification error:', err);
+      return {
+        verified: false,
+        message: err.message || 'Unable to check verification status right now.'
+      };
+    }
+  };
+
+  const resetPassword = async (email: string): Promise<{ success: boolean; message: string }> => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, message: 'Please enter a valid email address to receive password reset instructions.' };
+    }
+    try {
+      await sendPasswordResetEmail(auth, cleanEmail);
+      return {
+        success: true,
+        message: `Password reset link sent to ${cleanEmail}. Please check your inbox and spam folder to create a new password.`
+      };
+    } catch (err: any) {
+      console.warn('Password reset notice:', err);
+      if (err.code === 'auth/user-not-found') {
+        return { success: false, message: 'No registered user found with this email address.' };
+      }
+      return { success: false, message: err.message || 'Unable to send password reset email at this moment.' };
+    }
+  };
+
+  const resendVerificationEmail = async (email?: string, password?: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      if (auth.currentUser) {
+        await sendEmailVerification(auth.currentUser);
+        return {
+          success: true,
+          message: `Verification link resent to ${auth.currentUser.email}. Please check your inbox and spam folder.`
+        };
+      }
+      if (email && password) {
+        const userCred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password.trim());
+        await sendEmailVerification(userCred.user);
+        await signOut(auth);
+        return {
+          success: true,
+          message: `Verification link resent to ${email}. Please check your inbox and verify before logging in.`
+        };
+      }
+      return {
+        success: false,
+        message: 'Please provide your registered email and password to resend the verification link.'
+      };
+    } catch (err: any) {
+      console.warn('Resend verification email error:', err);
+      return {
+        success: false,
+        message: err.message || 'Unable to resend verification email.'
+      };
+    }
+  };
+
   const login = async (
     usernameOrEmailOrPhone: string,
     passwordOrPin: string,
     expectedRole?: UserRole
-  ): Promise<{ success: boolean; message: string; user?: User }> => {
+  ): Promise<{ success: boolean; message: string; user?: User; emailUnverified?: boolean; email?: string }> => {
     const rawInput = (usernameOrEmailOrPhone || '').trim();
-    const cleanInput = rawInput.toLowerCase();
-    const cleanDigits = rawInput.replace(/\D/g, '');
     const cleanSecret = (passwordOrPin || '').trim();
 
     if (!rawInput || !cleanSecret) {
       return {
         success: false,
-        message: 'Please enter your Username, Email, or Mobile, along with your Password/PIN.'
+        message: 'Please enter your Email or Username along with Password/PIN.'
       };
     }
 
-    // First try backend database API
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identifier: rawInput,
-          password: cleanSecret,
-          role: expectedRole
-        })
-      });
-      const data = await response.json();
-      if (data.success && data.user) {
-        setCurrentUser(data.user);
+    const authorizedAdminEmails = [
+      'rohitumdale@gmail.com',
+      'modernsalon02@gmail.com',
+      ...(settings.adminEmails || []).map(e => e.toLowerCase().trim()),
+      (settings.email || '').toLowerCase().trim()
+    ].filter(Boolean);
+
+    // 1. Admin Master Password / PIN check (editable from Admin Settings and stored in Firestore)
+    const configuredAdminPassword = settings.adminPassword || 'Salon@Owner#2026';
+    const configuredAdminPin = settings.adminPin || '8104';
+
+    if (expectedRole === 'ADMIN') {
+      const isInputAdminPass = cleanSecret === configuredAdminPassword;
+      const isInputAdminPin = Boolean(configuredAdminPin && cleanSecret === configuredAdminPin);
+
+      if (isInputAdminPass || isInputAdminPin) {
+        const cleanLower = rawInput.toLowerCase();
+        const cleanNum = rawInput.replace(/\D/g, '');
+        const isRecognizedAdminIdent =
+          cleanLower === 'admin' ||
+          cleanLower === 'owner' ||
+          authorizedAdminEmails.includes(cleanLower) ||
+          cleanNum === (settings.phone || '8104026257').replace(/\D/g, '');
+
+        if (isRecognizedAdminIdent || isInputAdminPass) {
+          const adminUser: User = {
+            id: 'usr-admin-owner',
+            name: 'Salon Owner (Rohit Umdale)',
+            email: settings.adminEmails?.[0] || 'rohitumdale@gmail.com',
+            phone: settings.phone || '8104026257',
+            role: 'ADMIN',
+            memberTier: 'Owner Admin',
+            loyaltyPoints: 5000,
+            emailVerified: true
+          };
+          setCurrentUser(adminUser);
+          setIsAdminMode(true);
+          setIsGuestMode(false);
+          setIsAuthModalOpen(false);
+          return { success: true, message: 'Owner credentials verified. Welcome to Admin Suite!', user: adminUser };
+        }
+      }
+    }
+
+    // 2. Real-time Firebase Authentication with mandatory email verification check
+    if (rawInput.includes('@')) {
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, rawInput.toLowerCase(), cleanSecret);
+        const fbUser = userCredential.user;
+
+        // STRICT EMAIL CONFIRMATION CHECK:
+        // User cannot sign in or access account until email is confirmed
+        if (!fbUser.emailVerified) {
+          await signOut(auth);
+          return {
+            success: false,
+            message: `Your email (${fbUser.email}) is NOT confirmed yet. Please click the confirmation link sent to your email before signing in.`,
+            emailUnverified: true,
+            email: fbUser.email || rawInput
+          };
+        }
+
+        const isUserAdmin = authorizedAdminEmails.includes((fbUser.email || '').toLowerCase().trim());
+
+        if (expectedRole === 'ADMIN' && !isUserAdmin) {
+          await signOut(auth);
+          return {
+            success: false,
+            message: `Access Denied: Account (${fbUser.email}) is not authorized as an administrator. Please sign in via the Client Portal.`
+          };
+        }
+
+        const userRole: UserRole = (expectedRole === 'ADMIN' || isUserAdmin) && expectedRole !== 'CUSTOMER' ? 'ADMIN' : 'CUSTOMER';
+
+        const user: User = {
+          id: fbUser.uid,
+          name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Client',
+          email: fbUser.email || '',
+          phone: fbUser.phoneNumber || '',
+          role: userRole,
+          emailVerified: true,
+          memberTier: userRole === 'ADMIN' ? 'Owner Admin' : 'VIP Member',
+          loyaltyPoints: 200
+        };
+
+        await setDoc(doc(db, 'users', fbUser.uid), cleanFirestoreData(user), { merge: true });
+
+        setCurrentUser(user);
         setIsGuestMode(false);
-        sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(data.user));
-        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
-        if (data.user.role === 'ADMIN') {
+        if (userRole === 'ADMIN') {
           setIsAdminMode(true);
         } else {
           setIsAdminMode(false);
           setActiveNavTab('home');
         }
         setIsAuthModalOpen(false);
-        return {
-          success: true,
-          message: data.message || `Welcome back, ${data.user.name}!`,
-          user: data.user
-        };
+        return { success: true, message: `Welcome back, ${user.name}!`, user };
+      } catch (err: any) {
+        console.warn('Firebase sign-in error:', err?.code);
+        if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+          return { success: false, message: 'Invalid password. Please check your credentials.' };
+        }
+        if (err.code === 'auth/user-not-found') {
+          return { success: false, message: 'No account found with this email. Please sign up to create your account.' };
+        }
       }
-    } catch {
-      // Fall through to local fallback check
     }
-
-    // Local fallback check
-    let user = users.find(u => {
-      const matchUsername = Boolean(u.username && u.username.toLowerCase() === cleanInput);
-      const matchEmail = Boolean(u.email && u.email.toLowerCase() === cleanInput);
-      const matchName = Boolean(u.name && u.name.toLowerCase() === cleanInput);
-      const matchPhone = Boolean(cleanDigits.length >= 4 && u.phone && u.phone.replace(/\D/g, '').includes(cleanDigits));
-      const matchAdminKeyword = (cleanInput === 'admin' || cleanInput === 'owner' || cleanInput === 'master') && u.role === 'ADMIN';
-      const matchRole = expectedRole ? u.role === expectedRole : true;
-
-      return (matchUsername || matchEmail || matchName || matchPhone || matchAdminKeyword) && matchRole;
-    });
-
-    // Fallback for admin if expectedRole is ADMIN and input was 'admin'
-    if (!user && expectedRole === 'ADMIN') {
-      user = users.find(u => u.role === 'ADMIN');
-    }
-
-    if (!user) {
-      return {
-        success: false,
-        message: expectedRole === 'ADMIN'
-          ? 'Admin account not found. You can log in with username "admin" or PIN "9999".'
-          : 'Account not found with provided username/email/phone. Please create a new account.'
-      };
-    }
-
-    // Verify Password or PIN
-    const isPasswordMatch = user.password && (user.password === cleanSecret || user.password.toLowerCase() === cleanSecret.toLowerCase());
-    const isPinMatch = user.pin && (user.pin === cleanSecret);
-    const isAdminDefaultMatch = user.role === 'ADMIN' && (cleanSecret === 'admin' || cleanSecret === '9999' || cleanSecret === 'admin123');
-
-    if (!isPasswordMatch && !isPinMatch && !isAdminDefaultMatch) {
-      return {
-        success: false,
-        message: 'Invalid password or PIN. (Hint: Customer default password is "password123", Admin is "admin" or PIN "9999")'
-      };
-    }
-
-    setCurrentUser(user);
-    setIsGuestMode(false);
-    sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(user));
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
-
-    if (user.role === 'ADMIN') {
-      setIsAdminMode(true);
-    } else {
-      setIsAdminMode(false);
-      setActiveNavTab('home');
-    }
-    setIsAuthModalOpen(false);
 
     return {
-      success: true,
-      message: `Welcome back, ${user.name}!`,
-      user
+      success: false,
+      message: 'Invalid credentials. If you are a new customer, please click Sign Up and confirm your email.'
     };
   };
 
   const loginWithGoogle = async (
-    googleCredentialOrProfile: any
+    optionsOrRole?: { forRole?: 'ADMIN' | 'CUSTOMER'; credential?: any; profile?: any } | 'ADMIN' | 'CUSTOMER'
   ): Promise<{ success: boolean; message: string; user?: User }> => {
+    const requestedRole: 'ADMIN' | 'CUSTOMER' = 
+      typeof optionsOrRole === 'string'
+        ? optionsOrRole
+        : optionsOrRole?.forRole || (isAdminMode ? 'ADMIN' : 'CUSTOMER');
+
     try {
-      const payload = typeof googleCredentialOrProfile === 'string'
-        ? { credential: googleCredentialOrProfile }
-        : googleCredentialOrProfile;
+      const result = await signInWithPopup(auth, googleProvider);
+      const fbUser = result.user;
+      const cleanEmail = (fbUser.email || '').toLowerCase().trim();
 
-      const response = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const authorizedAdminEmails = [
+        'rohitumdale@gmail.com',
+        'modernsalon02@gmail.com',
+        ...(settings.adminEmails || []).map(e => e.toLowerCase().trim()),
+        (settings.email || '').toLowerCase().trim()
+      ].filter(Boolean);
 
-      const data = await response.json();
-      if (data.success && data.user) {
-        setCurrentUser(data.user);
-        setIsGuestMode(false);
-        sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(data.user));
-        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      const isAuthorizedAdmin = authorizedAdminEmails.includes(cleanEmail);
 
-        if (data.user.role === 'ADMIN') {
-          setIsAdminMode(true);
-        } else {
-          setIsAdminMode(false);
-          setActiveNavTab('home');
+      // STRICT ADMIN GOOGLE CHECK
+      if (requestedRole === 'ADMIN') {
+        if (!isAuthorizedAdmin) {
+          await signOut(auth);
+          return {
+            success: false,
+            message: `Access Denied: Google account (${fbUser.email}) is NOT registered as a Salon Administrator. Please sign in with your authorized admin Google account (rohitumdale@gmail.com) or use Client Sign In.`
+          };
         }
-        setIsAuthModalOpen(false);
 
-        // Add welcome notification
-        setNotifications((prev) => [
-          {
-            id: `notif-${Date.now()}`,
-            title: data.isNewUser ? 'Welcome to Modern Unisex Salon! 🎉' : 'Signed in with Google',
-            message: data.isNewUser 
-              ? 'Your account was created via Google Sign-In with 100 bonus loyalty points.'
-              : `Welcome back, ${data.user.name}!`,
-            type: 'system',
-            timestamp: 'Just now',
-            read: false
-          },
-          ...prev
-        ]);
+        const adminProfile: User = {
+          id: fbUser.uid,
+          name: fbUser.displayName || 'Salon Owner (Rohit Umdale)',
+          email: fbUser.email || 'rohitumdale@gmail.com',
+          phone: fbUser.phoneNumber || settings.phone || '8104026257',
+          role: 'ADMIN',
+          memberTier: 'Owner Admin',
+          loyaltyPoints: 5000,
+          emailVerified: true,
+          ...(fbUser.photoURL ? { avatarUrl: fbUser.photoURL } : {})
+        };
+
+        await setDoc(doc(db, 'users', fbUser.uid), cleanFirestoreData(adminProfile), { merge: true });
+        setCurrentUser(adminProfile);
+        setIsGuestMode(false);
+        setIsAdminMode(true);
+        setActiveNavTab('admin');
+        setIsAuthModalOpen(false);
 
         return {
           success: true,
-          message: data.message || `Welcome, ${data.user.name}!`,
-          user: data.user
+          message: `Welcome Salon Owner (${adminProfile.name})! Admin Suite unlocked.`,
+          user: adminProfile
         };
       }
 
+      // CUSTOMER GOOGLE SIGN-IN
+      const clientProfile: User = {
+        id: fbUser.uid,
+        name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Client',
+        email: fbUser.email || '',
+        phone: fbUser.phoneNumber || '',
+        role: 'CUSTOMER',
+        memberTier: 'New Client',
+        loyaltyPoints: 100,
+        emailVerified: true,
+        ...(fbUser.photoURL ? { avatarUrl: fbUser.photoURL } : {})
+      };
+
+      await setDoc(doc(db, 'users', fbUser.uid), cleanFirestoreData(clientProfile), { merge: true });
+      setCurrentUser(clientProfile);
+      setIsGuestMode(false);
+      setIsAdminMode(false);
+      setActiveNavTab('home');
+      setIsAuthModalOpen(false);
+
       return {
-        success: false,
-        message: data.message || 'Google sign-in could not be completed.'
+        success: true,
+        message: `Welcome, ${clientProfile.name}!`,
+        user: clientProfile
       };
     } catch (err: any) {
-      console.error('Google Sign-In Error:', err);
+      console.warn('Firebase Google Sign-In notice:', err?.message);
       return {
         success: false,
-        message: 'Could not connect to authentication server. Please check your network.'
+        message: err.message || 'Google sign-in could not be completed.'
       };
     }
   };
@@ -856,141 +1191,77 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     phone: string;
     password?: string;
     preferredServices?: string[];
-  }): Promise<{ success: boolean; message: string; user?: User }> => {
+  }): Promise<{ success: boolean; message: string; user?: User; emailUnverified?: boolean; email?: string }> => {
     const cleanName = (data.name || '').trim();
     const cleanEmail = (data.email || '').trim().toLowerCase();
     const cleanPhone = (data.phone || '').trim();
-    const cleanUsername = (data.username || cleanName.toLowerCase().replace(/\s+/g, '')).trim().toLowerCase();
-    const cleanPassword = (data.password || 'password123').trim();
+    const cleanPassword = (data.password || '').trim();
 
-    if (!cleanName || !cleanPhone) {
-      return { success: false, message: 'Please provide your Full Name and Mobile Number.' };
+    if (!cleanName || !cleanPhone || !cleanEmail || !cleanPassword) {
+      return { success: false, message: 'Please provide your Full Name, Email, Mobile Number, and Password.' };
     }
 
-    // Call backend database API to register and persist to database
+    if (cleanPassword.length < 6) {
+      return { success: false, message: 'Password must be at least 6 characters long.' };
+    }
+
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: cleanName,
-          username: cleanUsername,
-          email: cleanEmail || `${cleanUsername}@example.com`,
-          phone: cleanPhone,
-          password: cleanPassword,
-          preferredServices: data.preferredServices || []
-        })
-      });
-      const resData = await response.json();
-      if (resData.success && resData.user) {
-        const newUser: User = resData.user;
-        setUsers(prev => [...prev.filter(u => u.id !== newUser.id), newUser]);
-        setCurrentUser(newUser);
-        setIsGuestMode(false);
-        sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-        sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
-        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
+      // 1. Create account in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+      const fbUser = userCredential.user;
 
-        // Also register in customer CRM directory with 0 initial visits for brand new account
-        setCustomers(prev => {
-          const filtered = prev.filter(c => c.phone !== newUser.phone && (!newUser.email || c.email !== newUser.email));
-          return [...filtered, {
-            id: `cust-${Date.now()}`,
-            name: newUser.name,
-            phone: newUser.phone,
-            email: newUser.email,
-            totalVisits: 0,
-            totalSpent: 0,
-            lastVisit: 'Just Joined',
-            favoriteService: (data.preferredServices && data.preferredServices[0]) || 'General Styling',
-            memberSince: newUser.memberSince || '2026',
-            tier: 'New Client'
-          }];
-        });
+      // 2. Set official display name
+      await updateProfile(fbUser, { displayName: cleanName });
 
-        setIsAdminMode(false);
-        setActiveNavTab('home');
-        setIsAuthModalOpen(false);
-        return {
-          success: true,
-          message: resData.message || `Account registered in database! Welcome to Modern Unisex Salon, ${newUser.name}.`,
-          user: newUser
-        };
-      } else if (resData.message) {
-        return { success: false, message: resData.message };
-      }
-    } catch {
-      // Fall through to local registration fallback
-    }
+      // 3. Send REAL email confirmation link
+      await sendEmailVerification(fbUser);
 
-    const existing = users.find(
-      u => (u.username && u.username.toLowerCase() === cleanUsername) ||
-           (cleanEmail && u.email.toLowerCase() === cleanEmail) ||
-           (cleanPhone.replace(/\D/g, '').length >= 7 && u.phone.replace(/\D/g, '') === cleanPhone.replace(/\D/g, ''))
-    );
+      const newUser: User = {
+        id: fbUser.uid,
+        name: cleanName,
+        username: data.username || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        phone: cleanPhone,
+        role: 'CUSTOMER',
+        memberTier: 'New Client',
+        loyaltyPoints: 100,
+        emailVerified: false,
+        memberSince: '2026',
+        preferredServices: data.preferredServices || []
+      };
 
-    if (existing) {
+      // 4. Save to Firestore users collection with emailVerified: false
+      await setDoc(doc(db, 'users', fbUser.uid), cleanFirestoreData(newUser));
+
+      // 5. CRITICAL: Immediately sign out newly created unconfirmed account.
+      // User is strictly NOT allowed to take the account or sign in until email is confirmed.
+      await signOut(auth);
+      setCurrentUser(null);
+
       return {
-        success: false,
-        message: `An account already exists with this mobile or username. Please log in directly.`
+        success: true,
+        message: `Account registration initiated! A verification email has been sent to ${cleanEmail}. Please click the confirmation link in the email to activate your account. You will not be able to log in until confirmed.`,
+        emailUnverified: true,
+        email: cleanEmail
       };
+    } catch (err: any) {
+      console.warn('Firebase registration notice:', err?.code, err?.message);
+      let userFriendlyMsg = err.message || 'Registration failed';
+      if (err.code === 'auth/email-already-in-use') {
+        userFriendlyMsg = 'This email is already registered. Please sign in or click Resend Verification.';
+      } else if (err.code === 'auth/weak-password') {
+        userFriendlyMsg = 'Password should be at least 6 characters.';
+      } else if (err.code === 'auth/invalid-email') {
+        userFriendlyMsg = 'Please enter a valid email address.';
+      }
+      return { success: false, message: userFriendlyMsg };
     }
-
-    const newUser: User = {
-      id: `usr-cust-${Date.now()}`,
-      name: cleanName,
-      username: cleanUsername,
-      email: cleanEmail || `${cleanUsername}@example.com`,
-      phone: cleanPhone,
-      role: 'CUSTOMER',
-      password: cleanPassword,
-      memberTier: 'New Client',
-      loyaltyPoints: 100, // 100 Welcome bonus loyalty points
-      totalVisits: 0,
-      memberSince: new Date().getFullYear().toString(),
-      preferredServices: data.preferredServices || []
-    };
-
-    const updatedUsers = [...users, newUser];
-    setUsers(updatedUsers);
-    setCurrentUser(newUser);
-    setIsGuestMode(false);
-    sessionStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    sessionStorage.setItem(`${LOCAL_STORAGE_KEY}_current_user`, JSON.stringify(newUser));
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_guest_mode`);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_current_user`);
-
-    // Also register in customer directory if not present
-    const existingCust = customers.find(c => c.phone === cleanPhone || (cleanEmail && c.email.toLowerCase() === cleanEmail));
-    if (!existingCust) {
-      const newCustRecord: Customer = {
-        id: `cust-${Date.now()}`,
-        name: newUser.name,
-        phone: newUser.phone,
-        email: newUser.email,
-        totalVisits: 0,
-        totalSpent: 0,
-        lastVisit: 'Just Joined',
-        favoriteService: (data.preferredServices && data.preferredServices[0]) || 'General Styling',
-        memberSince: newUser.memberSince || '2026',
-        tier: 'New Client'
-      };
-      setCustomers(prev => [...prev, newCustRecord]);
-    }
-
-    setIsAdminMode(false);
-    setActiveNavTab('home');
-    setIsAuthModalOpen(false);
-
-    return {
-      success: true,
-      message: `Account created successfully! Welcome to Modern Unisex Salon, ${newUser.name}.`,
-      user: newUser
-    };
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch {}
     setCurrentUser(null);
     setIsGuestMode(false);
     setIsAdminMode(false);
@@ -1038,6 +1309,13 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch {}
       return nextCusts;
     });
+
+    // Persist profile updates to Firestore in real time
+    try {
+      updateDoc(doc(db, 'users', updatedUser.id), cleanFirestoreData(updates)).catch(err => {
+        console.warn('Firestore updateCurrentUser note:', err);
+      });
+    } catch {}
 
     // Persist profile updates directly to backend database & MySQL
     try {
@@ -1151,6 +1429,15 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       whatsappUrl: clientWhatsappUrl,
       ownerWhatsappUrl: ownerWhatsappUrl
     };
+
+    // Persist real-time appointment directly to Firestore cloud database
+    try {
+      setDoc(doc(db, 'appointments', newAppointment.id), cleanFirestoreData(newAppointment)).catch(err => {
+        handleFirestoreError(err, OperationType.WRITE, `appointments/${newAppointment.id}`);
+      });
+    } catch (fsErr) {
+      console.warn('Firestore appointment direct save note:', fsErr);
+    }
 
     // Persist real-time appointment and notify admin suite & WhatsApp in database
     try {
@@ -1281,6 +1568,13 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
     }
 
+    // Update in Firestore cloud database in real time
+    try {
+      updateDoc(doc(db, 'appointments', id), { bookingStatus: status, status: status, isNew: false }).catch(err => {
+        console.warn('Firestore updateAppointmentStatus note:', err);
+      });
+    } catch {}
+
     try {
       fetch(`/api/appointments/${id}`, {
         method: 'PUT',
@@ -1322,7 +1616,16 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       timestamp: 'Just now',
       read: false
     };
-    setNotifications(prev => [notif, ...prev]);
+    // Update in Firestore cloud database in real time
+    try {
+      updateDoc(doc(db, 'appointments', id), {
+        date: newDate,
+        timeSlot: newTimeSlot,
+        bookingStatus: 'CONFIRMED',
+        status: 'CONFIRMED',
+        isNew: false
+      }).catch(err => console.warn('Firestore reschedule note:', err));
+    } catch {}
 
     // Persist to backend database API
     try {
@@ -1380,6 +1683,16 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
     setNotifications(prev => [notif, ...prev]);
 
+    // Update in Firestore cloud database in real time
+    try {
+      updateDoc(doc(db, 'appointments', id), {
+        bookingStatus: 'CANCELLED',
+        status: 'CANCELLED',
+        notes: cancelNotes,
+        isNew: false
+      }).catch(err => console.warn('Firestore cancel note:', err));
+    } catch {}
+
     // Persist cancellation to backend database API
     try {
       fetch(`/api/appointments/${id}`, {
@@ -1422,6 +1735,11 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
       setNotifications(prev => [notif, ...prev]);
     }
+
+    // Delete in Firestore
+    try {
+      deleteDoc(doc(db, 'appointments', id)).catch(err => console.warn('Firestore delete note:', err));
+    } catch {}
 
     try {
       fetch(`/api/appointments/${id}`, {
@@ -1471,6 +1789,11 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
     setInquiries(prev => [newInq, ...prev]);
 
+    // Save to Firestore in real time
+    try {
+      setDoc(doc(db, 'inquiries', newInq.id), cleanFirestoreData(newInq)).catch(err => console.warn('Firestore inquiry save note:', err));
+    } catch {}
+
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
       title: 'New Client Inquiry',
@@ -1508,10 +1831,20 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       status,
       ...(ownerReply !== undefined ? { ownerReply } : {})
     } : inq));
+
+    try {
+      updateDoc(doc(db, 'inquiries', id), {
+        status,
+        ...(ownerReply !== undefined ? { ownerReply } : {})
+      }).catch(err => console.warn(err));
+    } catch {}
   };
 
   const deleteInquiry = (id: string) => {
     setInquiries(prev => prev.filter(inq => inq.id !== id));
+    try {
+      deleteDoc(doc(db, 'inquiries', id)).catch(err => console.warn(err));
+    } catch {}
     fetch(`/api/inquiries/${id}`, {
       method: 'DELETE'
     }).catch(err => console.error('Failed to delete inquiry from backend API:', err));
@@ -1524,14 +1857,23 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       id: `gal-${Date.now()}`
     };
     setGallery(prev => [newItem, ...prev]);
+    setDoc(doc(db, 'gallery_items', newItem.id), cleanFirestoreData(newItem)).catch(err => {
+      console.warn('Firestore gallery item add error:', err);
+    });
   };
 
   const updateGalleryItem = (id: string, updated: Partial<GalleryItem>) => {
     setGallery(prev => prev.map(item => item.id === id ? { ...item, ...updated } : item));
+    updateDoc(doc(db, 'gallery_items', id), cleanFirestoreData(updated)).catch(err => {
+      console.warn('Firestore gallery item update error:', err);
+    });
   };
 
   const deleteGalleryItem = (id: string) => {
     setGallery(prev => prev.filter(item => item.id !== id));
+    deleteDoc(doc(db, 'gallery_items', id)).catch(err => {
+      console.warn('Firestore gallery item delete error:', err);
+    });
   };
 
   // Offers & Automated WhatsApp Broadcast Management
@@ -1541,6 +1883,10 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       id: `off-${Date.now()}`
     };
     setOffers(prev => [newOffer, ...prev]);
+
+    try {
+      setDoc(doc(db, 'offers', newOffer.id), cleanFirestoreData(newOffer)).catch(err => console.warn(err));
+    } catch {}
 
     try {
       const res = await fetch('/api/offers', {
@@ -1590,12 +1936,21 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const toggleOfferActive = (id: string) => {
+    const target = offers.find(off => off.id === id);
     setOffers(prev => prev.map(off => off.id === id ? { ...off, active: !off.active } : off));
+    if (target) {
+      try {
+        updateDoc(doc(db, 'offers', id), { active: !target.active }).catch(err => console.warn(err));
+      } catch {}
+    }
     fetch(`/api/offers/${id}/toggle`, { method: 'PATCH' }).catch(() => {});
   };
 
   const deleteOffer = (id: string) => {
     setOffers(prev => prev.filter(off => off.id !== id));
+    try {
+      deleteDoc(doc(db, 'offers', id)).catch(err => console.warn(err));
+    } catch {}
     fetch(`/api/offers/${id}`, { method: 'DELETE' }).catch(() => {});
   };
 
@@ -1609,6 +1964,13 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       status: 'published'
     };
     setReviews(prev => [newReview, ...prev]);
+
+    // Save to Firestore in real time
+    try {
+      setDoc(doc(db, 'reviews', newReview.id), cleanFirestoreData(newReview)).catch(err => {
+        console.warn('Firestore addReview note:', err);
+      });
+    } catch {}
 
     // Push instant real-time notification to the Admin Suite
     const newNotif: NotificationItem = {
@@ -1631,10 +1993,16 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const updateReview = (id: string, updated: Partial<Review>) => {
     setReviews(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
+    try {
+      updateDoc(doc(db, 'reviews', id), updated).catch(err => console.warn(err));
+    } catch {}
   };
 
   const deleteReview = (id: string) => {
     setReviews(prev => prev.filter(r => r.id !== id));
+    try {
+      deleteDoc(doc(db, 'reviews', id)).catch(err => console.warn(err));
+    } catch {}
   };
 
   // Policy CRUD
@@ -1721,6 +2089,10 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         advanceDeposit: Math.round((s.price * newPct) / 100)
       })));
     }
+
+    // Persist to Firebase Cloud Firestore in real time
+    setDoc(doc(db, 'salon_settings', 'main'), cleanFirestoreData(newSettings), { merge: true })
+      .catch(err => console.warn('Failed to sync settings to Firestore:', err));
 
     // Persist to backend database API
     fetch('/api/settings', {
@@ -1897,6 +2269,9 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         logout,
         openAuthModal,
         closeAuthModal,
+        checkEmailVerification,
+        resendVerificationEmail,
+        resetPassword,
         openProfileModal,
         closeProfileModal,
         setIsAdminMode,

@@ -195,6 +195,8 @@ export type GalleryCategory =
   | 'Spa'
   | 'Men Grooming';
 
+export type MediaFormat = 'image' | 'video';
+
 export interface GalleryItem {
   id: string;
   title: string;
@@ -202,6 +204,10 @@ export interface GalleryItem {
   category: GalleryCategory;
   tag: string;
   imageUrl: string;
+  mediaType?: MediaFormat;
+  videoUrl?: string;
+  videoThumbnail?: string;
+  duration?: string;
 }
 
 export interface NotificationItem {
@@ -251,6 +257,9 @@ export interface SalonSettings {
   mapsUrl?: string;
   gstNumber?: string;
   staffType?: string;
+  adminPassword?: string;
+  adminPin?: string;
+  adminEmails?: string[];
   blockedWindows?: BlockedSlotWindow[];
   isOwnerOnBreakToday?: boolean;
   breakNoticeMessage?: string;
@@ -277,6 +286,7 @@ export interface User {
   pin?: string;
   avatarUrl?: string;
   googleId?: string;
+  emailVerified?: boolean;
   memberTier?: 'Standard' | 'VIP Member' | 'New Client' | 'Silver VIP' | 'Owner Admin';
   loyaltyPoints?: number;
   totalVisits?: number;

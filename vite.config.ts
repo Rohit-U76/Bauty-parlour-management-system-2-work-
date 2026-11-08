@@ -12,6 +12,7 @@ export default defineConfig(() => {
       },
     },
     server: {
+      allowedHosts: true as const,
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching for data files to prevent reload loops
       watch: process.env.DISABLE_HMR === 'true' ? null : {

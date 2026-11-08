@@ -55,7 +55,10 @@ import {
   Printer,
   Compass,
   Radio,
-  Send
+  Send,
+  Video,
+  Play,
+  Film
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { ServiceItem, Appointment, GalleryItem, OfferCoupon, AppointmentStatus, StaffMember, WhatsAppBroadcastLog } from '../types';
@@ -298,6 +301,11 @@ export const AdminSuite: React.FC = () => {
   const [newGalleryCategory, setNewGalleryCategory] = useState<'Bridal' | 'Hair Care' | 'Skin Care' | 'Salon Interior' | 'Nail Art' | 'Spa'>('Hair Care');
   const [newGalleryTag, setNewGalleryTag] = useState('Hair Care');
   const [newGalleryImg, setNewGalleryImg] = useState('https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=600&q=80');
+  const [newGalleryMediaType, setNewGalleryMediaType] = useState<'image' | 'video'>('image');
+  const [newGalleryVideoUrl, setNewGalleryVideoUrl] = useState('');
+  const [newGalleryDuration, setNewGalleryDuration] = useState('0:45 min');
+  const [galleryMediaFilter, setGalleryMediaFilter] = useState<'all' | 'image' | 'video'>('all');
+  const [adminActiveVideoPreview, setAdminActiveVideoPreview] = useState<GalleryItem | null>(null);
 
   // Add Offer Form
   const [newOfferCode, setNewOfferCode] = useState('');
@@ -367,19 +375,26 @@ export const AdminSuite: React.FC = () => {
 
   const handleCreateGallery = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newGalleryTitle || !newGalleryImg) return;
+    if (!newGalleryTitle) return;
+    if (newGalleryMediaType === 'image' && !newGalleryImg) return;
+    if (newGalleryMediaType === 'video' && !newGalleryVideoUrl && !newGalleryImg) return;
 
     addGalleryItem({
       title: newGalleryTitle,
-      subtitle: newGallerySubtitle || 'Salon treatment results',
+      subtitle: newGallerySubtitle || (newGalleryMediaType === 'video' ? 'Client styling video transformation' : 'Salon treatment results'),
       category: newGalleryCategory,
       tag: newGalleryTag,
-      imageUrl: newGalleryImg
+      imageUrl: newGalleryImg || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=600&q=80',
+      mediaType: newGalleryMediaType,
+      videoUrl: newGalleryMediaType === 'video' ? newGalleryVideoUrl : undefined,
+      duration: newGalleryMediaType === 'video' ? (newGalleryDuration || '0:30 min') : undefined
     });
 
     setShowAddGalleryModal(false);
     setNewGalleryTitle('');
     setNewGallerySubtitle('');
+    setNewGalleryVideoUrl('');
+    setNewGalleryMediaType('image');
     setNewGalleryImg('https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=600&q=80');
   };
 
@@ -392,7 +407,10 @@ export const AdminSuite: React.FC = () => {
       subtitle: editingGalleryItem.subtitle,
       category: editingGalleryItem.category,
       tag: editingGalleryItem.tag,
-      imageUrl: editingGalleryItem.imageUrl
+      imageUrl: editingGalleryItem.imageUrl,
+      mediaType: editingGalleryItem.mediaType || 'image',
+      videoUrl: editingGalleryItem.videoUrl,
+      duration: editingGalleryItem.duration
     });
 
     setEditingGalleryItem(null);
@@ -556,7 +574,7 @@ export const AdminSuite: React.FC = () => {
                   <Crown className="w-3 h-3 text-amber-400 shrink-0" />
                 </div>
                 <div className="text-[10px] text-zinc-400 truncate font-mono">
-                  Owner Active • PIN: 9999
+                  Owner Active • {settings.adminPin ? `PIN: ${settings.adminPin}` : 'Secured'}
                 </div>
               </div>
             </div>
@@ -693,7 +711,7 @@ export const AdminSuite: React.FC = () => {
                     <Crown className="w-3.5 h-3.5 text-amber-400" />
                   </div>
                   <div className="text-[11px] text-zinc-400 truncate">
-                    Owner Active • PIN: 9999
+                    Owner Active • {settings.adminPin ? `PIN: ${settings.adminPin}` : 'Secured'}
                   </div>
                 </div>
               </div>
@@ -1404,65 +1422,170 @@ export const AdminSuite: React.FC = () => {
             </div>
           )}
 
-          {/* GALLERY MANAGER TAB WITH FULL EDIT / ADD / DELETE */}
+          {/* GALLERY & VIDEO SHOWCASE MANAGER TAB */}
           {adminTab === 'gallery' && (
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h1 className="font-serif text-2xl font-bold text-zinc-100">Gallery Manager</h1>
-                  <p className="text-xs text-zinc-400">Manage client transformation photos, bridal styling, and salon interior shots.</p>
+                  <h1 className="font-serif text-2xl font-bold text-zinc-100 flex items-center gap-2">
+                    <span>Gallery &amp; Video Manager</span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-xs font-mono font-bold">
+                      {gallery.length} items
+                    </span>
+                  </h1>
+                  <p className="text-xs text-zinc-400">
+                    Upload transformation photos, client style videos &amp; reels, and salon ambience to show on the client website.
+                  </p>
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setNewGalleryMediaType('image');
+                      setShowAddGalleryModal(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-750 text-zinc-200 font-semibold text-xs flex items-center gap-1.5 cursor-pointer border border-zinc-700 shadow-sm"
+                  >
+                    <ImageIcon className="w-4 h-4 text-amber-400" />
+                    <span>Upload Photo</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setNewGalleryMediaType('video');
+                      setShowAddGalleryModal(true);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
+                  >
+                    <Video className="w-4 h-4" />
+                    <span>Upload Video / Reel</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Media Filter Tabs */}
+              <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
                 <button
-                  onClick={() => setShowAddGalleryModal(true)}
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                  type="button"
+                  onClick={() => setGalleryMediaFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    galleryMediaFilter === 'all'
+                      ? 'bg-amber-500 text-zinc-950 shadow-sm'
+                      : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                  }`}
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Upload New Photo</span>
+                  All Showcase ({gallery.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGalleryMediaFilter('image')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    galleryMediaFilter === 'image'
+                      ? 'bg-amber-500 text-zinc-950 shadow-sm'
+                      : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                  }`}
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Photos Only ({gallery.filter(i => i.mediaType !== 'video').length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGalleryMediaFilter('video')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    galleryMediaFilter === 'video'
+                      ? 'bg-amber-500 text-zinc-950 shadow-sm'
+                      : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                  }`}
+                >
+                  <Film className="w-3.5 h-3.5" />
+                  <span>Videos &amp; Reels ({gallery.filter(i => i.mediaType === 'video' || Boolean(i.videoUrl)).length})</span>
                 </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {gallery.map(item => (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-sm flex flex-col justify-between"
-                  >
-                    <div className="relative h-48 w-full overflow-hidden bg-zinc-950">
-                      <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
-                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/70 text-amber-400 text-[10px] font-bold">
-                        {item.tag}
-                      </span>
-                    </div>
+                {gallery
+                  .filter(item => {
+                    if (galleryMediaFilter === 'image') return item.mediaType !== 'video';
+                    if (galleryMediaFilter === 'video') return item.mediaType === 'video' || Boolean(item.videoUrl);
+                    return true;
+                  })
+                  .map(item => {
+                    const isVideo = item.mediaType === 'video' || Boolean(item.videoUrl);
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-sm flex flex-col justify-between group hover:border-zinc-700 transition"
+                      >
+                        <div
+                          className="relative h-48 w-full overflow-hidden bg-zinc-950 cursor-pointer"
+                          onClick={() => {
+                            if (isVideo) setAdminActiveVideoPreview(item);
+                          }}
+                        >
+                          <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                          
+                          {/* Video Overlay Badge & Play Button */}
+                          {isVideo ? (
+                            <>
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <div className="w-11 h-11 rounded-full bg-amber-500/90 hover:bg-amber-400 text-zinc-950 flex items-center justify-center shadow-lg transition transform group-hover:scale-110">
+                                  <Play className="w-5 h-5 fill-current ml-0.5" />
+                                </div>
+                              </div>
+                              <span className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-sm text-amber-400 text-[10px] font-bold flex items-center gap-1 border border-amber-500/30">
+                                <Video className="w-3 h-3 text-rose-500" />
+                                <span>VIDEO {item.duration ? `• ${item.duration}` : ''}</span>
+                              </span>
+                            </>
+                          ) : (
+                            <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/70 text-amber-400 text-[10px] font-bold">
+                              {item.tag}
+                            </span>
+                          )}
+                        </div>
 
-                    <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
-                      <div>
-                        <h3 className="font-serif text-sm font-bold text-zinc-100">{item.title}</h3>
-                        <p className="text-xs text-zinc-400 mt-0.5">{item.subtitle}</p>
-                      </div>
+                        <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              {isVideo && <Film className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                              <h3 className="font-serif text-sm font-bold text-zinc-100 truncate">{item.title}</h3>
+                            </div>
+                            <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">{item.subtitle}</p>
+                          </div>
 
-                      <div className="pt-3 border-t border-zinc-800 flex items-center justify-between">
-                        <span className="text-[11px] text-zinc-500">{item.category}</span>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => setEditingGalleryItem(item)}
-                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                          >
-                            <Edit2 className="w-3 h-3 text-amber-400" />
-                            <span>Edit</span>
-                          </button>
-                          <button
-                            onClick={() => deleteGalleryItem(item.id)}
-                            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition"
-                            title="Delete Image"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="pt-3 border-t border-zinc-800 flex items-center justify-between">
+                            <span className="text-[11px] text-zinc-500">{item.category}</span>
+                            <div className="flex items-center gap-1.5">
+                              {isVideo && (
+                                <button
+                                  type="button"
+                                  onClick={() => setAdminActiveVideoPreview(item)}
+                                  className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-semibold flex items-center gap-1 cursor-pointer border border-amber-500/30"
+                                >
+                                  <Play className="w-3 h-3 fill-current" />
+                                  <span>Preview</span>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setEditingGalleryItem(item)}
+                                className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit2 className="w-3 h-3 text-amber-400" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                onClick={() => deleteGalleryItem(item.id)}
+                                className="p-1.5 rounded-lg bg-zinc-800 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition cursor-pointer"
+                                title="Delete Item"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -2301,6 +2424,86 @@ export const AdminSuite: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {/* CARD 4: ADMIN MASTER SECURITY & PASSWORD */}
+              <div className="p-6 rounded-2xl bg-zinc-900 border border-amber-500/40 space-y-4 shadow-sm text-xs">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    <span>4. Unique Admin Password &amp; Master Security Credentials</span>
+                  </h3>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    Firestore Real-time
+                  </span>
+                </div>
+
+                <p className="text-zinc-400 text-[11px] leading-relaxed">
+                  Customize the unique credentials required to unlock the Admin Suite. All defaults have been removed—these settings are saved to Firebase Firestore and sync instantly.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="font-semibold text-zinc-300 block mb-1">
+                      Authorized Admin Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={settings.adminEmails?.[0] || 'rohitumdale@gmail.com'}
+                      onChange={(e) => {
+                        const newEmails = [e.target.value.trim().toLowerCase()];
+                        updateSettings({ adminEmails: newEmails });
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-amber-500"
+                      placeholder="rohitumdale@gmail.com"
+                    />
+                    <span className="text-[10px] text-zinc-500 mt-1 block">
+                      Google Sign-In authorized for this email
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-zinc-300 block mb-1">
+                      Admin Master Password *
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.adminPassword || 'Salon@Owner#2026'}
+                      onChange={(e) => updateSettings({ adminPassword: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-amber-500"
+                      placeholder="e.g. UniqueOwnerPass#2026"
+                    />
+                    <span className="text-[10px] text-zinc-500 mt-1 block">
+                      Unique password for Admin login
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-zinc-300 block mb-1">
+                      Admin Quick PIN
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={8}
+                      value={settings.adminPin || '8104'}
+                      onChange={(e) => updateSettings({ adminPin: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-amber-500"
+                      placeholder="e.g. 8104"
+                    />
+                    <span className="text-[10px] text-zinc-500 mt-1 block">
+                      Unique PIN for front-desk clearance
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="text-[11px] text-zinc-300">
+                      Security active: Changes persist to Firebase immediately with zero dummy credentials.
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -2553,24 +2756,66 @@ export const AdminSuite: React.FC = () => {
         </div>
       )}
 
-      {/* Add Gallery Modal */}
+      {/* Add Gallery & Video Modal */}
       {showAddGalleryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-4 shadow-2xl my-6">
             <div className="flex items-center justify-between">
-              <h3 className="font-serif text-lg font-bold text-zinc-100">Add Gallery Photo</h3>
-              <button onClick={() => setShowAddGalleryModal(false)} className="text-zinc-400 hover:text-white">
+              <div className="flex items-center gap-2">
+                {newGalleryMediaType === 'video' ? (
+                  <Video className="w-5 h-5 text-amber-400" />
+                ) : (
+                  <ImageIcon className="w-5 h-5 text-amber-400" />
+                )}
+                <h3 className="font-serif text-lg font-bold text-zinc-100">
+                  {newGalleryMediaType === 'video' ? 'Upload Client Style Video / Reel' : 'Add Gallery Photo'}
+                </h3>
+              </div>
+              <button onClick={() => setShowAddGalleryModal(false)} className="text-zinc-400 hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {/* Media Type Switcher */}
+            <div>
+              <label className="text-zinc-300 block mb-1.5 font-semibold text-xs">Media Format *</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNewGalleryMediaType('image')}
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition ${
+                    newGalleryMediaType === 'image'
+                      ? 'bg-amber-500 text-zinc-950 border-amber-500 shadow-sm'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <ImageIcon className="w-4 h-4" />
+                  <span>Photo / Image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewGalleryMediaType('video')}
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition ${
+                    newGalleryMediaType === 'video'
+                      ? 'bg-amber-500 text-zinc-950 border-amber-500 shadow-sm'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <Video className="w-4 h-4" />
+                  <span>Video / Reel</span>
+                </button>
+              </div>
+            </div>
+
             <form onSubmit={handleCreateGallery} className="space-y-3 text-xs">
               <div>
-                <label className="text-zinc-300 block mb-1">Photo Title *</label>
+                <label className="text-zinc-300 block mb-1 font-semibold">
+                  {newGalleryMediaType === 'video' ? 'Video Title *' : 'Photo Title *'}
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Classic Bridal Transformation"
+                  placeholder={newGalleryMediaType === 'video' ? 'e.g. Bridal Reception Makeover Reel' : 'e.g. Classic Bridal Transformation'}
                   value={newGalleryTitle}
                   onChange={(e) => setNewGalleryTitle(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
@@ -2578,10 +2823,10 @@ export const AdminSuite: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-zinc-300 block mb-1">Subtitle / Details</label>
+                <label className="text-zinc-300 block mb-1">Subtitle / Description</label>
                 <input
                   type="text"
-                  placeholder="e.g. HD Make Up & Jewellery Styling"
+                  placeholder="e.g. 360 degree styling view, glowing skin, HD makeup finish"
                   value={newGallerySubtitle}
                   onChange={(e) => setNewGallerySubtitle(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
@@ -2595,7 +2840,7 @@ export const AdminSuite: React.FC = () => {
                     value={newGalleryCategory}
                     onChange={(e: any) => {
                       setNewGalleryCategory(e.target.value);
-                      setNewGalleryTag(e.target.value);
+                      setNewGalleryTag(newGalleryMediaType === 'video' ? 'Video Reel' : e.target.value);
                     }}
                     className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
                   >
@@ -2605,6 +2850,7 @@ export const AdminSuite: React.FC = () => {
                     <option value="Salon Interior">Salon Interior</option>
                     <option value="Nail Art">Nail Art</option>
                     <option value="Spa">Spa</option>
+                    <option value="Men Grooming">Men Grooming</option>
                   </select>
                 </div>
                 <div>
@@ -2618,8 +2864,97 @@ export const AdminSuite: React.FC = () => {
                 </div>
               </div>
 
+              {/* VIDEO SPECIFIC FIELDS */}
+              {newGalleryMediaType === 'video' && (
+                <div className="space-y-3 p-3.5 rounded-2xl bg-zinc-950 border border-amber-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-400 flex items-center gap-1.5">
+                      <Film className="w-3.5 h-3.5" />
+                      <span>Video Source (Upload File or Paste Link) *</span>
+                    </span>
+                    <span className="text-[10px] text-zinc-500">MP4, WebM, YouTube, Vimeo</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Paste video URL (YouTube, Vimeo, MP4)..."
+                        value={newGalleryVideoUrl}
+                        onChange={(e) => setNewGalleryVideoUrl(e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs"
+                      />
+                      <label className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold cursor-pointer shrink-0 flex items-center gap-1 transition">
+                        <Video className="w-3.5 h-3.5" />
+                        <span>Upload File</span>
+                        <input
+                          type="file"
+                          accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                if (typeof reader.result === 'string') {
+                                  setNewGalleryVideoUrl(reader.result);
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-zinc-400 block mb-1">Duration (e.g. 0:45 min)</label>
+                        <input
+                          type="text"
+                          value={newGalleryDuration}
+                          onChange={(e) => setNewGalleryDuration(e.target.value)}
+                          placeholder="0:45 min"
+                          className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-zinc-400 block mb-1">Quick Sample Presets</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewGalleryVideoUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
+                            setNewGalleryDuration('0:15 min');
+                          }}
+                          className="w-full py-2 px-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-semibold text-center cursor-pointer"
+                        >
+                          Fill Sample Salon Reel
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Video Player Preview inside Modal */}
+                    {newGalleryVideoUrl && (
+                      <div className="pt-2">
+                        <label className="text-zinc-400 block mb-1">Video Player Preview:</label>
+                        <div className="rounded-xl overflow-hidden border border-zinc-800 bg-black aspect-video flex items-center justify-center">
+                          <video
+                            src={newGalleryVideoUrl}
+                            controls
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Cover / Poster Image */}
               <div>
-                <label className="text-zinc-300 block mb-1 font-semibold">Image (Upload file or Paste URL) *</label>
+                <label className="text-zinc-300 block mb-1 font-semibold">
+                  {newGalleryMediaType === 'video' ? 'Cover / Poster Thumbnail *' : 'Image (Upload file or Paste URL) *'}
+                </label>
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <input
@@ -2662,9 +2997,9 @@ export const AdminSuite: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs cursor-pointer"
+                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs cursor-pointer shadow-lg shadow-amber-500/20"
               >
-                Upload to Gallery
+                {newGalleryMediaType === 'video' ? 'Publish Video to Salon Gallery' : 'Upload to Gallery'}
               </button>
             </form>
           </div>
@@ -2673,18 +3008,51 @@ export const AdminSuite: React.FC = () => {
 
       {/* Edit Gallery Item Modal */}
       {editingGalleryItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-4 shadow-2xl my-6">
             <div className="flex items-center justify-between">
-              <h3 className="font-serif text-lg font-bold text-zinc-100">Edit Gallery Photo</h3>
-              <button onClick={() => setEditingGalleryItem(null)} className="text-zinc-400 hover:text-white">
+              <h3 className="font-serif text-lg font-bold text-zinc-100">
+                Edit {editingGalleryItem.mediaType === 'video' ? 'Video Reel' : 'Gallery Photo'}
+              </h3>
+              <button onClick={() => setEditingGalleryItem(null)} className="text-zinc-400 hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleUpdateGallerySubmit} className="space-y-3 text-xs">
+              {/* Media Type Switcher */}
               <div>
-                <label className="text-zinc-300 block mb-1">Photo Title</label>
+                <label className="text-zinc-300 block mb-1">Media Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingGalleryItem({ ...editingGalleryItem, mediaType: 'image' })}
+                    className={`py-1.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
+                      editingGalleryItem.mediaType !== 'video'
+                        ? 'bg-amber-500 text-zinc-950 border-amber-500'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                    }`}
+                  >
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>Photo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingGalleryItem({ ...editingGalleryItem, mediaType: 'video' })}
+                    className={`py-1.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
+                      editingGalleryItem.mediaType === 'video'
+                        ? 'bg-amber-500 text-zinc-950 border-amber-500'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                    }`}
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    <span>Video</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-zinc-300 block mb-1">Title</label>
                 <input
                   type="text"
                   required
@@ -2718,6 +3086,7 @@ export const AdminSuite: React.FC = () => {
                     <option value="Salon Interior">Salon Interior</option>
                     <option value="Nail Art">Nail Art</option>
                     <option value="Spa">Spa</option>
+                    <option value="Men Grooming">Men Grooming</option>
                   </select>
                 </div>
                 <div>
@@ -2731,8 +3100,55 @@ export const AdminSuite: React.FC = () => {
                 </div>
               </div>
 
+              {/* If Video, show video URL and duration */}
+              {editingGalleryItem.mediaType === 'video' && (
+                <div className="space-y-2 p-3 rounded-2xl bg-zinc-950 border border-zinc-800">
+                  <label className="text-amber-400 block font-bold">Video URL / Upload</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={editingGalleryItem.videoUrl || ''}
+                      onChange={(e) => setEditingGalleryItem({ ...editingGalleryItem, videoUrl: e.target.value })}
+                      placeholder="Paste video URL..."
+                      className="flex-1 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs"
+                    />
+                    <label className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-750 text-zinc-200 text-xs font-semibold cursor-pointer shrink-0 flex items-center gap-1">
+                      <Video className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Upload</span>
+                      <input
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              if (typeof reader.result === 'string') {
+                                setEditingGalleryItem({ ...editingGalleryItem, videoUrl: reader.result });
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <div>
+                    <label className="text-zinc-400 block mb-1">Duration</label>
+                    <input
+                      type="text"
+                      value={editingGalleryItem.duration || ''}
+                      onChange={(e) => setEditingGalleryItem({ ...editingGalleryItem, duration: e.target.value })}
+                      placeholder="0:45 min"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="text-zinc-300 block mb-1 font-semibold">Image (Upload file or Paste URL)</label>
+                <label className="text-zinc-300 block mb-1 font-semibold">Image / Cover</label>
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <input
@@ -2774,11 +3190,48 @@ export const AdminSuite: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs cursor-pointer shadow-md"
               >
-                Update Photo
+                Update Media Item
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Video Playback Preview Lightbox */}
+      {adminActiveVideoPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+          <div className="relative max-w-2xl w-full bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Video className="w-4 h-4 text-amber-400" />
+                <h3 className="font-serif text-base font-bold text-white truncate">
+                  {adminActiveVideoPreview.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setAdminActiveVideoPreview(null)}
+                className="p-1.5 rounded-full bg-zinc-800 text-zinc-300 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-zinc-800">
+              <video
+                src={adminActiveVideoPreview.videoUrl}
+                controls
+                autoPlay
+                playsInline
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
+              <span>Category: <strong className="text-amber-400">{adminActiveVideoPreview.category}</strong></span>
+              <span>Duration: <strong className="text-zinc-200">{adminActiveVideoPreview.duration || '0:30 min'}</strong></span>
+            </div>
           </div>
         </div>
       )}

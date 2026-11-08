@@ -17,7 +17,9 @@ import {
   Scissors,
   Gift,
   Percent,
-  Flame
+  Flame,
+  Video,
+  Play
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
 import { ServiceItem } from '../types';
@@ -444,35 +446,50 @@ export const CustomerHome: React.FC = () => {
               setActiveNavTab('gallery');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1"
+            className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
           >
-            <span>View All Photos</span>
+            <span>View All Photos &amp; Reels</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          {gallery.slice(0, 4).map(item => (
-            <div
-              key={item.id}
-              onClick={() => {
-                setActiveNavTab('gallery');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="group relative rounded-2xl overflow-hidden aspect-square border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 cursor-pointer shadow-sm"
-            >
-              <img
-                src={item.imageUrl}
-                alt={item.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                loading="lazy"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end">
-                <span className="text-[10px] text-amber-400 font-bold uppercase">{item.tag}</span>
-                <span className="text-xs font-bold text-white leading-tight">{item.title}</span>
+          {gallery.slice(0, 4).map(item => {
+            const isVideo = item.mediaType === 'video' || Boolean(item.videoUrl);
+            return (
+              <div
+                key={item.id}
+                onClick={() => {
+                  setActiveNavTab('gallery');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="group relative rounded-2xl overflow-hidden aspect-square border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 cursor-pointer shadow-sm hover:border-amber-500/40"
+              >
+                <img
+                  src={item.imageUrl}
+                  alt={item.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  loading="lazy"
+                />
+
+                {isVideo && (
+                  <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-amber-500/90 text-zinc-950 flex items-center justify-center shadow-md">
+                      <Play className="w-5 h-5 fill-current ml-0.5" />
+                    </div>
+                  </div>
+                )}
+
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end">
+                  <div className="flex items-center gap-1">
+                    {isVideo && <Video className="w-3 h-3 text-rose-400" />}
+                    <span className="text-[10px] text-amber-400 font-bold uppercase">{item.tag}</span>
+                  </div>
+                  <span className="text-xs font-bold text-white leading-tight mt-0.5">{item.title}</span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
