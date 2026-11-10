@@ -511,7 +511,66 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  app.use(express.json());
+  // Support video and image file uploads up to 100MB
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+
+  // Ensure public uploads directory exists for video storage
+  const VIDEO_UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'videos');
+  if (!fs.existsSync(VIDEO_UPLOAD_DIR)) {
+    fs.mkdirSync(VIDEO_UPLOAD_DIR, { recursive: true });
+  }
+  app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+
+  // Dedicated Video Upload Endpoint for Salon Gallery Reels
+  app.post('/api/gallery/upload-video', (req, res) => {
+    try {
+      const { videoBase64, fileName } = req.body;
+      if (!videoBase64) {
+        return res.status(400).json({ success: false, message: 'No video data provided in request' });
+      }
+
+      // Extract base64 payload
+      const matches = videoBase64.match(/^data:([A-Za-z0-9-+\/]+);base64,(.+)$/);
+      let buffer: Buffer;
+      let ext = 'mp4';
+
+      if (matches && matches.length === 3) {
+        const mime = matches[1];
+        if (mime.includes('webm')) ext = 'webm';
+        else if (mime.includes('ogg')) ext = 'ogg';
+        else if (mime.includes('quicktime')) ext = 'mov';
+        buffer = Buffer.from(matches[2], 'base64');
+      } else {
+        buffer = Buffer.from(videoBase64, 'base64');
+      }
+
+      const timestamp = Date.now();
+      const sanitizedName = (fileName || 'salon_reel')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .slice(0, 30);
+      const generatedFilename = `video_${timestamp}_${sanitizedName}.${ext}`;
+      const filePath = path.join(VIDEO_UPLOAD_DIR, generatedFilename);
+
+      fs.writeFileSync(filePath, buffer);
+      const videoUrl = `/uploads/videos/${generatedFilename}`;
+
+      console.log(`[Gallery Video Uploaded]: Saved ${generatedFilename} (${(buffer.length / (1024 * 1024)).toFixed(2)} MB)`);
+
+      return res.json({
+        success: true,
+        videoUrl,
+        filename: generatedFilename,
+        sizeBytes: buffer.length
+      });
+    } catch (err: any) {
+      console.error('[Gallery Video Upload Error]:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process and store video file: ' + err.message
+      });
+    }
+  });
 
   // Health check endpoint with database status
   app.get('/api/health', async (req, res) => {

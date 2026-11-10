@@ -24,7 +24,12 @@ import { ModernSalonLogo } from './ModernSalonLogo';
 import { ThemeToggle } from './ThemeToggle';
 import { GoogleAccountSelectModal } from './GoogleAccountSelectModal';
 
-export const AuthGatewayScreen: React.FC = () => {
+interface AuthGatewayScreenProps {
+  initialTab?: 'customer_login' | 'customer_register' | 'admin_login' | 'pending_verification' | 'forgot_password' | 'admin_forgot_password';
+  initialEmail?: string;
+}
+
+export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab, initialEmail }) => {
   const {
     login,
     loginWithGoogle,
@@ -39,7 +44,7 @@ export const AuthGatewayScreen: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<
     'customer_login' | 'customer_register' | 'admin_login' | 'pending_verification' | 'forgot_password' | 'admin_forgot_password'
-  >('customer_login');
+  >(initialTab || 'customer_login');
 
   // Customer Login Form State
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -59,14 +64,14 @@ export const AuthGatewayScreen: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
 
   // Admin Form State
-  const [adminIdentifier, setAdminIdentifier] = useState('rohitumdale@gmail.com');
+  const [adminIdentifier, setAdminIdentifier] = useState('');
   const [adminSecret, setAdminSecret] = useState('');
   const [showAdminSecret, setShowAdminSecret] = useState(false);
 
   // Feedback State
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [unverifiedEmail, setUnverifiedEmail] = useState('');
+  const [unverifiedEmail, setUnverifiedEmail] = useState(initialEmail || '');
   const [showGoogleModal, setShowGoogleModal] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -204,7 +209,7 @@ export const AuthGatewayScreen: React.FC = () => {
     setIsLoading(false);
 
     if (res.success) {
-      setSuccessMsg('Owner Access Verified. Entering Management Suite...');
+      setSuccessMsg('Administrator Access Verified. Entering Management Suite...');
     } else {
       setErrorMsg(res.message);
     }
@@ -435,7 +440,7 @@ export const AuthGatewayScreen: React.FC = () => {
                     id="login-username-input"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="e.g. rohit@gmail.com / 8104026257"
+                    placeholder="Enter your email, username, or phone"
                     className="w-full px-4 py-3 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none transition"
                   />
                 </div>
@@ -559,7 +564,7 @@ export const AuthGatewayScreen: React.FC = () => {
                       id="reg-name-input"
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
-                      placeholder="e.g. Rohit Umdale"
+                      placeholder="Enter your full name"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                     />
                   </div>
@@ -573,7 +578,7 @@ export const AuthGatewayScreen: React.FC = () => {
                       id="reg-username-input"
                       value={regUsername}
                       onChange={(e) => setRegUsername(e.target.value)}
-                      placeholder="e.g. rohit123"
+                      placeholder="Enter username (optional)"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                     />
                   </div>
@@ -591,7 +596,7 @@ export const AuthGatewayScreen: React.FC = () => {
                       id="reg-phone-input"
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
-                      placeholder="e.g. 8104026257"
+                      placeholder="Enter 10-digit mobile number"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                     />
                   </div>
@@ -607,7 +612,7 @@ export const AuthGatewayScreen: React.FC = () => {
                       id="reg-email-input"
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="e.g. rohit@gmail.com"
+                      placeholder="Enter your email address"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                     />
                   </div>
@@ -730,7 +735,7 @@ export const AuthGatewayScreen: React.FC = () => {
                 <div className="p-3 rounded-2xl bg-purple-100/80 dark:bg-amber-500/10 border border-purple-200 dark:border-amber-500/30 flex items-center gap-2.5">
                   <Crown className="w-5 h-5 text-purple-700 dark:text-amber-400 shrink-0" />
                   <div className="text-xs text-zinc-700 dark:text-zinc-300">
-                    <span className="font-bold text-purple-900 dark:text-amber-300">Owner Access:</span> Manage appointments, edit rate cards, view Direct Bank UPI transactions, and handle inquiries.
+                    <span className="font-bold text-purple-900 dark:text-amber-300">Salon Management Portal:</span> Manage appointments, update rate cards, view direct bank payments, and client inquiries.
                   </div>
                 </div>
 
@@ -745,7 +750,7 @@ export const AuthGatewayScreen: React.FC = () => {
                     id="admin-identifier-input"
                     value={adminIdentifier}
                     onChange={(e) => setAdminIdentifier(e.target.value)}
-                    placeholder="e.g. rohitumdale@gmail.com or admin"
+                    placeholder="Enter admin email or username"
                     className="w-full px-4 py-3 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                   />
                 </div>
@@ -971,18 +976,25 @@ export const AuthGatewayScreen: React.FC = () => {
               <div className="space-y-4 animate-in fade-in py-2">
                 <div className="space-y-1">
                   <h3 className="font-serif text-lg font-bold text-zinc-900 dark:text-white">
-                    Reset Salon Owner Credentials
+                    Reset Administrator Password
                   </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                    For owner security, a password reset link can be dispatched directly to the registered salon administrator email.
+                    Enter your registered administrator email address to receive a secure password reset link.
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-purple-100/70 dark:bg-zinc-800/80 border border-purple-200 dark:border-zinc-700 text-xs space-y-1">
-                  <div className="text-zinc-500 dark:text-zinc-400 text-[11px]">Authorized Owner Email:</div>
-                  <div className="font-mono font-bold text-purple-900 dark:text-amber-300">
-                    {settings.adminEmails?.[0] || 'rohitumdale@gmail.com'}
-                  </div>
+                <div className="space-y-1 text-left">
+                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    Administrator Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="Enter administrator email"
+                    value={adminIdentifier}
+                    onChange={(e) => setAdminIdentifier(e.target.value)}
+                    className="w-full px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-purple-200 dark:border-zinc-700 text-sm focus:outline-none focus:border-purple-600 dark:focus:border-amber-400 text-zinc-900 dark:text-zinc-100"
+                  />
                 </div>
 
                 <button
@@ -996,7 +1008,7 @@ export const AuthGatewayScreen: React.FC = () => {
                   ) : (
                     <>
                       <KeyRound className="w-4 h-4" />
-                      <span>Send Reset Email to Owner</span>
+                      <span>Send Reset Email to Administrator</span>
                     </>
                   )}
                 </button>
@@ -1017,23 +1029,14 @@ export const AuthGatewayScreen: React.FC = () => {
               </div>
             )}
 
-            {/* Bottom Notice: Authorization Enforced */}
-            <div className="pt-4 border-t border-purple-100 dark:border-zinc-800 text-center space-y-2">
-              <div className="text-xs text-zinc-600 dark:text-zinc-300 flex items-center justify-center gap-1.5 font-medium">
-                <Lock className="w-3.5 h-3.5 text-purple-600 dark:text-amber-500" />
-                <span>Sign in for saved passes & VIP perks, or explore as visitor</span>
+            {/* Bottom Notice: Secure Salon Portal */}
+            <div className="pt-4 border-t border-purple-100 dark:border-zinc-800 text-center space-y-1.5">
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 flex items-center justify-center gap-1.5 font-medium">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                <span>Verified Account Access • 100% Real-Time Cloud Security</span>
               </div>
-              <button
-                type="button"
-                id="auth-explore-guest-btn"
-                onClick={() => setIsGuestMode(true)}
-                className="w-full py-2.5 px-4 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-purple-200 dark:border-zinc-700 text-purple-700 dark:text-amber-400 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-              >
-                <Compass className="w-4 h-4 text-purple-600 dark:text-amber-400" />
-                <span>Browse Salon Website & Rate Card as Visitor &rarr;</span>
-              </button>
               <p className="text-[11px] text-zinc-500">
-                All client profiles and appointments are saved directly to the salon database.
+                All client booking records and advance deposits are secured directly in the salon database.
               </p>
             </div>
           </div>

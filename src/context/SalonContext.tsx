@@ -148,7 +148,7 @@ interface SalonContextType {
 
   // Booking & Razorpay
   createAppointment: (payload: BookingPayload) => Promise<Appointment>;
-  updateAppointmentStatus: (id: string, status: AppointmentStatus) => void;
+  updateAppointmentStatus: (id: string, status: AppointmentStatus, extraFields?: Partial<Appointment>) => void;
   rescheduleAppointment: (id: string, newDate: string, newTimeSlot: string) => Promise<{ success: boolean; message: string }>;
   cancelAppointment: (id: string, reason?: string) => Promise<{ success: boolean; message: string }>;
   deleteAppointment: (id: string) => void;
@@ -440,6 +440,14 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           fbUser.email === 'rohitumdale@gmail.com' || 
           fbUser.email === 'modernsalon02@gmail.com' ||
           fbUser.email === 'admin@modernsalon.com';
+
+        // STRICT MANDATORY EMAIL VERIFICATION GATE:
+        // Regular customers MUST verify their email before taking an account or entering the dashboard!
+        if (!isAdminUser && !fbUser.emailVerified) {
+          console.log('Unverified customer session detected - access to dashboard blocked until email confirmed:', fbUser.email);
+          setCurrentUser(null);
+          return;
+        }
 
         const userDocRef = doc(db, 'users', fbUser.uid);
         
@@ -1519,11 +1527,11 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return newAppointment;
   };
 
-  const updateAppointmentStatus = (id: string, status: AppointmentStatus) => {
+  const updateAppointmentStatus = (id: string, status: AppointmentStatus, extraFields?: Partial<Appointment>) => {
     const target = appointments.find(apt => apt.id === id);
 
     setAppointments(prev => {
-      const updated = prev.map(apt => apt.id === id ? { ...apt, bookingStatus: status, status: status, isNew: false } : apt);
+      const updated = prev.map(apt => apt.id === id ? { ...apt, bookingStatus: status, status: status, isNew: false, ...(extraFields || {}) } : apt);
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_appointments`, JSON.stringify(updated));
       return updated;
     });
@@ -1568,9 +1576,11 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
     }
 
+    const payload = cleanFirestoreData({ bookingStatus: status, status: status, isNew: false, ...(extraFields || {}) });
+
     // Update in Firestore cloud database in real time
     try {
-      updateDoc(doc(db, 'appointments', id), { bookingStatus: status, status: status, isNew: false }).catch(err => {
+      updateDoc(doc(db, 'appointments', id), payload).catch(err => {
         console.warn('Firestore updateAppointmentStatus note:', err);
       });
     } catch {}
@@ -1579,11 +1589,9 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       fetch(`/api/appointments/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingStatus: status, status: status, isNew: false })
-      }).catch(err => console.log('Appointment status update background notice:', err));
-    } catch {
-      // Fallback
-    }
+        body: JSON.stringify(payload)
+      }).catch(() => {});
+    } catch {}
   };
 
   const rescheduleAppointment = async (id: string, newDate: string, newTimeSlot: string): Promise<{ success: boolean; message: string }> => {

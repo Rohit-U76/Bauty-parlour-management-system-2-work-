@@ -93,23 +93,29 @@ export const CustomerReviewsPage: React.FC = () => {
     });
   }, [reviews, selectedCategory, minRating, searchQuery]);
 
-  // Toggle helpful like (increments by 1 or decrements back to 0)
+  // Increment helpful count (+1 on each user's helpful vote)
   const handleLikeReview = (reviewId: string) => {
     const rev = reviews.find(r => r.id === reviewId);
     if (!rev) return;
 
-    const isLiked = !!userLikedReviews[reviewId];
-    const currentCount = typeof rev.helpfulCount === 'number' ? rev.helpfulCount : 0;
-    const newCount = isLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
+    const isAlreadyLiked = !!userLikedReviews[reviewId];
+    if (isAlreadyLiked) {
+      setToastMessage('You have already marked this review as helpful!');
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
 
-    const nextLiked = { ...userLikedReviews, [reviewId]: !isLiked };
+    const currentCount = typeof rev.helpfulCount === 'number' ? rev.helpfulCount : 0;
+    const newCount = currentCount + 1;
+
+    const nextLiked = { ...userLikedReviews, [reviewId]: true };
     setUserLikedReviews(nextLiked);
     try {
       localStorage.setItem('modern_salon_user_liked_reviews', JSON.stringify(nextLiked));
     } catch {}
 
     updateReview(reviewId, { helpfulCount: newCount });
-    setToastMessage(isLiked ? 'Removed helpful feedback' : 'Marked review as helpful!');
+    setToastMessage('Marked review as helpful (+1)!');
     setTimeout(() => setToastMessage(null), 3000);
   };
 

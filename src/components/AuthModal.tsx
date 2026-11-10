@@ -60,7 +60,7 @@ export const AuthModal: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
 
   // Admin Form State
-  const [adminIdentifier, setAdminIdentifier] = useState('rohitumdale@gmail.com');
+  const [adminIdentifier, setAdminIdentifier] = useState('');
   const [adminSecret, setAdminSecret] = useState('');
   const [showAdminSecret, setShowAdminSecret] = useState(false);
 
@@ -443,7 +443,7 @@ export const AuthModal: React.FC = () => {
                   id="modal-login-identifier"
                   value={customerIdentifier}
                   onChange={(e) => setCustomerIdentifier(e.target.value)}
-                  placeholder="e.g. rohit@gmail.com / 8104026257"
+                  placeholder="Enter your email, username, or phone"
                   className="w-full px-4 py-2.5 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none transition"
                 />
               </div>
@@ -569,7 +569,7 @@ export const AuthModal: React.FC = () => {
                     id="modal-reg-name"
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    placeholder="e.g. Rohit Umdale"
+                    placeholder="Enter your full name"
                     className="w-full px-3 py-2 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                   />
                 </div>
@@ -583,7 +583,7 @@ export const AuthModal: React.FC = () => {
                     id="modal-reg-username"
                     value={regUsername}
                     onChange={(e) => setRegUsername(e.target.value)}
-                    placeholder="e.g. rohit123"
+                    placeholder="Enter username (optional)"
                     className="w-full px-3 py-2 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                   />
                 </div>
@@ -600,7 +600,7 @@ export const AuthModal: React.FC = () => {
                     id="modal-reg-phone"
                     value={regPhone}
                     onChange={(e) => setRegPhone(e.target.value)}
-                    placeholder="e.g. 8104026257"
+                    placeholder="Enter 10-digit mobile number"
                     className="w-full px-3 py-2 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                   />
                 </div>
@@ -615,7 +615,7 @@ export const AuthModal: React.FC = () => {
                     id="modal-reg-email"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="e.g. rohit@gmail.com"
+                    placeholder="Enter your email address"
                     className="w-full px-3 py-2 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                   />
                 </div>
@@ -739,7 +739,7 @@ export const AuthModal: React.FC = () => {
               <div className="p-3 rounded-2xl bg-purple-100/80 dark:bg-amber-500/10 border border-purple-200 dark:border-amber-500/30 flex items-center gap-2">
                 <Crown className="w-4 h-4 text-purple-700 dark:text-amber-400 shrink-0" />
                 <span className="text-xs text-zinc-700 dark:text-zinc-300 font-semibold">
-                  Salon Owner &amp; Stylist Access Portal
+                  Salon Administrator Access Portal
                 </span>
               </div>
 
@@ -754,7 +754,7 @@ export const AuthModal: React.FC = () => {
                   id="modal-admin-identifier"
                   value={adminIdentifier}
                   onChange={(e) => setAdminIdentifier(e.target.value)}
-                  placeholder="e.g. rohitumdale@gmail.com or admin"
+                  placeholder="Enter admin email or username"
                   className="w-full px-4 py-2.5 rounded-xl bg-purple-50/40 dark:bg-zinc-950 border border-purple-200 dark:border-zinc-700 focus:border-purple-600 dark:focus:border-amber-500 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
                 />
               </div>
@@ -981,18 +981,25 @@ export const AuthModal: React.FC = () => {
             <div className="space-y-4 animate-in fade-in">
               <div className="space-y-1">
                 <h3 className="font-serif text-base font-bold text-zinc-900 dark:text-white">
-                  Reset Salon Owner Credentials
+                  Reset Administrator Password
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                  For owner security, a password reset link can be sent to the registered salon administrator email.
+                  Enter your registered administrator email address to receive a secure password reset link.
                 </p>
               </div>
 
-              <div className="p-3 rounded-2xl bg-purple-100/70 dark:bg-zinc-800/80 border border-purple-200 dark:border-zinc-700 text-xs space-y-1">
-                <div className="text-zinc-500 dark:text-zinc-400 text-[11px]">Authorized Owner Email:</div>
-                <div className="font-mono font-bold text-purple-900 dark:text-amber-300">
-                  {settings.adminEmails?.[0] || 'rohitumdale@gmail.com'}
-                </div>
+              <div className="space-y-1 text-left">
+                <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Administrator Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="Enter administrator email"
+                  value={adminIdentifier}
+                  onChange={(e) => setAdminIdentifier(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-purple-200 dark:border-zinc-700 text-sm focus:outline-none focus:border-purple-600 dark:focus:border-amber-400 text-zinc-900 dark:text-zinc-100"
+                />
               </div>
 
               <button
@@ -1006,7 +1013,7 @@ export const AuthModal: React.FC = () => {
                 ) : (
                   <>
                     <KeyRound className="w-4 h-4" />
-                    <span>Send Reset Email to Owner</span>
+                    <span>Send Reset Email to Administrator</span>
                   </>
                 )}
               </button>

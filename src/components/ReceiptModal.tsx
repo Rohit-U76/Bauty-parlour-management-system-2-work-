@@ -167,6 +167,16 @@ Salon Helpline: +91 ${salonPhone}
                   {appointment.paymentMethod || 'Online (UPI / Card)'}
                 </span>
               </div>
+              {(appointment.upiTransactionId || appointment.razorpayPaymentId) && (
+                <div className="col-span-2 p-2 rounded-lg bg-emerald-50/70 border border-emerald-200 text-[11px] flex items-center justify-between">
+                  <span className="text-emerald-800 font-medium">
+                    UPI Transaction ID / UTR: <strong className="font-mono">{appointment.upiTransactionId || appointment.razorpayPaymentId}</strong>
+                  </span>
+                  <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                    {appointment.isBankVerified ? '✅ Bank Credited' : '⏳ Deposited (Under Verification)'}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Financials Box */}

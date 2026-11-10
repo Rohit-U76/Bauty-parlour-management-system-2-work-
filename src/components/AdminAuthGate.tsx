@@ -17,7 +17,7 @@ import { ModernSalonLogo } from './ModernSalonLogo';
 
 export const AdminAuthGate: React.FC = () => {
   const { login, loginWithGoogle, setIsAdminMode, setActiveNavTab, settings } = useSalon();
-  const [adminIdentifier, setAdminIdentifier] = useState('rohitumdale@gmail.com');
+  const [adminIdentifier, setAdminIdentifier] = useState('');
   const [adminSecret, setAdminSecret] = useState('');
   const [showSecret, setShowSecret] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -112,7 +112,7 @@ export const AdminAuthGate: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. rohitumdale@gmail.com or admin"
+                  placeholder="Enter admin email or username"
                   value={adminIdentifier}
                   onChange={(e) => setAdminIdentifier(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-amber-500 transition font-mono"

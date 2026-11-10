@@ -26,7 +26,7 @@ interface AdminBankSmsHubProps {
 }
 
 export const AdminBankSmsHub: React.FC<AdminBankSmsHubProps> = ({ onShowToast }) => {
-  const { appointments, updateAppointmentStatus } = useSalon();
+  const { appointments, updateAppointmentStatus, settings } = useSalon();
   const [deposits, setDeposits] = useState<VerifiedBankDeposit[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [copiedUrl, setCopiedUrl] = useState<boolean>(false);
@@ -311,8 +311,8 @@ export const AdminBankSmsHub: React.FC<AdminBankSmsHubProps> = ({ onShowToast })
               onChange={(e) => setSimBank(e.target.value as any)}
               className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-200 focus:outline-none focus:border-amber-500"
             >
-              <option value="hdfc">HDFC Bank (Current A/c ...74441)</option>
-              <option value="phonepe">PhonePe Merchant (ghodakedinesh@ybl)</option>
+              <option value="hdfc">{settings.bankName || 'Union Bank of India'} (A/c ...{(settings.bankAccountNumber || '4079').slice(-5)})</option>
+              <option value="phonepe">PhonePe Merchant ({settings.merchantUpiId || settings.upiId || '9975236976@ibl'})</option>
               <option value="boi">Bank of India (A/c ...0428)</option>
             </select>
           </div>

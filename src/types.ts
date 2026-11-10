@@ -247,8 +247,12 @@ export interface SalonSettings {
   bankIfsc?: string;
   bankBranch?: string;
   bankAccountType?: string;
-  merchantUpiId?: string; // Scanner 1 VPA (e.g. ghodakedinesh@ybl)
+  merchantUpiId?: string; // Scanner 1 VPA (PhonePe / Union Bank: 9975236976@ibl)
+  upiId?: string; // Scanner 1 VPA alias
+  upiQrCodeUrl?: string; // Scanner 1 QR poster image URL
   secondaryUpiId?: string; // Scanner 2 VPA (e.g. 8104026257@axl)
+  secondaryAccountHolder?: string;
+  secondaryUpiQrCodeUrl?: string; // Scanner 2 QR poster image URL
   razorpayKeyId?: string;
   razorpayKeySecret?: string;
   paymentGatewayMode?: 'live' | 'test';

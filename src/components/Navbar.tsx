@@ -86,37 +86,37 @@ export const Navbar: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm overflow-hidden">
       {/* 1. Top Announcement Bar */}
-      <div className="bg-zinc-900 dark:bg-black text-zinc-300 border-b border-zinc-800 px-3 sm:px-4 py-1 text-[11px] sm:text-xs font-medium">
+      <div className="bg-purple-100/90 dark:bg-black text-zinc-800 dark:text-zinc-300 border-b border-purple-200 dark:border-zinc-800 px-3 sm:px-4 py-1 text-[11px] sm:text-xs font-medium transition-colors">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 truncate">
-            <span className="flex h-2 w-2 shrink-0 rounded-full bg-amber-400 animate-pulse"></span>
-            <span className="text-amber-400 font-bold shrink-0">
+            <span className="flex h-2 w-2 shrink-0 rounded-full bg-amber-500 animate-pulse"></span>
+            <span className="text-amber-600 dark:text-amber-400 font-bold shrink-0">
               Modern Unisex Salon:
             </span>
-            <span className="truncate text-zinc-300">
+            <span className="truncate text-zinc-700 dark:text-zinc-300">
               Mohol • B.N. Gund Complex • {settings.advancePercentage || 10}% Online Advance Deposit
             </span>
           </div>
-          <div className="hidden md:flex items-center gap-3 lg:gap-4 text-zinc-400 shrink-0">
+          <div className="hidden md:flex items-center gap-3 lg:gap-4 text-zinc-500 dark:text-zinc-400 shrink-0">
             <a 
               href={`tel:${settings.phone}`} 
-              className="flex items-center gap-1 text-zinc-300 hover:text-amber-300 transition font-mono"
+              className="flex items-center gap-1 text-zinc-700 dark:text-zinc-300 hover:text-purple-700 dark:hover:text-amber-300 transition font-mono"
             >
               <Phone className="w-3.5 h-3.5 text-amber-500" />
               <span>+91 {settings.phone}</span>
             </a>
-            <span className="text-zinc-700">|</span>
+            <span className="text-zinc-300 dark:text-zinc-700">|</span>
             <a
               href={settings.instagramUrl || "https://www.instagram.com/modern_unisex_salon_mohol?utm_source=qr"}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-pink-400 hover:text-pink-300 transition"
+              className="flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:text-pink-700 dark:hover:text-pink-300 transition"
             >
               <Instagram className="w-3.5 h-3.5" />
               <span>@modern_unisex_salon_mohol</span>
             </a>
-            <span className="text-zinc-700">|</span>
-            <span className="text-emerald-400 flex items-center gap-1 font-mono text-[11px]">
+            <span className="text-zinc-300 dark:text-zinc-700">|</span>
+            <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1 font-mono text-[11px]">
               <ShieldCheck className="w-3.5 h-3.5" /> Direct Bank UPI {settings.advancePercentage || 10}% Advance
             </span>
           </div>
@@ -295,7 +295,7 @@ export const Navbar: React.FC = () => {
       <nav 
         id="navbar-all-headers-strip"
         aria-label="Main Navigation"
-        className="w-full border-t border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/90 dark:bg-zinc-900/90 backdrop-blur-sm relative"
+        className="w-full border-t border-purple-200/80 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-900/90 backdrop-blur-sm relative"
       >
         <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
           {/* Desktop Navigation (md and up): All headers visible in single clean row */}

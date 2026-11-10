@@ -36,6 +36,17 @@ function SalonAppContent() {
     );
   }
 
+  // Strict Email Verification Gate:
+  // Customers MUST verify their email address before accessing the salon dashboard or taking the account
+  if (currentUser && !currentUser.emailVerified && currentUser.role !== 'ADMIN') {
+    return (
+      <div className="min-h-screen bg-[#faf7ff] dark:bg-stone-950 text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors duration-200">
+        <AuthGatewayScreen initialTab="pending_verification" initialEmail={currentUser.email} />
+        <AuthModal />
+      </div>
+    );
+  }
+
   // Standard Role Authorization: Customers are strictly regular clients and never routed to admin gate
   if (currentUser && currentUser.role !== 'ADMIN' && isAdminMode) {
     setIsAdminMode(false);

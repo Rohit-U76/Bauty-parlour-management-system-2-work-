@@ -407,6 +407,31 @@ export const CustomerPastAppointments: React.FC = () => {
                   </span>
                 </div>
 
+                {/* Real-time UTR & Bank Deposit Verification Status */}
+                {(apt.upiTransactionId || apt.razorpayPaymentId) && (
+                  <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 ${
+                    apt.isBankVerified
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                      : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
+                  }`}>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {apt.isBankVerified ? (
+                        <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-amber-500 shrink-0 animate-pulse" />
+                      )}
+                      <span className="truncate">
+                        {apt.isBankVerified
+                          ? `Bank Deposit Confirmed in Union Bank A/c 4079 (UTR: ${apt.upiTransactionId || apt.razorpayPaymentId})`
+                          : `UTR #${apt.upiTransactionId || 'Processing'} — Bank credit confirmation in progress`}
+                      </span>
+                    </div>
+                    <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-white dark:bg-zinc-900 shadow-sm shrink-0">
+                      {apt.isBankVerified ? '✅ CREDITED' : '⏳ VERIFYING'}
+                    </span>
+                  </div>
+                )}
+
                 {/* Action Buttons: Pass & QR, Print Receipt, PDF Receipt, WhatsApp */}
                 <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
@@ -693,6 +718,31 @@ export const CustomerPastAppointments: React.FC = () => {
                     {apt.notes && (
                       <div className="text-[11px] text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 italic">
                         Note: "{apt.notes}"
+                      </div>
+                    )}
+
+                    {/* Real-time UTR & Bank Deposit Verification Status */}
+                    {(apt.upiTransactionId || apt.razorpayPaymentId) && (
+                      <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 ${
+                        apt.isBankVerified
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                          : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
+                      }`}>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {apt.isBankVerified ? (
+                            <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                          ) : (
+                            <Clock className="w-4 h-4 text-amber-500 shrink-0 animate-pulse" />
+                          )}
+                          <span className="truncate">
+                            {apt.isBankVerified
+                              ? `Bank Deposit Confirmed in Union Bank A/c 4079 (UTR: ${apt.upiTransactionId || apt.razorpayPaymentId})`
+                              : `UTR #${apt.upiTransactionId || 'Processing'} — Bank credit verification pending`}
+                          </span>
+                        </div>
+                        <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-white dark:bg-zinc-900 shadow-sm shrink-0">
+                          {apt.isBankVerified ? '✅ CREDITED' : '⏳ VERIFYING'}
+                        </span>
                       </div>
                     )}
 

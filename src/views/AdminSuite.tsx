@@ -58,6 +58,7 @@ import {
   Send,
   Video,
   Play,
+  Upload,
   Film
 } from 'lucide-react';
 import { useSalon } from '../context/SalonContext';
@@ -306,6 +307,102 @@ export const AdminSuite: React.FC = () => {
   const [newGalleryDuration, setNewGalleryDuration] = useState('0:45 min');
   const [galleryMediaFilter, setGalleryMediaFilter] = useState<'all' | 'image' | 'video'>('all');
   const [adminActiveVideoPreview, setAdminActiveVideoPreview] = useState<GalleryItem | null>(null);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [videoUploadStatus, setVideoUploadStatus] = useState<string | null>(null);
+
+  const handleUploadVideoFile = async (file: File, isEditing = false) => {
+    if (!file) return;
+    setIsUploadingVideo(true);
+    setVideoUploadStatus('Reading video file...');
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          if (typeof reader.result !== 'string') {
+            setIsUploadingVideo(false);
+            return;
+          }
+          setVideoUploadStatus('Uploading video to salon storage...');
+          const res = await fetch('/api/gallery/upload-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              videoBase64: reader.result,
+              fileName: file.name
+            })
+          });
+          const data = await res.json();
+          if (data.success && data.videoUrl) {
+            if (isEditing) {
+              setEditingGalleryItem(prev => prev ? { ...prev, videoUrl: data.videoUrl } : null);
+            } else {
+              setNewGalleryVideoUrl(data.videoUrl);
+            }
+            setActionFeedbackToast(`✅ Video "${file.name}" uploaded successfully!`);
+            setTimeout(() => setActionFeedbackToast(null), 3500);
+
+            // Auto-extract thumbnail frame from video using canvas
+            try {
+              const tempVid = document.createElement('video');
+              tempVid.src = data.videoUrl;
+              tempVid.muted = true;
+              tempVid.crossOrigin = 'anonymous';
+              tempVid.currentTime = 0.5;
+              tempVid.onloadeddata = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = tempVid.videoWidth || 640;
+                canvas.height = tempVid.videoHeight || 360;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  ctx.drawImage(tempVid, 0, 0, canvas.width, canvas.height);
+                  const thumb = canvas.toDataURL('image/jpeg', 0.7);
+                  if (!isEditing && (!newGalleryImg || newGalleryImg.includes('unsplash'))) {
+                    setNewGalleryImg(thumb);
+                  }
+                }
+              };
+            } catch {}
+          } else {
+            alert('Upload failed: ' + (data.message || 'Server error'));
+          }
+        } catch (err: any) {
+          alert('Could not upload video: ' + err.message);
+        } finally {
+          setIsUploadingVideo(false);
+          setVideoUploadStatus(null);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setIsUploadingVideo(false);
+      alert('Could not read video file: ' + err.message);
+    }
+  };
+
+  const handleConfirmBankCredit = (app: Appointment) => {
+    updateAppointmentStatus(app.id, 'CONFIRMED', {
+      isBankVerified: true,
+      bankVerifiedSource: 'ADMIN_MANUAL',
+      verifiedBankName: 'Union Bank of India (A/c 4079)',
+      paymentStatus: 'PAID'
+    });
+    setActionFeedbackToast(`✅ Confirmed ₹${app.advancePaid} deposit credit for ${app.clientName}! (UTR: ${app.upiTransactionId || 'Manual Verified'})`);
+    setTimeout(() => setActionFeedbackToast(null), 4000);
+  };
+
+  const handleRejectUtrDeposit = (app: Appointment) => {
+    if (!window.confirm(`Are you sure you want to mark UTR "${app.upiTransactionId}" as unverified/fake for ${app.clientName}? This will cancel the booking.`)) {
+      return;
+    }
+    updateAppointmentStatus(app.id, 'CANCELLED', {
+      isBankVerified: false,
+      paymentStatus: 'FAILED',
+      cancelReason: 'Unverified / Fake UTR number'
+    });
+    setActionFeedbackToast(`Booking #${app.bookingRef} cancelled due to unverified UTR.`);
+    setTimeout(() => setActionFeedbackToast(null), 3500);
+  };
 
   // Add Offer Form
   const [newOfferCode, setNewOfferCode] = useState('');
@@ -574,7 +671,7 @@ export const AdminSuite: React.FC = () => {
                   <Crown className="w-3 h-3 text-amber-400 shrink-0" />
                 </div>
                 <div className="text-[10px] text-zinc-400 truncate font-mono">
-                  Owner Active • {settings.adminPin ? `PIN: ${settings.adminPin}` : 'Secured'}
+                  Administrator • Secured
                 </div>
               </div>
             </div>
@@ -711,7 +808,7 @@ export const AdminSuite: React.FC = () => {
                     <Crown className="w-3.5 h-3.5 text-amber-400" />
                   </div>
                   <div className="text-[11px] text-zinc-400 truncate">
-                    Owner Active • {settings.adminPin ? `PIN: ${settings.adminPin}` : 'Secured'}
+                    Administrator • Secured
                   </div>
                 </div>
               </div>
@@ -1103,11 +1200,35 @@ export const AdminSuite: React.FC = () => {
                             {settings.advancePercentage || 10}% Adv: ₹{app.advancePaid}
                           </div>
                           {(app.upiTransactionId || app.razorpayPaymentId) && (
-                            <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1 mt-0.5" title="UPI Reference / UTR Number">
+                            <div className="text-[10px] text-zinc-300 font-mono flex items-center gap-1 mt-0.5" title="UPI Reference / 12-digit UTR">
                               <span className="text-amber-400 font-bold">UTR:</span>
-                              <span className="truncate max-w-[130px]">{app.upiTransactionId || app.razorpayPaymentId}</span>
+                              <span className="truncate max-w-[110px] font-semibold">{app.upiTransactionId || app.razorpayPaymentId}</span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(app.upiTransactionId || app.razorpayPaymentId || '');
+                                  setActionFeedbackToast(`Copied UTR: ${app.upiTransactionId || app.razorpayPaymentId}`);
+                                  setTimeout(() => setActionFeedbackToast(null), 2500);
+                                }}
+                                className="p-0.5 rounded text-zinc-400 hover:text-white"
+                                title="Copy UTR to check bank SMS or statement"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
                             </div>
                           )}
+                          <div className="mt-1">
+                            {app.isBankVerified ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                                <span>Bank Credited</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                <Clock className="w-2.5 h-2.5 text-amber-400" />
+                                <span>Pending Bank Credit</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1122,6 +1243,29 @@ export const AdminSuite: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            {/* Bank Credit Verification Quick Actions */}
+                            {!app.isBankVerified && getAppStatus(app) !== 'CANCELLED' && (
+                              <button
+                                type="button"
+                                onClick={() => handleConfirmBankCredit(app)}
+                                className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer transition shadow-sm"
+                                title="Confirm that ₹{app.advancePaid} is credited in your Union Bank account"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Confirm Credit</span>
+                              </button>
+                            )}
+
+                            {!app.isBankVerified && (app.upiTransactionId) && getAppStatus(app) !== 'CANCELLED' && (
+                              <button
+                                type="button"
+                                onClick={() => handleRejectUtrDeposit(app)}
+                                className="px-2 py-1 rounded-lg bg-red-950/60 hover:bg-red-900 border border-red-500/30 text-red-400 text-[10px] font-semibold transition cursor-pointer"
+                                title="Reject fake/invalid UTR and cancel booking"
+                              >
+                                <span>Reject Fake</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => {
@@ -2213,53 +2357,180 @@ export const AdminSuite: React.FC = () => {
 
                 {/* Scanners 1 & 2 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+                  {/* Scanner 1 (Primary Union Bank / PhonePe QR) */}
+                  <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
                     <div className="flex items-center justify-between">
-                      <label className="font-bold text-xs text-zinc-200">
-                        Scanner 1 (Primary Salon QR)
+                      <label className="font-bold text-xs text-zinc-200 flex items-center gap-1.5">
+                        <Smartphone className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Scanner 1 (Primary Salon QR)</span>
                       </label>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold uppercase">PhonePe UPI</span>
+                      <span className="text-[9px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold uppercase">PhonePe / Union Bank</span>
                     </div>
-                    <div className="text-[11px] text-zinc-400">Payee: <strong className="text-zinc-200">MODERN JENTS PARLOUR</strong></div>
-                    <input
-                      type="text"
-                      value={settings.merchantUpiId || 'ghodakedinesh@ybl'}
-                      onChange={(e) => updateSettings({ merchantUpiId: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
-                    />
-                    <span className="text-[10px] text-zinc-500 block">
-                      PhonePe UPI ID used for generating exact service deposit QR codes
-                    </span>
+
+                    <div>
+                      <label className="text-[10px] text-zinc-400 block mb-1">Payee / Account Holder Name</label>
+                      <input
+                        type="text"
+                        value={settings.accountHolder || 'MODERN JENTS PARLOUR'}
+                        onChange={(e) => updateSettings({ accountHolder: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs font-semibold focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] text-zinc-400 font-semibold">Active Salon UPI ID (VPA)</label>
+                        <span className="text-[9px] text-emerald-400 font-mono">Live on Client Side</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={settings.merchantUpiId || settings.upiId || '9975236976@ibl'}
+                        onChange={(e) => updateSettings({ merchantUpiId: e.target.value, upiId: e.target.value })}
+                        placeholder="e.g. 9975236976@ibl"
+                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-amber-500/60 text-amber-400 font-mono text-xs font-bold focus:outline-none focus:border-amber-400"
+                      />
+                      <span className="text-[10px] text-zinc-500 block mt-1">
+                        Changing this instantly updates the customer UPI payment modal & dynamic QR code across the website.
+                      </span>
+                    </div>
+
+                    {/* QR Code Poster Image Upload & Preview */}
+                    <div className="pt-2 border-t border-zinc-800 space-y-2">
+                      <label className="text-[10px] text-zinc-400 font-semibold block">Store Standee QR Poster Image</label>
+                      <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 rounded-xl bg-zinc-900 border border-zinc-700 overflow-hidden flex items-center justify-center shrink-0 p-1">
+                          <img
+                            src={settings.upiQrCodeUrl || '/qr-union-bank-phonepe.jpg'}
+                            alt="Primary QR Standee"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div className="space-y-1.5 flex-1">
+                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-bold cursor-pointer transition">
+                            <Upload className="w-3 h-3 text-amber-400" />
+                            <span>Upload QR Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  if (event.target?.result) {
+                                    updateSettings({ upiQrCodeUrl: event.target.result as string });
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => updateSettings({
+                              upiQrCodeUrl: '/qr-union-bank-phonepe.jpg',
+                              merchantUpiId: '9975236976@ibl',
+                              upiId: '9975236976@ibl'
+                            })}
+                            className="text-[10px] text-amber-400 hover:underline block cursor-pointer"
+                          >
+                            Reset to Official Union Bank PhonePe QR
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+                  {/* Scanner 2 (Secondary / Personal QR) */}
+                  <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
                     <div className="flex items-center justify-between">
-                      <label className="font-bold text-xs text-zinc-200">
-                        Scanner 2 (Secondary / Personal QR)
+                      <label className="font-bold text-xs text-zinc-200 flex items-center gap-1.5">
+                        <Smartphone className="w-3.5 h-3.5 text-purple-500" />
+                        <span>Scanner 2 (Secondary Backup QR)</span>
                       </label>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold uppercase">PhonePe UPI</span>
+                      <span className="text-[9px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold uppercase">PhonePe UPI</span>
                     </div>
-                    <div className="text-[11px] text-zinc-400">Payee: <strong className="text-zinc-200">DINESH VITTHAL GHODAKE</strong></div>
-                    <input
-                      type="text"
-                      value={settings.secondaryUpiId || '8104026257@axl'}
-                      onChange={(e) => updateSettings({ secondaryUpiId: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
-                    />
-                    <span className="text-[10px] text-zinc-500 block">
-                      Secondary backup UPI handle for customer scanning
-                    </span>
+
+                    <div>
+                      <label className="text-[10px] text-zinc-400 block mb-1">Payee Name</label>
+                      <input
+                        type="text"
+                        value={settings.secondaryAccountHolder || 'DINESH VITTHAL GHODAKE'}
+                        onChange={(e) => updateSettings({ secondaryAccountHolder: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs font-semibold focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-zinc-400 font-semibold block mb-1">Secondary UPI ID (VPA)</label>
+                      <input
+                        type="text"
+                        value={settings.secondaryUpiId || '8104026257@axl'}
+                        onChange={(e) => updateSettings({ secondaryUpiId: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                      />
+                      <span className="text-[10px] text-zinc-500 block mt-1">
+                        Secondary backup UPI handle for customer scanning.
+                      </span>
+                    </div>
+
+                    {/* Scanner 2 QR Poster */}
+                    <div className="pt-2 border-t border-zinc-800 space-y-2">
+                      <label className="text-[10px] text-zinc-400 font-semibold block">Scanner 2 Poster Standee</label>
+                      <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 rounded-xl bg-zinc-900 border border-zinc-700 overflow-hidden flex items-center justify-center shrink-0 p-1">
+                          <img
+                            src={settings.secondaryUpiQrCodeUrl || '/qr-dinesh-ghodake.jpg'}
+                            alt="Secondary QR Standee"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div className="space-y-1.5 flex-1">
+                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-bold cursor-pointer transition">
+                            <Upload className="w-3 h-3 text-purple-400" />
+                            <span>Upload QR Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  if (event.target?.result) {
+                                    updateSettings({ secondaryUpiQrCodeUrl: event.target.result as string });
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* HDFC Bank Details */}
+                {/* Bank Account Details */}
                 <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
                   <div className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
                     <Building2 className="w-4 h-4" />
-                    <span>HDFC Bank Account Details</span>
+                    <span>Official Bank Account Details</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="font-semibold text-zinc-400 block mb-1">Bank Name</label>
+                      <input
+                        type="text"
+                        value={settings.bankName || 'Union Bank of India'}
+                        onChange={(e) => updateSettings({ bankName: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs font-semibold focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
                     <div>
                       <label className="font-semibold text-zinc-400 block mb-1">Account Holder</label>
                       <input
@@ -2274,7 +2545,7 @@ export const AdminSuite: React.FC = () => {
                       <label className="font-semibold text-zinc-400 block mb-1">Account Number</label>
                       <input
                         type="text"
-                        value={settings.bankAccountNumber || '50200072074441'}
+                        value={settings.bankAccountNumber || '0701163100004079'}
                         onChange={(e) => updateSettings({ bankAccountNumber: e.target.value })}
                         className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
                       />
@@ -2284,7 +2555,7 @@ export const AdminSuite: React.FC = () => {
                       <label className="font-semibold text-zinc-400 block mb-1">IFSC Code &amp; Branch</label>
                       <input
                         type="text"
-                        value={settings.bankIfsc || 'HDFC0000635'}
+                        value={settings.bankIfsc || 'UBIN0532151'}
                         onChange={(e) => updateSettings({ bankIfsc: e.target.value })}
                         className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
                       />
@@ -2884,28 +3155,32 @@ export const AdminSuite: React.FC = () => {
                         onChange={(e) => setNewGalleryVideoUrl(e.target.value)}
                         className="flex-1 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs"
                       />
-                      <label className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold cursor-pointer shrink-0 flex items-center gap-1 transition">
-                        <Video className="w-3.5 h-3.5" />
-                        <span>Upload File</span>
+                      <label className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold cursor-pointer shrink-0 flex items-center gap-1 transition disabled:opacity-50">
+                        {isUploadingVideo ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5" />
+                        )}
+                        <span>{isUploadingVideo ? 'Uploading...' : 'Upload Video File'}</span>
                         <input
                           type="file"
-                          accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                          accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*"
                           className="hidden"
+                          disabled={isUploadingVideo}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = () => {
-                                if (typeof reader.result === 'string') {
-                                  setNewGalleryVideoUrl(reader.result);
-                                }
-                              };
-                              reader.readAsDataURL(file);
-                            }
+                            if (file) handleUploadVideoFile(file, false);
                           }}
                         />
                       </label>
                     </div>
+
+                    {isUploadingVideo && (
+                      <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-mono flex items-center gap-2 animate-pulse">
+                        <RefreshCw className="w-3 h-3 animate-spin shrink-0 text-amber-400" />
+                        <span>{videoUploadStatus || 'Saving video to salon storage...'}</span>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
@@ -3112,28 +3387,31 @@ export const AdminSuite: React.FC = () => {
                       placeholder="Paste video URL..."
                       className="flex-1 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs"
                     />
-                    <label className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-750 text-zinc-200 text-xs font-semibold cursor-pointer shrink-0 flex items-center gap-1">
-                      <Video className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Upload</span>
+                    <label className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold cursor-pointer shrink-0 flex items-center gap-1 disabled:opacity-50">
+                      {isUploadingVideo ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5" />
+                      )}
+                      <span>{isUploadingVideo ? 'Uploading...' : 'Upload Video'}</span>
                       <input
                         type="file"
                         accept="video/*"
                         className="hidden"
+                        disabled={isUploadingVideo}
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              if (typeof reader.result === 'string') {
-                                setEditingGalleryItem({ ...editingGalleryItem, videoUrl: reader.result });
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }
+                          if (file) handleUploadVideoFile(file, true);
                         }}
                       />
                     </label>
                   </div>
+                  {isUploadingVideo && (
+                    <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-mono flex items-center gap-2 animate-pulse">
+                      <RefreshCw className="w-3 h-3 animate-spin shrink-0 text-amber-400" />
+                      <span>{videoUploadStatus || 'Saving video to salon storage...'}</span>
+                    </div>
+                  )}
                   <div>
                     <label className="text-zinc-400 block mb-1">Duration</label>
                     <input

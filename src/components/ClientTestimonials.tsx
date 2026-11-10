@@ -172,10 +172,16 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
     if (!rev) return;
 
     const isCurrentlyLiked = !!userLikedReviews[reviewId];
-    const currentCount = typeof rev.helpfulCount === 'number' ? rev.helpfulCount : 0;
-    const newCount = isCurrentlyLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
+    if (isCurrentlyLiked) {
+      setToastMessage('You already marked this review as helpful!');
+      setTimeout(() => setToastMessage(null), 2500);
+      return;
+    }
 
-    const nextLiked = { ...userLikedReviews, [reviewId]: !isCurrentlyLiked };
+    const currentCount = typeof rev.helpfulCount === 'number' ? rev.helpfulCount : 0;
+    const newCount = currentCount + 1;
+
+    const nextLiked = { ...userLikedReviews, [reviewId]: true };
     setUserLikedReviews(nextLiked);
     try {
       localStorage.setItem('modern_salon_user_liked_reviews', JSON.stringify(nextLiked));
@@ -183,11 +189,7 @@ export const ClientTestimonials: React.FC<ClientTestimonialsProps> = ({
 
     updateReview(reviewId, { helpfulCount: newCount });
 
-    if (!isCurrentlyLiked) {
-      setToastMessage('Marked review as helpful (+1)');
-    } else {
-      setToastMessage('Removed helpful mark');
-    }
+    setToastMessage('Marked review as helpful (+1)');
     setTimeout(() => setToastMessage(null), 2000);
   };
 

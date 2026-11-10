@@ -128,7 +128,25 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
   const effectiveService = orderData?.serviceName ?? propServiceName ?? 'Salon Service';
   const effectiveSuccess = onPaymentSuccess || onSuccess || (() => {});
 
-  const currentUpiTarget = selectedOption === 'scanner2' ? BANK_INFO.scanner2 : BANK_INFO.scanner1;
+  const currentUpiTarget = useMemo(() => {
+    if (selectedOption === 'scanner2') {
+      return {
+        id: 'scanner2',
+        name: settings.secondaryAccountHolder || 'DINESH VITTHAL GHODAKE',
+        subtitle: 'Secondary Owner Account (PhonePe / UPI)',
+        upiId: settings.secondaryUpiId || BANK_INFO.scanner2.upiId,
+        posterImage: settings.secondaryUpiQrCodeUrl || BANK_INFO.scanner2.posterImage
+      };
+    }
+    // Scanner 1: Primary Salon Current Account (Union Bank / PhonePe QR)
+    return {
+      id: 'scanner1',
+      name: settings.accountHolder || settings.salonName || BANK_INFO.scanner1.name,
+      subtitle: `${settings.bankName || 'Union Bank'} (PhonePe / UPI)`,
+      upiId: settings.merchantUpiId || settings.upiId || '9975236976@ibl',
+      posterImage: settings.upiQrCodeUrl || '/qr-union-bank-phonepe.jpg'
+    };
+  }, [selectedOption, settings]);
 
   // Stable session booking reference code (generated once per modal mount)
   const [sessionRefCode] = useState(() => `MS-${Math.floor(100000 + Math.random() * 900000)}`);
@@ -422,7 +440,7 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
                   <Smartphone className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                   <span className="truncate">Scanner 1</span>
                 </div>
-                <div className="text-[10px] opacity-80 truncate mt-1">MODERN JENTS</div>
+                <div className="text-[10px] opacity-80 truncate mt-1">{settings.accountHolder || 'MODERN JENTS'}</div>
               </button>
 
               <button
@@ -438,7 +456,7 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
                   <Smartphone className="w-3.5 h-3.5 text-purple-500 shrink-0" />
                   <span className="truncate">Scanner 2</span>
                 </div>
-                <div className="text-[10px] opacity-80 truncate mt-1">DINESH GHODAKE</div>
+                <div className="text-[10px] opacity-80 truncate mt-1">{settings.secondaryAccountHolder || 'DINESH GHODAKE'}</div>
               </button>
 
               <button
@@ -454,7 +472,7 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
                   <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                   <span className="truncate">Bank Account</span>
                 </div>
-                <div className="text-[10px] opacity-80 truncate mt-1">HDFC Bank</div>
+                <div className="text-[10px] opacity-80 truncate mt-1">{settings.bankName || 'Union Bank'}</div>
               </button>
             </div>
           </div>

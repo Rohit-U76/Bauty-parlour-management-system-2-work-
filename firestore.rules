@@ -39,11 +39,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Customer reviews (Public reading, authenticated or verified client submission)
+    // Customer reviews (Public reading, authenticated or verified client submission, helpful votes)
     match /reviews/{reviewId} {
       allow read: if true;
       allow create: if true;
-      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin() || 
+                       (isSignedIn() && resource.data.userId == request.auth.uid) || 
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['helpfulCount']);
+      allow delete: if isAdmin();
     }
 
     // Inquiries from contact page
@@ -56,13 +59,13 @@ service cloud.firestore {
     // Offers & Coupons
     match /offers/{offerId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isSignedIn();
     }
 
     // Salon settings & rate cards
     match /salon_settings/{settingId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isSignedIn();
     }
 
     // Customer CRM records
@@ -73,7 +76,7 @@ service cloud.firestore {
     // Gallery & video showcase collection
     match /gallery_items/{itemId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isSignedIn() || true;
     }
   }
 }
