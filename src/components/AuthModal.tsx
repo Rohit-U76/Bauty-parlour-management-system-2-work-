@@ -188,15 +188,18 @@ export const AuthModal: React.FC = () => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
-    setIsLoading(true);
 
-    const target = (adminIdentifier && adminIdentifier.includes('@')) 
-      ? adminIdentifier.trim().toLowerCase() 
-      : (settings.adminEmails?.[0] || 'dineshghodake941@gmail.com');
+    const target = adminIdentifier.trim().toLowerCase();
+    if (!target || !target.includes('@')) {
+      setErrorMsg('Please enter a valid administrator email address.');
+      return;
+    }
+
+    setIsLoading(true);
     const res = await resetPassword(target);
     setIsLoading(false);
     if (res.success) {
-      setSuccessMsg(res.message || `Password reset link dispatched to authorized salon owner email (${target}). Please check your inbox.`);
+      setSuccessMsg(res.message);
     } else {
       setErrorMsg(res.message);
     }
@@ -955,7 +958,7 @@ export const AuthModal: React.FC = () => {
           {/* TAB 6: ADMIN FORGOT PASSWORD */}
           {/* ========================================================================= */}
           {activeTab === 'admin_forgot_password' && (
-            <div className="space-y-4 animate-in fade-in">
+            <form onSubmit={handleAdminForgotPassword} className="space-y-4 animate-in fade-in">
               <div className="space-y-1">
                 <h3 className="font-serif text-base font-bold text-zinc-900 dark:text-white">
                   Reset Administrator Password
@@ -980,8 +983,7 @@ export const AuthModal: React.FC = () => {
               </div>
 
               <button
-                type="button"
-                onClick={handleAdminForgotPassword}
+                type="submit"
                 disabled={isLoading}
                 className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-zinc-950 font-bold text-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
@@ -1008,7 +1010,7 @@ export const AuthModal: React.FC = () => {
                   ← Back to Admin Login
                 </button>
               </div>
-            </div>
+            </form>
           )}
         </div>
       </div>

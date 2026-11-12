@@ -931,28 +931,27 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       await sendPasswordResetEmail(auth, cleanEmail);
       return {
         success: true,
-        message: `Password reset link sent to ${cleanEmail}. Please check your inbox and spam folder to create a new password.`
+        message: `Password reset link sent to ${cleanEmail}. Please check your inbox (and spam folder) to set your new password.`
       };
     } catch (err: any) {
       console.warn('Password reset notice:', err);
       const isRecognizedAdmin = 
         cleanEmail === 'dineshghodake941@gmail.com' ||
-        cleanEmail === 'rohitumdale@gmail.com' ||
         (settings.adminEmails || []).map(e => e.toLowerCase()).includes(cleanEmail);
 
       if (isRecognizedAdmin) {
         return {
           success: true,
-          message: `Owner reset instructions confirmed for ${cleanEmail}. Your emergency salon admin PIN is ${settings.adminPin || '8104'}. You can log in using this PIN and update your master password inside Admin Suite > Salon Settings.`
+          message: `Owner reset instructions confirmed for ${cleanEmail}. Emergency Salon Owner PIN: ${settings.adminPin || '8104'}. You can log in with this PIN anytime and update your master password in Salon Settings.`
         };
       }
 
       if (err.code === 'auth/user-not-found') {
-        return { success: false, message: 'No registered user found with this email address. Please sign up to create a new account.' };
+        return { success: false, message: 'No account found with this email address. Please sign up to create a new account.' };
       }
       return {
         success: true,
-        message: `Password reset request submitted for ${cleanEmail}. If an account is associated with this email, reset instructions have been dispatched.`
+        message: `Password reset request submitted for ${cleanEmail}. If an account is associated with this email, reset instructions have been dispatched to your inbox.`
       };
     }
   };
@@ -1085,7 +1084,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           phone: fbUser.phoneNumber || '',
           role: userRole,
           emailVerified: true,
-          memberTier: userRole === 'ADMIN' ? 'Owner Admin' : 'Valued Client',
+          memberTier: userRole === 'ADMIN' ? 'Owner Admin' : 'Standard',
           loyaltyPoints: 200
         };
 

@@ -91,10 +91,11 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center gap-2 truncate">
             <span className="flex h-2 w-2 shrink-0 rounded-full bg-amber-500 animate-pulse"></span>
             <span className="text-amber-600 dark:text-amber-400 font-bold shrink-0">
-              Modern Unisex Salon:
+              Modern Unisex Salon
             </span>
-            <span className="truncate text-zinc-700 dark:text-zinc-300">
-              Mohol • B.N. Gund Complex • {settings.advancePercentage || 10}% Online Advance Deposit
+            <span className="text-zinc-600 dark:text-zinc-300 font-medium md:hidden">• Mohol</span>
+            <span className="hidden md:inline truncate text-zinc-700 dark:text-zinc-300">
+              • Mohol • B.N. Gund Complex • {settings.advancePercentage || 10}% Online Advance Deposit
             </span>
           </div>
           <div className="hidden md:flex items-center gap-3 lg:gap-4 text-zinc-500 dark:text-zinc-400 shrink-0">
@@ -125,14 +126,15 @@ export const Navbar: React.FC = () => {
 
       {/* 2. Top Header Action Row: Logo on Left; Theme, Notification, Profile of client & Book appointment in the SAME ROW on Right */}
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
+        <div className="flex items-center justify-between h-14 sm:h-16 gap-1.5 sm:gap-2">
           
           {/* Logo */}
           <div 
             onClick={() => handleNav('home')}
-            className="cursor-pointer group select-none shrink-0"
+            className="cursor-pointer group select-none shrink min-w-0"
           >
-            <ModernSalonLogo size="md" showTagline={true} />
+            <ModernSalonLogo size="md" showTagline={false} className="sm:hidden" />
+            <ModernSalonLogo size="md" showTagline={true} className="hidden sm:inline-flex" />
           </div>
 
           {/* Right Action Items - ALL in the SAME ROW across desktop and mobile */}
@@ -248,7 +250,7 @@ export const Navbar: React.FC = () => {
             <button
               id="navbar-client-profile-btn"
               onClick={openProfileModal}
-              className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-white dark:bg-zinc-900 border border-purple-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 hover:border-purple-500 dark:hover:border-purple-400 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer shadow-sm shrink-0"
+              className="px-2 py-1.5 sm:px-3 sm:py-2 rounded-xl text-xs font-bold bg-white dark:bg-zinc-900 border border-purple-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 hover:border-purple-500 dark:hover:border-purple-400 transition flex items-center gap-1 sm:gap-2 cursor-pointer shadow-sm shrink-0"
               title="Click to edit and save your client profile & preferences"
             >
               {currentUser ? (
@@ -256,15 +258,15 @@ export const Navbar: React.FC = () => {
                   <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-purple-600 text-white flex items-center justify-center font-extrabold text-[10px] sm:text-[11px] shrink-0">
                     {currentUser.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="hidden sm:inline-block max-w-[90px] lg:max-w-[120px] truncate font-bold text-zinc-900 dark:text-zinc-100">
+                  <span className="hidden sm:inline-block max-w-[80px] lg:max-w-[120px] truncate font-bold text-zinc-900 dark:text-zinc-100">
                     {currentUser.name}
                   </span>
-                  <Edit3 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                  <Edit3 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0 hidden sm:inline-block" />
                 </>
               ) : (
                 <>
                   <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                  <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                  <span className="font-bold text-[11px] sm:text-xs text-zinc-800 dark:text-zinc-200">
                     Profile
                   </span>
                   <span className="hidden md:inline-block text-[10px] text-purple-600 dark:text-purple-400 font-semibold bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.2 rounded-full">
@@ -278,11 +280,11 @@ export const Navbar: React.FC = () => {
             <button
               id="navbar-book-appointment-btn"
               onClick={() => openBookingModal()}
-              className="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs sm:text-xs flex items-center gap-1.5 shadow-sm shadow-purple-600/20 active:scale-95 transition cursor-pointer shrink-0"
+              className="px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[11px] sm:text-xs flex items-center gap-1 sm:gap-1.5 shadow-sm shadow-purple-600/20 active:scale-95 transition cursor-pointer shrink-0"
               title="Book your salon appointment with 10% advance deposit"
             >
               <Calendar className="w-3.5 h-3.5 text-white shrink-0" />
-              <span className="whitespace-nowrap">
+              <span className="whitespace-nowrap font-bold">
                 <span className="inline sm:hidden">Book</span>
                 <span className="hidden sm:inline">Book Appointment</span>
               </span>

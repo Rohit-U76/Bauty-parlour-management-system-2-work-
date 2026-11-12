@@ -86,7 +86,7 @@ export const AiAssistantWidget: React.FC = () => {
     {
       id: 'msg-1',
       sender: 'ai',
-      text: `✨ **Welcome to Smart Salon!**\nI am your AI Beauty & Grooming Consultant.\n• Ask about our hair styling, facials, bridal & grooming\n• Explore current seasonal promotions & discounts\n• Inquire about our transparent ${advPct}% online advance booking policy.\nHow can I help you today?`,
+      text: `✨ **Welcome to Modern Unisex Salon • Mohol!**\nI am your AI Beauty & Grooming Consultant.\n• Ask about our haircuts, keratin, bridal makeover & facials\n• Inquire about our transparent ${advPct}% online advance booking policy\n• Hours: 09:00 AM - 10:00 PM Daily | Master Stylist: Dinesh Ghodake.\nHow can I help you today?`,
       time: 'Just now'
     }
   ]);
@@ -104,6 +104,26 @@ export const AiAssistantWidget: React.FC = () => {
     }
   }, [messages, isAiChatOpen]);
 
+  const getInstantExpertAnswer = (query: string): string | null => {
+    const lower = query.toLowerCase();
+    if (lower.includes('price') || lower.includes('cost') || lower.includes('rate') || lower.includes('advance') || lower.includes('deposit') || lower.includes('10%')) {
+      return `💳 **Transparent Booking & Payment:**\n• **Online Reservation:** Pay only **${advPct}% Advance Deposit** via Direct Bank UPI QR Scanner (PhonePe, GPay, Paytm) straight to our bank account.\n• **Balance Amount:** The remaining ${100 - Number(advPct)}% is paid at salon reception after your service.\n• **Zero Convenience Fee:** Direct bank transfer saves all third-party charges!`;
+    }
+    if (lower.includes('timing') || lower.includes('hour') || lower.includes('time') || lower.includes('open') || lower.includes('close')) {
+      return `⏰ **Salon Timings & Schedule:**\n• **Operating Hours:** Open Daily from **09:00 AM to 10:00 PM**\n• **Location:** Mohol, B.N. Gund Complex, Kurul Road\n• **Stylist & Founder:** Dinesh Ghodake\n• **Bookings:** Reserve your preferred 3-4 hour slot online!`;
+    }
+    if (lower.includes('owner') || lower.includes('dinesh') || lower.includes('stylist') || lower.includes('founder') || lower.includes('contact')) {
+      return `💈 **Modern Unisex Salon Mohol:**\n• **Founder & Master Stylist:** Dinesh Ghodake\n• **Contact Phone:** +91 8104026257\n• **Email:** dineshghodake941@gmail.com\n• **Location:** B.N. Gund Complex, Opp. Market, Mohol`;
+    }
+    if (lower.includes('facial') || lower.includes('skin') || lower.includes('glow')) {
+      return `🌸 **Glowing Skin & Facial Therapies:**\n• **Radiance Facial:** Barrier repair & deep hydration (₹1,800)\n• **Hydra-Glow Cleansing:** Fruit peel & pore extraction (₹2,500)\n• **Instant De-Tan Ritual:** Removes sun tan in 45 mins (₹1,200)\n• **Offer:** Apply available coupon in booking for up to 20% off!`;
+    }
+    if (lower.includes('hair') || lower.includes('cut') || lower.includes('keratin') || lower.includes('beard')) {
+      return `✂️ **Hair & Grooming Excellence:**\n• **Precision Razor Haircut & Styling:** Designed for your face shape (₹850)\n• **Brazilian Keratin Smoothing:** Frizz-free, glassy hair for months (₹4,200)\n• **Executive Beard Sculpting & Charcoal Shave:** Sharp lines & skin detox (₹650)`;
+    }
+    return null;
+  };
+
   const handleSendMessage = async (textToSend?: string) => {
     const query = textToSend || inputText;
     if (!query.trim() || isLoading) return;
@@ -117,29 +137,52 @@ export const AiAssistantWidget: React.FC = () => {
 
     setMessages(prev => [...prev, userMsg]);
     if (!textToSend) setInputText('');
+
+    // Instant performance response check
+    const instantAns = getInstantExpertAnswer(query);
+    if (instantAns) {
+      setTimeout(() => {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `msg-${Date.now() + 1}`,
+            sender: 'ai',
+            text: instantAns,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+      }, 120);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: query })
+        body: JSON.stringify({ message: query }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
 
       const aiMsg: ChatMessage = {
         id: `msg-${Date.now() + 1}`,
         sender: 'ai',
-        text: data.reply || `I am glad to help you pick the best salon treatments. Would you like to reserve a slot with our ${advPct}% advance deposit?`,
+        text: data.reply || `I am glad to assist you at Modern Unisex Salon Mohol. You can reserve any service with only a ${advPct}% advance deposit!`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, aiMsg]);
     } catch (err) {
-      console.error(err);
+      const fallback = getInstantExpertAnswer(query) || `✨ **Modern Unisex Salon • Mohol:**\n• **Services:** Hair styling, Facials, Keratin, Grooming, Bridal\n• **Hours:** 09:00 AM - 10:00 PM Daily\n• **Advance Deposit:** Only **${advPct}%** online via UPI scanner to confirm your seat!`;
       const aiMsg: ChatMessage = {
         id: `msg-${Date.now() + 1}`,
         sender: 'ai',
-        text: `✨ **Smart Salon Services:**\n• **Facials & Glow:** Radiance facial & hydra deep pore treatments\n• **Hair Care:** Precision cuts, Brazilian keratin smoothing\n• **Advance Deposit:** Only **${advPct}%** online to reserve your slot!`,
+        text: fallback,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, aiMsg]);
@@ -150,22 +193,23 @@ export const AiAssistantWidget: React.FC = () => {
 
   const quickPrompts = [
     `How does the ${advPct}% advance deposit work?`,
+    "Salon timings & Mohol location",
     "Recommend a facial for dull skin",
-    "What bridal makeover packages do you offer?",
-    "Executive men beard & haircut cost"
+    "Executive beard & haircut cost"
   ];
 
   return (
     <>
-      {/* Floating Widget Trigger Button */}
-      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+      {/* Floating Widget Trigger Button - Short label on mobile to avoid merging */}
+      <div className="fixed bottom-20 right-3 sm:bottom-6 sm:right-6 z-40">
         <button
           id="ai-assistant-floating-btn"
           onClick={toggleAiChat}
-          className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white dark:bg-gradient-to-r dark:from-yellow-500 dark:to-amber-500 dark:hover:from-yellow-400 dark:hover:to-amber-400 dark:text-black font-bold text-xs sm:text-sm flex items-center gap-2 shadow-2xl shadow-purple-600/30 dark:shadow-yellow-500/30 border border-purple-400/40 dark:border-yellow-300/40 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          className="px-2.5 py-1.5 sm:px-4 sm:py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white dark:bg-gradient-to-r dark:from-yellow-500 dark:to-amber-500 dark:hover:from-yellow-400 dark:hover:to-amber-400 dark:text-black font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-2xl shadow-purple-600/30 dark:shadow-yellow-500/30 border border-purple-400/40 dark:border-yellow-300/40 transition-all hover:scale-105 active:scale-95 cursor-pointer"
         >
           <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white dark:text-black" />
-          <span>AI Assistant</span>
+          <span className="inline sm:hidden text-xs">AI</span>
+          <span className="hidden sm:inline">AI Assistant</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 dark:bg-emerald-700 animate-pulse"></span>
         </button>
       </div>
@@ -182,10 +226,10 @@ export const AiAssistantWidget: React.FC = () => {
               </div>
               <div>
                 <div className="text-sm font-bold text-zinc-900 dark:text-yellow-400 flex items-center gap-1.5">
-                  <span>Smart Salon AI</span>
+                  <span>Modern Unisex Salon AI</span>
                   <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-mono font-bold">Online</span>
                 </div>
-                <div className="text-[10px] text-zinc-600 dark:text-zinc-400">Beauty &amp; Booking Consultant</div>
+                <div className="text-[10px] text-zinc-600 dark:text-zinc-400">Beauty &amp; Booking Consultant • Mohol</div>
               </div>
             </div>
 

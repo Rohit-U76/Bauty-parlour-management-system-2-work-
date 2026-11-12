@@ -395,14 +395,17 @@ export const AppointmentReminderToast: React.FC = () => {
                 setSnoozeUntil(null);
                 setIsCollapsed(false);
               }}
-              className="px-2.5 py-1.5 flex items-center gap-2 cursor-pointer active:scale-95 transition"
+              className="px-2 py-1.5 sm:px-2.5 flex items-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 transition"
               title="View Upcoming Appointment Reminder"
             >
               <div className="relative">
                 <Bell className="w-4 h-4 animate-bounce" />
                 <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-600" />
               </div>
-              <span>Upcoming Appointment ({upcomingReminders.length})</span>
+              <span className="text-xs">
+                <span className="inline sm:hidden">Reminder</span>
+                <span className="hidden sm:inline">Upcoming Appointment ({upcomingReminders.length})</span>
+              </span>
             </button>
 
             {position && (
