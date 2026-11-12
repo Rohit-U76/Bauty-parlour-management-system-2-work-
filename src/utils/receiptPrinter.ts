@@ -153,7 +153,7 @@ export async function generateReceiptHtml(appointment: Appointment): Promise<str
         <div class="header">
           <div class="salon-brand">MODERN UNISEX SALON</div>
           <div class="salon-sub">B.N. Gund Complex, Near Kanya Prashala & ICICI Bank, Mohol, Solapur - 413213</div>
-          <div class="salon-sub">Helpline & WhatsApp: +91 81040 26257 | Founder & Master Stylist: Rohit Umdale</div>
+          <div class="salon-sub">Helpline & WhatsApp: +91 81040 26257 | Founder & Master Stylist: Dinesh Ghodake</div>
           <div class="deposit-badge">10% ADVANCE ONLINE PAYMENT CONFIRMED</div>
         </div>
 
@@ -181,7 +181,7 @@ export async function generateReceiptHtml(appointment: Appointment): Promise<str
         </div>
         <div class="info-row">
           <span class="label">Assigned Master Stylist</span>
-          <span class="val">${appointment.stylistName || 'Master Stylist (Rohit Umdale)'}</span>
+          <span class="val">${appointment.stylistName || 'Master Stylist (Dinesh Ghodake)'}</span>
         </div>
         <div class="info-row">
           <span class="label">Appointment Date</span>

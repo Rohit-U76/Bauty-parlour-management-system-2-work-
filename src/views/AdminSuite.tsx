@@ -134,6 +134,7 @@ export const AdminSuite: React.FC = () => {
   const [isBroadcastingOffer, setIsBroadcastingOffer] = useState(false);
   const [showSmsHubModal, setShowSmsHubModal] = useState(false);
   const [selectedAppForMessaging, setSelectedAppForMessaging] = useState<Appointment | null>(null);
+  const [viewingScreenshotUrl, setViewingScreenshotUrl] = useState<string | null>(null);
 
   // Staff State & Form
   const [staffSearch, setStaffSearch] = useState('');
@@ -587,7 +588,6 @@ export const AdminSuite: React.FC = () => {
   const navTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'appointments', label: 'Appointments', icon: Calendar, badge: confirmedCount },
-    { id: 'bank-hub', label: 'Bank SMS & UPI Ledger', icon: Smartphone, badge: appointments.filter(a => (a.bookingStatus === 'PENDING' || a.paymentStatus === 'PENDING') && a.bookingStatus !== 'CANCELLED').length },
     { id: 'services', label: 'Services & Pricing', icon: Scissors },
     { id: 'staff', label: 'Staff & Team', icon: UserCheck, badge: staffMembers.length },
     { id: 'gallery', label: 'Gallery Manager', icon: ImageIcon },
@@ -677,20 +677,6 @@ export const AdminSuite: React.FC = () => {
             </div>
           )}
 
-          {/* Switch to Client Website button */}
-          <button
-            id="admin-sidebar-client-website-btn"
-            onClick={() => {
-              setIsAdminMode(false);
-              setActiveNavTab('home');
-            }}
-            className="w-full py-2 px-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
-            title="Switch to Client / Customer Website"
-          >
-            <Compass className="w-4 h-4 text-purple-400" />
-            <span>Switch to Client Website</span>
-          </button>
-
           {/* Dedicated Sign Out button that returns to Authorization Page */}
           <button
             id="admin-sidebar-signout-btn"
@@ -727,19 +713,6 @@ export const AdminSuite: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            id="admin-mobile-client-website-btn"
-            onClick={() => {
-              setIsAdminMode(false);
-              setActiveNavTab('home');
-            }}
-            className="text-xs text-purple-300 hover:text-white font-bold px-2.5 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center gap-1 cursor-pointer"
-            title="Switch to Client Website"
-          >
-            <Compass className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Client Site</span>
-          </button>
-
           <button
             id="admin-mobile-signout-btn"
             onClick={() => logout()}
@@ -1104,10 +1077,6 @@ export const AdminSuite: React.FC = () => {
             </div>
           )}
 
-          {/* BANK SMS & UPI LEDGER TAB */}
-          {adminTab === 'bank-hub' && (
-            <AdminBankSmsHub onShowToast={(msg) => setActionFeedbackToast(msg)} />
-          )}
 
           {/* APPOINTMENTS TAB */}
           {adminTab === 'appointments' && (
@@ -1279,6 +1248,18 @@ export const AdminSuite: React.FC = () => {
                               <span>WhatsApp</span>
                             </button>
 
+                            {app.paymentScreenshotUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setViewingScreenshotUrl(app.paymentScreenshotUrl!)}
+                                className="px-2.5 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition shadow-xs"
+                                title="View PhonePe Payment Receipt Screenshot uploaded by client"
+                              >
+                                <ImageIcon className="w-3.5 h-3.5 text-purple-400" />
+                                <span>Screenshot</span>
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               onClick={() => setReceiptAppointment(app)}
@@ -1430,6 +1411,18 @@ export const AdminSuite: React.FC = () => {
                             <MessageSquare className="w-3.5 h-3.5" />
                             <span>WhatsApp</span>
                           </button>
+
+                          {app.paymentScreenshotUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingScreenshotUrl(app.paymentScreenshotUrl!)}
+                              className="px-3 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 min-h-[40px] cursor-pointer"
+                              title="View PhonePe Payment Receipt Screenshot"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5 text-purple-400" />
+                              <span>Screenshot</span>
+                            </button>
+                          )}
 
                           <button
                             type="button"
@@ -2564,48 +2557,6 @@ export const AdminSuite: React.FC = () => {
                 </div>
               </div>
 
-              {/* CARD 2: DIRECT BANK UPI & SETTLEMENT GUIDE */}
-              <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4 text-xs shadow-sm">
-                <div className="flex items-center gap-2 text-sm font-bold text-amber-400">
-                  <Building2 className="w-4 h-4" />
-                  <span>2. Direct Bank &amp; UPI Settlement Workflow</span>
-                </div>
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  How direct customer booking payments flow without third-party commission deductions:
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
-                    <div className="flex items-center gap-2 font-bold text-zinc-200">
-                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">1</span>
-                      <span>Customer Scans QR</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 leading-relaxed">
-                      Customer scans either Scanner 1 (Modern Jents Parlour) or Scanner 2 (Dinesh Ghodake). The exact 10% advance amount is pre-filled.
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
-                    <div className="flex items-center gap-2 font-bold text-zinc-200">
-                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">2</span>
-                      <span>12-Digit UTR Verification</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 leading-relaxed">
-                      Customer enters the unique 12-digit UTR from their PhonePe/GPay receipt. The system verifies uniqueness to prevent duplicates.
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
-                    <div className="flex items-center gap-2 font-bold text-zinc-200">
-                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-mono">3</span>
-                      <span>Instant Pass &amp; WhatsApp</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 leading-relaxed">
-                      100% of the deposit settles straight in your HDFC account. Booking Pass is generated and WhatsApp notification is sent to +91 8104026257.
-                    </p>
-                  </div>
-                </div>
-              </div>
 
               {/* CARD 3: SALON PROFILE & POLICIES */}
               <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4 shadow-sm text-xs">
@@ -2719,13 +2670,13 @@ export const AdminSuite: React.FC = () => {
                     </label>
                     <input
                       type="email"
-                      value={settings.adminEmails?.[0] || 'rohitumdale@gmail.com'}
+                      value={settings.adminEmails?.[0] || 'dineshghodake941@gmail.com'}
                       onChange={(e) => {
                         const newEmails = [e.target.value.trim().toLowerCase()];
                         updateSettings({ adminEmails: newEmails });
                       }}
                       className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-amber-500"
-                      placeholder="rohitumdale@gmail.com"
+                      placeholder="dineshghodake941@gmail.com"
                     />
                     <span className="text-[10px] text-zinc-500 mt-1 block">
                       Google Sign-In authorized for this email
@@ -3962,6 +3913,52 @@ export const AdminSuite: React.FC = () => {
           setTimeout(() => setActionFeedbackToast(null), 4500);
         }}
       />
+
+      {/* ADMIN PAYMENT SCREENSHOT PREVIEW MODAL */}
+      {viewingScreenshotUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="relative max-w-lg w-full bg-zinc-900 border border-zinc-700 rounded-3xl overflow-hidden shadow-2xl p-4 sm:p-5 space-y-3.5">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <h4 className="font-bold text-sm text-zinc-100 flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-purple-400" />
+                <span>Client PhonePe / UPI Payment Receipt Screenshot</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setViewingScreenshotUrl(null)}
+                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex justify-center bg-black/50 rounded-2xl p-2.5 max-h-[68vh] overflow-auto border border-zinc-800">
+              <img
+                src={viewingScreenshotUrl}
+                alt="Client Payment Receipt"
+                className="max-h-[62vh] w-auto object-contain rounded-xl shadow-lg"
+              />
+            </div>
+            <div className="flex items-center justify-between pt-1 text-xs">
+              <a
+                href={viewingScreenshotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-400 hover:text-purple-300 hover:underline font-bold"
+              >
+                Open Original Image ↗
+              </a>
+              <button
+                type="button"
+                onClick={() => setViewingScreenshotUrl(null)}
+                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Action Feedback Toast */}
       {actionFeedbackToast && (

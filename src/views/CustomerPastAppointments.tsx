@@ -163,7 +163,7 @@ export const CustomerPastAppointments: React.FC = () => {
 
   const handleWhatsAppHelp = (apt: Appointment) => {
     const text = encodeURIComponent(
-      `Hello Rohit, I have an upcoming booking at Modern Unisex Salon Mohol.\n` +
+      `Hello Dinesh Ghodake, I have an upcoming booking at Modern Unisex Salon Mohol.\n` +
       `*Booking Ref:* ${apt.bookingRef}\n` +
       `*Service:* ${apt.serviceName}\n` +
       `*Date & Time:* ${apt.date} at ${apt.timeSlot}\n` +
@@ -273,7 +273,7 @@ export const CustomerPastAppointments: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                {currentUser.phone} • Preferred: {currentUser.preferredStylist || 'Master Stylist (Rohit Umdale)'}
+                {currentUser.phone} • Preferred: {currentUser.preferredStylist || 'Master Stylist (Dinesh Ghodake)'}
               </p>
             </div>
           </div>
@@ -366,7 +366,7 @@ export const CustomerPastAppointments: React.FC = () => {
                       {apt.serviceName}
                     </h3>
                     <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                      Stylist: <strong className="text-zinc-900 dark:text-zinc-200">{apt.stylistName || 'Master Stylist (Rohit Umdale)'}</strong>
+                      Stylist: <strong className="text-zinc-900 dark:text-zinc-200">{apt.stylistName || 'Master Stylist (Dinesh Ghodake)'}</strong>
                     </p>
                   </div>
 

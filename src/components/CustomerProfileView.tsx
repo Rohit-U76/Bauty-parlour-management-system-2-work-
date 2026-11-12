@@ -298,7 +298,7 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
                   required
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Rohit Umdale"
+                  placeholder="Enter your full name"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
@@ -391,7 +391,7 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
                   className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="">Select Preferred Stylist (Optional)</option>
-                  <option value="Rohit Umdale (Master Stylist & Founder)">Rohit Umdale (Master Stylist &amp; Founder)</option>
+                  <option value="Dinesh Ghodake (Master Stylist & Founder)">Dinesh Ghodake (Master Stylist &amp; Founder)</option>
                   {staffList.map(st => (
                     <option key={st.id} value={st.name}>
                       {st.name} ({st.role || 'Stylist'})
@@ -402,16 +402,18 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Preferred Appointment Time
+                  Preferred Appointment Time (9:00 AM - 10:00 PM)
                 </label>
                 <select
                   value={formData.preferredSlot}
                   onChange={e => setFormData({ ...formData, preferredSlot: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  <option value="Morning (9 AM - 12 PM)">Morning (9:00 AM - 12:00 PM)</option>
-                  <option value="Afternoon (12 PM - 4 PM)">Afternoon (12:00 PM - 4:00 PM)</option>
-                  <option value="Evening (4 PM - 9 PM)">Evening (4:00 PM - 9:00 PM)</option>
+                  <option value="Morning (9:00 AM - 12:00 PM)">Morning (9:00 AM - 12:00 PM)</option>
+                  <option value="Afternoon (12:00 PM - 4:00 PM)">Afternoon (12:00 PM - 4:00 PM)</option>
+                  <option value="Evening (4:00 PM - 7:00 PM)">Evening (4:00 PM - 7:00 PM)</option>
+                  <option value="Night (7:00 PM - 10:00 PM)">Night (7:00 PM - 10:00 PM)</option>
+                  <option value="Flexible / Any Open Slot">Flexible / Any Open Slot (9 AM - 10 PM)</option>
                   <option value="Weekends Only">Weekends Only</option>
                 </select>
               </div>

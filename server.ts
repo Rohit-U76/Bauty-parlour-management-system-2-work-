@@ -37,9 +37,9 @@ function initDb() {
         salonName: 'Modern Unisex Salon',
         tagline: "WE'LL STYLE YOU'LL SMILE",
         phone: '8104026257',
-        email: 'modernsalon02@gmail.com',
+        email: 'dineshghodake941@gmail.com',
         address: 'B.N. GUND COMPLEX, NEAR KANYA PRASHALA AND ICICI BANK, MOHOL - 413213',
-        openingHours: 'Mon - Sun: 09:00 AM - 09:00 PM',
+        openingHours: 'Mon - Sun: 09:00 AM - 10:00 PM',
         advancePercentage: 10,
         currencySymbol: '₹',
         razorpayKeyId: 'rzp_test_modern_salon_mohol',
@@ -568,6 +568,57 @@ async function startServer() {
       return res.status(500).json({
         success: false,
         message: 'Failed to process and store video file: ' + err.message
+      });
+    }
+  });
+
+  // Ensure public screenshot uploads directory exists
+  const SCREENSHOT_UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'screenshots');
+  if (!fs.existsSync(SCREENSHOT_UPLOAD_DIR)) {
+    fs.mkdirSync(SCREENSHOT_UPLOAD_DIR, { recursive: true });
+  }
+
+  // Dedicated Screenshot Upload Endpoint for Payment Receipts / PhonePe Proofs
+  app.post('/api/appointments/upload-screenshot', (req, res) => {
+    try {
+      const { imageBase64, fileName, bookingRef } = req.body;
+      if (!imageBase64) {
+        return res.status(400).json({ success: false, message: 'No screenshot image provided' });
+      }
+
+      const matches = imageBase64.match(/^data:([A-Za-z0-9-+\/]+);base64,(.+)$/);
+      let buffer: Buffer;
+      let ext = 'jpg';
+
+      if (matches && matches.length === 3) {
+        const mime = matches[1];
+        if (mime.includes('png')) ext = 'png';
+        else if (mime.includes('webp')) ext = 'webp';
+        buffer = Buffer.from(matches[2], 'base64');
+      } else {
+        buffer = Buffer.from(imageBase64, 'base64');
+      }
+
+      const timestamp = Date.now();
+      const safeRef = (bookingRef || 'booking').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const generatedFilename = `screenshot_${safeRef}_${timestamp}.${ext}`;
+      const filePath = path.join(SCREENSHOT_UPLOAD_DIR, generatedFilename);
+
+      fs.writeFileSync(filePath, buffer);
+      const screenshotUrl = `/uploads/screenshots/${generatedFilename}`;
+
+      console.log(`[Payment Screenshot Saved]: ${generatedFilename} (${(buffer.length / 1024).toFixed(1)} KB)`);
+
+      return res.json({
+        success: true,
+        screenshotUrl,
+        filename: generatedFilename
+      });
+    } catch (err: any) {
+      console.error('[Screenshot Upload Error]:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to save screenshot: ' + err.message
       });
     }
   });

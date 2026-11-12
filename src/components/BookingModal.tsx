@@ -213,7 +213,8 @@ export const BookingModal: React.FC = () => {
     scannerUsed?: string,
     isBankVerified: boolean = true,
     bankVerifiedSource: 'SMS_WEBHOOK' | 'ADMIN_MANUAL' | 'NONE' = 'SMS_WEBHOOK',
-    bankName?: string
+    bankName?: string,
+    paymentScreenshotUrl?: string
   ) => {
     setShowPaymentModal(false);
     if (!selectedService) return;
@@ -249,6 +250,7 @@ export const BookingModal: React.FC = () => {
         bankVerifiedAt: isBankVerified ? new Date().toISOString() : undefined,
         bankVerifiedSource: isBankVerified ? bankVerifiedSource : undefined,
         bankName,
+        paymentScreenshotUrl,
         holdExpiresAt: !isBankVerified ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : undefined
       });
 
@@ -477,7 +479,7 @@ export const BookingModal: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-400 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block mb-2">
                   Select Appointment Date
                 </label>
                 <input
@@ -485,7 +487,7 @@ export const BookingModal: React.FC = () => {
                   min={getLocalDateString()}
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-white dark:bg-[#0e0e11] border border-purple-200/80 dark:border-zinc-800 text-sm text-zinc-900 dark:white focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-amber-500/40"
+                  className="w-full px-4 py-2.5 rounded-2xl bg-white dark:bg-zinc-900 border border-purple-200/80 dark:border-zinc-700 text-sm font-bold text-zinc-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-purple-500/40 dark:focus:ring-amber-500/40 shadow-xs"
                 />
               </div>
 

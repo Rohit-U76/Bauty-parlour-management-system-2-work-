@@ -41,8 +41,8 @@ export interface DirectUpiPaymentModalProps {
   clientName?: string;
   clientEmail?: string;
   clientPhone?: string;
-  onPaymentSuccess?: (paymentId: string, utr: string, scannerUsed: string, isBankVerified?: boolean, bankVerifiedSource?: 'SMS_WEBHOOK' | 'ADMIN_MANUAL' | 'NONE', bankName?: string) => void;
-  onSuccess?: (paymentId: string, utr: string, scannerUsed: string, isBankVerified?: boolean, bankVerifiedSource?: 'SMS_WEBHOOK' | 'ADMIN_MANUAL' | 'NONE', bankName?: string) => void;
+  onPaymentSuccess?: (paymentId: string, utr: string, scannerUsed: string, isBankVerified?: boolean, bankVerifiedSource?: 'SMS_WEBHOOK' | 'ADMIN_MANUAL' | 'NONE', bankName?: string, paymentScreenshotUrl?: string) => void;
+  onSuccess?: (paymentId: string, utr: string, scannerUsed: string, isBankVerified?: boolean, bankVerifiedSource?: 'SMS_WEBHOOK' | 'ADMIN_MANUAL' | 'NONE', bankName?: string, paymentScreenshotUrl?: string) => void;
 }
 
 type ScannerOption = 'scanner1' | 'scanner2' | 'bank';
@@ -103,9 +103,13 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
   const [dynamicQrDataUrl, setDynamicQrDataUrl] = useState<string>('');
   const [utrNumber, setUtrNumber] = useState<string>('');
   const [screenshotFileName, setScreenshotFileName] = useState<string>('');
+  const [uploadedScreenshotUrl, setUploadedScreenshotUrl] = useState<string>('');
+  const [isUploadingScreenshot, setIsUploadingScreenshot] = useState<boolean>(false);
+  const [screenshotUploadError, setScreenshotUploadError] = useState<string>('');
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [verificationError, setVerificationError] = useState<string>('');
   const [paymentVerified, setPaymentVerified] = useState<boolean>(false);
+  const [showSuccessScreen, setShowSuccessScreen] = useState<boolean>(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Real Bank SMS Webhook Polling & Verification States
@@ -119,6 +123,63 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
   const [showDesktopScanNotice, setShowDesktopScanNotice] = useState<boolean>(false);
   const [hasLaunchedUpiApp, setHasLaunchedUpiApp] = useState<boolean>(false);
   const [showReturnedFromAppBanner, setShowReturnedFromAppBanner] = useState<boolean>(false);
+
+  // Handler to upload PhonePe payment receipt screenshot
+  const handleScreenshotFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setScreenshotUploadError('Please select a valid image file (PNG, JPG, JPEG, WEBP).');
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setScreenshotUploadError('Image size exceeds 8MB limit. Please choose a smaller screenshot.');
+      return;
+    }
+
+    setScreenshotUploadError('');
+    setIsUploadingScreenshot(true);
+    setScreenshotFileName(file.name);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result as string;
+        try {
+          const res = await fetch('/api/appointments/upload-screenshot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: base64Data,
+              fileName: file.name,
+              bookingRef: sessionRefCode
+            })
+          });
+          const resData = await res.json();
+          if (resData.success && resData.screenshotUrl) {
+            setUploadedScreenshotUrl(resData.screenshotUrl);
+          } else {
+            // Fallback to direct data URL so screenshot is never lost
+            setUploadedScreenshotUrl(base64Data);
+          }
+        } catch {
+          setUploadedScreenshotUrl(base64Data);
+        } finally {
+          setIsUploadingScreenshot(false);
+        }
+      };
+      reader.onerror = () => {
+        setIsUploadingScreenshot(false);
+        setScreenshotUploadError('Failed to read image file. Please try again.');
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setIsUploadingScreenshot(false);
+      setScreenshotUploadError('Failed to process image. Please try again.');
+    }
+  };
 
   const effectiveAdvance = orderData?.advanceAmount ?? propAdvance ?? 0;
   const effectiveTotal = orderData?.totalAmount ?? propTotal ?? 0;
@@ -287,6 +348,7 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
         setVerifiedBankName(data.bankName || 'HDFC Bank');
         setVerifiedAmount(data.depositAmount || effectiveAdvance);
         setPaymentVerified(true);
+        setShowSuccessScreen(true);
         triggerCelebration();
 
         const scannerLabel = selectedOption === 'bank' 
@@ -294,8 +356,8 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
           : `UPI Scanner: ${currentUpiTarget.name}`;
 
         setTimeout(() => {
-          effectiveSuccess(`upi_${cleanUtr}`, cleanUtr, scannerLabel, true, 'SMS_WEBHOOK', data.bankName);
-        }, 1200);
+          effectiveSuccess(`upi_${cleanUtr}`, cleanUtr, scannerLabel, true, 'SMS_WEBHOOK', data.bankName, uploadedScreenshotUrl);
+        }, 1800);
         return;
       }
 
@@ -320,6 +382,7 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
             setVerifiedBankName(pollData.deposit?.bankName || 'HDFC Bank');
             setVerifiedAmount(pollData.deposit?.amount || effectiveAdvance);
             setPaymentVerified(true);
+            setShowSuccessScreen(true);
             triggerCelebration();
 
             const scannerLabel = selectedOption === 'bank' 
@@ -327,8 +390,8 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
               : `UPI Scanner: ${currentUpiTarget.name}`;
 
             setTimeout(() => {
-              effectiveSuccess(`upi_${cleanUtr}`, cleanUtr, scannerLabel, true, 'SMS_WEBHOOK', pollData.deposit?.bankName);
-            }, 1200);
+              effectiveSuccess(`upi_${cleanUtr}`, cleanUtr, scannerLabel, true, 'SMS_WEBHOOK', pollData.deposit?.bankName, uploadedScreenshotUrl);
+            }, 1800);
             return;
           }
         } catch (e) {
@@ -358,10 +421,21 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
       ? 'HDFC Bank Direct Transfer' 
       : `UPI Scanner: ${currentUpiTarget.name}`;
 
+    setShowSuccessScreen(true);
+    triggerCelebration();
+
     setTimeout(() => {
       setIsSubmittingManualHold(false);
-      effectiveSuccess(`upi_${cleanUtr}`, cleanUtr, scannerLabel, false, 'NONE');
-    }, 800);
+      effectiveSuccess(`upi_${cleanUtr}`, cleanUtr, scannerLabel, false, 'NONE', undefined, uploadedScreenshotUrl);
+    }, 1800);
+  };
+
+  const handleFinishSuccess = () => {
+    const cleanUtr = utrNumber.trim();
+    const scannerLabel = selectedOption === 'bank' 
+      ? 'HDFC Bank Direct Transfer' 
+      : `UPI Scanner: ${currentUpiTarget.name}`;
+    effectiveSuccess(`upi_${cleanUtr}`, cleanUtr, scannerLabel, paymentVerified, paymentVerified ? 'SMS_WEBHOOK' : 'NONE', verifiedBankName, uploadedScreenshotUrl);
   };
 
   return (
@@ -756,6 +830,14 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
               </div>
             )}
 
+            {/* USER REQUESTED PROMINENT VERIFICATION NOTICE */}
+            <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-purple-500/15 to-amber-500/20 border-2 border-amber-500/40 text-amber-950 dark:text-amber-200 text-xs font-bold flex items-start gap-2.5 shadow-sm">
+              <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="leading-snug">
+                <span>Send the screenshot or write the UTR number to verify and get confirmed with your seat.</span>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between">
               <label className="font-bold text-xs text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -790,6 +872,87 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
                 After paying in PhonePe/Google Pay, look for <strong>"UTR"</strong> or <strong>"UPI Ref No"</strong> on the payment successful screen. Every booking strictly requires this authentic 12-digit reference to generate your pass.
               </span>
             </p>
+
+            {/* UPLOAD PAYMENT SCREENSHOT SECTION */}
+            <div className="pt-2 border-t border-amber-500/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="font-bold text-xs text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                  <Upload className="w-4 h-4 text-purple-600 dark:text-amber-400" />
+                  <span>Upload PhonePe / UPI Payment Screenshot</span>
+                </label>
+                {uploadedScreenshotUrl && (
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Attached
+                  </span>
+                )}
+              </div>
+
+              {uploadedScreenshotUrl ? (
+                <div className="p-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-500/40 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img
+                      src={uploadedScreenshotUrl}
+                      alt="Payment Screenshot Preview"
+                      className="w-12 h-12 rounded-lg object-cover border border-emerald-400 shadow-xs shrink-0"
+                    />
+                    <div className="truncate">
+                      <div className="font-bold text-xs text-emerald-950 dark:text-emerald-200 truncate">
+                        {screenshotFileName || 'phonepe_receipt.jpg'}
+                      </div>
+                      <div className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">
+                        Screenshot attached for Admin verification
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadedScreenshotUrl('');
+                      setScreenshotFileName('');
+                    }}
+                    className="p-1 rounded-lg text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/50 cursor-pointer text-xs"
+                    title="Remove Screenshot"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <label className="border-2 border-dashed border-amber-500/30 hover:border-amber-500/60 dark:border-zinc-700 dark:hover:border-amber-400/60 rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-white/50 dark:bg-zinc-950/50 transition">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleScreenshotFile}
+                    className="hidden"
+                    disabled={isUploadingScreenshot}
+                  />
+                  {isUploadingScreenshot ? (
+                    <div className="flex items-center gap-2 text-xs text-purple-700 dark:text-amber-400 font-bold py-1">
+                      <div className="w-3.5 h-3.5 border-2 border-purple-600 dark:border-amber-400 border-t-transparent rounded-full animate-spin" />
+                      <span>Uploading receipt screenshot...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-zinc-800 text-purple-600 dark:text-amber-400 flex items-center justify-center">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                        Click to select PhonePe payment screenshot
+                      </span>
+                      <span className="text-[10px] text-zinc-500">
+                        PNG, JPG, WEBP (Max 8MB)
+                      </span>
+                    </>
+                  )}
+                </label>
+              )}
+
+              {screenshotUploadError && (
+                <div className="text-[11px] text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{screenshotUploadError}</span>
+                </div>
+              )}
+            </div>
 
             {/* Live Bank SMS Webhook Polling Card */}
             {isPollingBankSms && (
@@ -905,6 +1068,68 @@ export const DirectUpiPaymentModal: React.FC<DirectUpiPaymentModalProps> = ({
             )}
           </button>
         </div>
+
+        {/* DEDICATED PAYMENT SUCCESSFUL SCREEN OVERLAY WHEN TRANSACTION IS COMPLETED */}
+        {showSuccessScreen && (
+          <div className="absolute inset-0 z-20 bg-white/95 dark:bg-[#121216]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-emerald-500 mb-3 shadow-lg">
+              <CheckCircle2 className="w-9 h-9" />
+            </div>
+
+            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs font-black uppercase tracking-wider mb-2">
+              Payment is Successful
+            </span>
+
+            <h3 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-zinc-100">
+              ₹{verifiedAmount || effectiveAdvance} Advance Confirmed!
+            </h3>
+
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-sm">
+              Your 10% advance deposit has been recorded for <strong>{effectiveService}</strong>.
+            </p>
+
+            {/* Displaying UTR Number prominently as requested */}
+            <div className="mt-4 w-full max-w-md p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/90 border border-amber-500/30 space-y-2 text-left">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-500 dark:text-zinc-400 font-medium">12-Digit UTR Number:</span>
+                <span className="font-mono font-black text-amber-600 dark:text-amber-400 text-sm tracking-wider">
+                  {utrNumber || 'Pending'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs pt-1.5 border-t border-zinc-200 dark:border-zinc-800">
+                <span className="text-zinc-500 dark:text-zinc-400 font-medium">Payment Target:</span>
+                <span className="font-bold text-zinc-900 dark:text-zinc-200">
+                  {selectedOption === 'bank' ? 'HDFC Bank Account' : currentUpiTarget.name}
+                </span>
+              </div>
+
+              {uploadedScreenshotUrl && (
+                <div className="flex items-center justify-between text-xs pt-1.5 border-t border-zinc-200 dark:border-zinc-800">
+                  <span className="text-zinc-500 dark:text-zinc-400 font-medium">Payment Screenshot:</span>
+                  <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Uploaded to Salon Admin</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Prominent confirmation note */}
+            <div className="mt-3.5 max-w-md p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-950 dark:text-amber-200 text-xs font-semibold">
+              Send the screenshot or write the UTR number to verify and get confirmed with your seat.
+            </div>
+
+            <button
+              type="button"
+              onClick={handleFinishSuccess}
+              className="mt-5 w-full max-w-md py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-sm shadow-xl flex items-center justify-center gap-2 transition cursor-pointer"
+            >
+              <span>View Appointment Pass</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
       </div>
     </div>

@@ -24,7 +24,6 @@ import {
 import { useSalon } from '../context/SalonContext';
 import { ServiceItem } from '../types';
 import { ServicePriceTable } from '../components/ServicePriceTable';
-import { ServiceBundleBuilder } from '../components/ServiceBundleBuilder';
 import { FloatingBundleBar } from '../components/FloatingBundleBar';
 import { RealTimeAvailabilityBanner } from '../components/RealTimeAvailabilityBanner';
 import { getServiceAvailabilityInsight } from '../utils/availability';
@@ -32,7 +31,7 @@ import { getServiceAvailabilityInsight } from '../utils/availability';
 export const CustomerServices: React.FC = () => {
   const { services, openBookingModal, openQuizModal, settings, appointments } = useSalon();
   
-  const [viewMode, setViewMode] = useState<'table' | 'grid' | 'bundle'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedGender, setSelectedGender] = useState<string>('all');
@@ -191,23 +190,6 @@ export const CustomerServices: React.FC = () => {
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>Grid View</span>
             </button>
-
-            <button
-              onClick={() => setViewMode('bundle')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer relative ${
-                viewMode === 'bundle'
-                  ? 'bg-amber-500 text-zinc-950 shadow-sm'
-                  : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20'
-              }`}
-            >
-              <Gift className="w-3.5 h-3.5 text-amber-500" />
-              <span>Bundle &amp; Save</span>
-              {selectedBundleServiceIds.length > 0 && (
-                <span className="w-4 h-4 rounded-full bg-emerald-500 text-zinc-950 text-[9px] font-black flex items-center justify-center">
-                  {selectedBundleServiceIds.length}
-                </span>
-              )}
-            </button>
           </div>
 
           <button
@@ -226,17 +208,6 @@ export const CustomerServices: React.FC = () => {
           openBookingModal();
         }}
       />
-
-      {/* Mode 1: Bundle & Save Builder View */}
-      {viewMode === 'bundle' && (
-        <ServiceBundleBuilder
-          selectedServiceIds={selectedBundleServiceIds}
-          onToggleService={handleToggleBundleService}
-          onClearBundle={handleClearBundle}
-          onApplyPreset={handleApplyPreset}
-          onBookBundle={handleBookBundle}
-        />
-      )}
 
       {/* Mode 2: Tabular Rate Card */}
       {viewMode === 'table' && (
@@ -480,8 +451,7 @@ export const CustomerServices: React.FC = () => {
         discountedPrice={finalDiscountedPrice}
         advanceDeposit={advanceDeposit}
         onOpenBundleView={() => {
-          setViewMode('bundle');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          handleBookBundle();
         }}
         onBookBundle={() => handleBookBundle()}
         onClearBundle={handleClearBundle}

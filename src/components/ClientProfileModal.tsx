@@ -174,9 +174,13 @@ export const ClientProfileModal: React.FC = () => {
                   {currentUser ? 'Client Profile & Preferences' : 'Create & Save Client Profile'}
                 </h3>
                 {currentUser && (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-extrabold text-[10px] flex items-center gap-1">
-                    <Crown className="w-3 h-3" />
-                    <span>{currentUser.memberTier || 'VIP Member'}</span>
+                  <span className={`px-2 py-0.5 rounded-full font-extrabold text-[10px] flex items-center gap-1 ${
+                    (currentUser.totalVisits || 0) >= 10
+                      ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                      : 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30'
+                  }`}>
+                    {(currentUser.totalVisits || 0) >= 10 ? <Crown className="w-3 h-3 text-amber-500" /> : <Sparkles className="w-3 h-3 text-purple-500" />}
+                    <span>{(currentUser.totalVisits || 0) >= 10 ? 'VIP Member' : ((currentUser.totalVisits || 0) > 0 ? 'Valued Client' : 'New Client')}</span>
                   </span>
                 )}
               </div>
@@ -293,8 +297,8 @@ export const ClientProfileModal: React.FC = () => {
                 <Gift className="w-3.5 h-3.5" />
                 <span>Special Occasion Perks</span>
               </div>
-              <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full font-semibold">
-                Get 15% VIP discount on special days
+              <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full font-semibold">
+                Get 15% discount on special days (available only if coupon is applied/available)
               </span>
             </div>
 
@@ -343,7 +347,7 @@ export const ClientProfileModal: React.FC = () => {
                   className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="">Select Preferred Stylist (Optional)</option>
-                  <option value="Rohit Umdale (Master Stylist)">Rohit Umdale (Master Stylist - Mohol)</option>
+                  <option value="Dinesh Ghodake (Master Stylist)">Dinesh Ghodake (Master Stylist &amp; Founder - Mohol)</option>
                   <option value="Pooja (Senior Hairdresser)">Pooja (Senior Hairdresser)</option>
                   <option value="Amit (Creative Colorist)">Amit (Creative Colorist)</option>
                   <option value="Sneha (Skin & Bridal Expert)">Sneha (Skin &amp; Bridal Expert)</option>

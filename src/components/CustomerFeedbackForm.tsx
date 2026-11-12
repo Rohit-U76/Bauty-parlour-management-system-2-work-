@@ -399,7 +399,7 @@ export const CustomerFeedbackForm: React.FC<CustomerFeedbackFormProps> = ({
             <input
               type="text"
               required
-              placeholder="e.g. Pooja Kadam"
+              placeholder="Enter your full name"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-700 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
@@ -412,7 +412,7 @@ export const CustomerFeedbackForm: React.FC<CustomerFeedbackFormProps> = ({
             </label>
             <input
               type="tel"
-              placeholder="e.g. +91 81040 26257"
+              placeholder="Enter your mobile number"
               value={clientPhone}
               onChange={(e) => setClientPhone(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-700 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
@@ -445,7 +445,7 @@ export const CustomerFeedbackForm: React.FC<CustomerFeedbackFormProps> = ({
             </label>
             <input
               type="text"
-              placeholder="e.g. MS-2026-891024"
+              placeholder="e.g. 20261111-WED-001"
               value={bookingRef}
               onChange={(e) => setBookingRef(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-700 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40"

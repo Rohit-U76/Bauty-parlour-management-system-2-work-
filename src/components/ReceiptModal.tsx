@@ -121,7 +121,7 @@ Salon Helpline: +91 ${salonPhone}
                 B.N. Gund Complex, Near Kanya Prashala &amp; ICICI Bank, Mohol, Solapur - 413213
               </p>
               <p className="text-[11px] text-zinc-600">
-                Helpline &amp; WhatsApp: +91 {salonPhone} • Rohit Umdale (Master Stylist)
+                Helpline &amp; WhatsApp: +91 {salonPhone} • Dinesh Ghodake (Master Stylist)
               </p>
               <div className="pt-2">
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px] tracking-wider border border-emerald-300">
@@ -159,7 +159,7 @@ Salon Helpline: +91 ${salonPhone}
               </div>
               <div>
                 <span className="text-zinc-500 block">Assigned Specialist:</span>
-                <span className="font-medium text-zinc-800">{appointment.stylistName || 'Rohit Umdale'}</span>
+                <span className="font-medium text-zinc-800">{appointment.stylistName || 'Dinesh Ghodake'}</span>
               </div>
               <div className="text-right">
                 <span className="text-zinc-500 block">Payment Mode:</span>

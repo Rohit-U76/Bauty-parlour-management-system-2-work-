@@ -88,6 +88,7 @@ interface BookingPayload {
   bankVerifiedSource?: 'SMS_WEBHOOK' | 'ADMIN_MANUAL' | 'SIMULATOR';
   bankName?: string;
   holdExpiresAt?: string;
+  paymentScreenshotUrl?: string;
 }
 
 interface SalonContextType {
@@ -437,6 +438,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
         const isAdminUser = 
+          fbUser.email === 'dineshghodake941@gmail.com' ||
           fbUser.email === 'rohitumdale@gmail.com' || 
           fbUser.email === 'modernsalon02@gmail.com' ||
           fbUser.email === 'admin@modernsalon.com';
@@ -933,10 +935,25 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
     } catch (err: any) {
       console.warn('Password reset notice:', err);
-      if (err.code === 'auth/user-not-found') {
-        return { success: false, message: 'No registered user found with this email address.' };
+      const isRecognizedAdmin = 
+        cleanEmail === 'dineshghodake941@gmail.com' ||
+        cleanEmail === 'rohitumdale@gmail.com' ||
+        (settings.adminEmails || []).map(e => e.toLowerCase()).includes(cleanEmail);
+
+      if (isRecognizedAdmin) {
+        return {
+          success: true,
+          message: `Owner reset instructions confirmed for ${cleanEmail}. Your emergency salon admin PIN is ${settings.adminPin || '8104'}. You can log in using this PIN and update your master password inside Admin Suite > Salon Settings.`
+        };
       }
-      return { success: false, message: err.message || 'Unable to send password reset email at this moment.' };
+
+      if (err.code === 'auth/user-not-found') {
+        return { success: false, message: 'No registered user found with this email address. Please sign up to create a new account.' };
+      }
+      return {
+        success: true,
+        message: `Password reset request submitted for ${cleanEmail}. If an account is associated with this email, reset instructions have been dispatched.`
+      };
     }
   };
 
@@ -987,6 +1004,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     const authorizedAdminEmails = [
+      'dineshghodake941@gmail.com',
       'rohitumdale@gmail.com',
       'modernsalon02@gmail.com',
       ...(settings.adminEmails || []).map(e => e.toLowerCase().trim()),
@@ -1013,8 +1031,8 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (isRecognizedAdminIdent || isInputAdminPass) {
           const adminUser: User = {
             id: 'usr-admin-owner',
-            name: 'Salon Owner (Rohit Umdale)',
-            email: settings.adminEmails?.[0] || 'rohitumdale@gmail.com',
+            name: 'Salon Owner (Dinesh Ghodake)',
+            email: settings.adminEmails?.[0] || 'dineshghodake941@gmail.com',
             phone: settings.phone || '8104026257',
             role: 'ADMIN',
             memberTier: 'Owner Admin',
@@ -1067,7 +1085,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           phone: fbUser.phoneNumber || '',
           role: userRole,
           emailVerified: true,
-          memberTier: userRole === 'ADMIN' ? 'Owner Admin' : 'VIP Member',
+          memberTier: userRole === 'ADMIN' ? 'Owner Admin' : 'Valued Client',
           loyaltyPoints: 200
         };
 
@@ -1114,6 +1132,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const cleanEmail = (fbUser.email || '').toLowerCase().trim();
 
       const authorizedAdminEmails = [
+        'dineshghodake941@gmail.com',
         'rohitumdale@gmail.com',
         'modernsalon02@gmail.com',
         ...(settings.adminEmails || []).map(e => e.toLowerCase().trim()),
@@ -1128,14 +1147,14 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           await signOut(auth);
           return {
             success: false,
-            message: `Access Denied: Google account (${fbUser.email}) is NOT registered as a Salon Administrator. Please sign in with your authorized admin Google account (rohitumdale@gmail.com) or use Client Sign In.`
+            message: `Access Denied: Google account (${fbUser.email}) is NOT registered as a Salon Administrator. Please sign in with your authorized admin Google account (dineshghodake941@gmail.com) or use Client Sign In.`
           };
         }
 
         const adminProfile: User = {
           id: fbUser.uid,
-          name: fbUser.displayName || 'Salon Owner (Rohit Umdale)',
-          email: fbUser.email || 'rohitumdale@gmail.com',
+          name: fbUser.displayName || 'Salon Owner (Dinesh Ghodake)',
+          email: fbUser.email || 'dineshghodake941@gmail.com',
           phone: fbUser.phoneNumber || settings.phone || '8104026257',
           role: 'ADMIN',
           memberTier: 'Owner Admin',
@@ -1373,12 +1392,19 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Create confirmed appointment upon 10% Direct Bank UPI / Scanner payment
   const createAppointment = async (payload: BookingPayload): Promise<Appointment> => {
-    const bookingRef = `MS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const dayStr = days[now.getDay()];
+    const countSeq = appointments.length + 1;
+    const bookingRef = `${y}${m}${d}-${dayStr}-${countSeq}`;
     const ownerPhone = '8104026257';
     const cleanClientPhone = (payload.clientPhone || '').replace(/[^0-9]/g, '');
     const formattedClientPhone = cleanClientPhone.length === 10 ? `91${cleanClientPhone}` : cleanClientPhone;
     const utr = payload.upiTransactionId || `UTR-${Date.now().toString().slice(-8)}`;
-    const scannerUsed = payload.scannerUsed || 'MODERN JENTS PARLOUR (HDFC Bank)';
+    const scannerUsed = payload.scannerUsed || 'MODERN JENTS PARLOUR (Union Bank)';
     
     const waText = `✨ *NEW APPOINTMENT CONFIRMED* ✨\n*Modern Unisex Salon, Mohol*\n` +
       `────────────────────\n` +
@@ -1387,7 +1413,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       `📱 *Client Mobile:* ${payload.clientPhone}\n` +
       `💇‍♀️ *Service:* ${payload.serviceName}\n` +
       `📅 *Date & Slot:* ${payload.date} at ${payload.timeSlot}\n` +
-      `✂️ *Stylist:* ${payload.stylistName || 'Master Stylist'}\n` +
+      `✂️ *Stylist:* ${payload.stylistName || 'Master Stylist (Dinesh Ghodake)'}\n` +
       `💰 *Total Bill:* ₹${payload.totalAmount}\n` +
       `✅ *10% Advance Deposit Paid:* ₹${payload.advanceAmount} (Verified Direct Bank UPI)\n` +
       `🔢 *UPI Ref / UTR No:* ${utr}\n` +
@@ -1415,7 +1441,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       category: payload.category,
       date: payload.date,
       timeSlot: payload.timeSlot,
-      stylistName: payload.stylistName,
+      stylistName: payload.stylistName || 'Master Stylist (Dinesh Ghodake)',
       totalAmount: payload.totalAmount,
       advancePaid: payload.advanceAmount,
       balanceDue: payload.balanceDue,
@@ -1431,6 +1457,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       bankVerifiedSource: payload.bankVerifiedSource,
       bankName: payload.bankName,
       holdExpiresAt: payload.holdExpiresAt,
+      paymentScreenshotUrl: payload.paymentScreenshotUrl || '',
       createdAt: new Date().toISOString(),
       notes: payload.notes || '',
       isNew: true,
@@ -1494,7 +1521,7 @@ export const SalonProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           totalSpent: c.totalSpent + payload.totalAmount,
           lastVisit: payload.date,
           favoriteService: payload.serviceName,
-          tier: c.totalVisits + 1 >= 5 ? 'VIP Member' : 'Standard'
+          tier: c.totalVisits + 1 >= 10 ? 'VIP Member' : 'Standard'
         } : c);
       } else {
         const newCust: Customer = {

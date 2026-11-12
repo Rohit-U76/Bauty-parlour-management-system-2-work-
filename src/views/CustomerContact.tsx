@@ -134,7 +134,7 @@ export const CustomerContact: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Ramesh Kulkarni"
+                    placeholder="Enter your name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500"
@@ -146,7 +146,7 @@ export const CustomerContact: React.FC = () => {
                     <label className="font-semibold text-zinc-700 dark:text-zinc-300 block mb-1">Phone Number</label>
                     <input
                       type="tel"
-                      placeholder="+91 98000 00000"
+                      placeholder="Enter 10-digit mobile number"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500"
@@ -156,7 +156,7 @@ export const CustomerContact: React.FC = () => {
                     <label className="font-semibold text-zinc-700 dark:text-zinc-300 block mb-1">Email Address</label>
                     <input
                       type="email"
-                      placeholder="client@example.com"
+                      placeholder="Enter email address"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500"

@@ -86,6 +86,10 @@ export interface Appointment {
   bankVerifiedSource?: 'SMS_WEBHOOK' | 'ADMIN_MANUAL' | 'SIMULATOR';
   bankName?: string;
   holdExpiresAt?: string;
+  isBankVerified?: boolean;
+  paymentScreenshotUrl?: string;
+  verifiedBankName?: string;
+  cancelReason?: string;
 }
 
 export type InquiryStatus = 'NEW' | 'IN PROGRESS' | 'RESOLVED';
