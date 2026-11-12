@@ -39,6 +39,7 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab
     resetPassword,
     setIsGuestMode,
     settings,
+    updateSettings,
     currentUser
   } = useSalon();
 
@@ -67,6 +68,9 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab
   const [adminIdentifier, setAdminIdentifier] = useState('');
   const [adminSecret, setAdminSecret] = useState('');
   const [showAdminSecret, setShowAdminSecret] = useState(false);
+  const [adminResetPin, setAdminResetPin] = useState('');
+  const [adminNewPassword, setAdminNewPassword] = useState('');
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
 
   // Feedback State
   const [errorMsg, setErrorMsg] = useState('');
@@ -177,13 +181,38 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab
       return;
     }
 
+    const cleanPin = adminResetPin.trim();
+    const correctPin = (settings.adminPin || '8104').trim();
+    if (!cleanPin || cleanPin !== correctPin) {
+      setErrorMsg(`Invalid Owner Security PIN. Please enter your confidential salon master PIN (default: 8104) to authorize resetting the admin password.`);
+      return;
+    }
+
+    if (!adminNewPassword.trim() || adminNewPassword.trim().length < 6) {
+      setErrorMsg('New Admin Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (adminNewPassword.trim() !== adminConfirmPassword.trim()) {
+      setErrorMsg('Passwords do not match. Please verify both password fields.');
+      return;
+    }
+
     setIsLoading(true);
-    const res = await resetPassword(target);
-    setIsLoading(false);
-    if (res.success) {
-      setSuccessMsg(res.message);
-    } else {
-      setErrorMsg(res.message);
+    try {
+      await updateSettings({ adminPassword: adminNewPassword.trim() });
+      setIsLoading(false);
+      setSuccessMsg('✅ Admin Master Password updated successfully! It has been saved into Admin Settings. You can now sign in with your new password.');
+      setAdminSecret(adminNewPassword.trim());
+      setAdminResetPin('');
+      setAdminNewPassword('');
+      setAdminConfirmPassword('');
+      setTimeout(() => {
+        setActiveTab('admin_login');
+      }, 2000);
+    } catch {
+      setIsLoading(false);
+      setErrorMsg('Failed to update admin password. Please try again.');
     }
   };
 
@@ -313,8 +342,8 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab
                 {activeTab === 'admin_login' && 'Salon Owner & Staff Login'}
               </h2>
               <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">
-                {activeTab === 'customer_login' && 'Access reward points, booking passes, and express checkouts'}
-                {activeTab === 'customer_register' && 'Register now to receive a 100 Reward Points welcome bonus'}
+                {activeTab === 'customer_login' && 'Manage your appointment passes, booking history, and fast check-in'}
+                {activeTab === 'customer_register' && 'Register your client profile for quick and seamless appointments'}
                 {activeTab === 'admin_login' && 'Master Stylist Dashboard & Business Operations'}
               </p>
             </div>
@@ -542,7 +571,7 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab
                     }}
                     className="text-xs text-purple-700 dark:text-amber-400 font-bold hover:underline cursor-pointer"
                   >
-                    Create an Account (+100 pts)
+                    Create an Account
                   </button>
                 </div>
               </form>
@@ -551,13 +580,6 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab
             {/* TAB 2: CUSTOMER REGISTER */}
             {activeTab === 'customer_register' && (
               <form onSubmit={handleCustomerRegister} className="space-y-4">
-                <div className="p-3 rounded-2xl bg-purple-100/80 dark:bg-amber-500/10 border border-purple-200 dark:border-amber-500/30 flex items-center gap-2.5">
-                  <Gift className="w-5 h-5 text-purple-700 dark:text-amber-400 shrink-0" />
-                  <div className="text-xs text-zinc-700 dark:text-zinc-300">
-                    <span className="font-bold text-purple-900 dark:text-amber-300">100 Welcome Points:</span> Instantly credited to your profile upon account creation!
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
@@ -959,7 +981,7 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab
                     Reset Administrator Password
                   </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                    Enter your registered administrator email address to receive a secure password reset link.
+                    Verify your authorized administrator email and owner PIN to set a new Admin Master Password.
                   </p>
                 </div>
 
@@ -970,11 +992,56 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab
                   <input
                     type="email"
                     required
-                    placeholder="Enter administrator email"
+                    placeholder="e.g. dineshghodake941@gmail.com"
                     value={adminIdentifier}
                     onChange={(e) => setAdminIdentifier(e.target.value)}
                     className="w-full px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-purple-200 dark:border-zinc-700 text-sm focus:outline-none focus:border-purple-600 dark:focus:border-amber-400 text-zinc-900 dark:text-zinc-100"
                   />
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                    <span>Salon Owner Security PIN *</span>
+                    <span className="text-[10px] text-zinc-400 font-normal">Default: 8104</span>
+                  </label>
+                  <input
+                    type="password"
+                    maxLength={8}
+                    required
+                    placeholder="Enter 4-digit Owner PIN"
+                    value={adminResetPin}
+                    onChange={(e) => setAdminResetPin(e.target.value)}
+                    className="w-full px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-purple-200 dark:border-zinc-700 text-sm font-mono tracking-widest focus:outline-none focus:border-purple-600 dark:focus:border-amber-400 text-zinc-900 dark:text-zinc-100"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      New Admin Password *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Min 6 characters"
+                      value={adminNewPassword}
+                      onChange={(e) => setAdminNewPassword(e.target.value)}
+                      className="w-full px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-purple-200 dark:border-zinc-700 text-sm focus:outline-none focus:border-purple-600 dark:focus:border-amber-400 text-zinc-900 dark:text-zinc-100"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      Confirm Password *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Confirm new password"
+                      value={adminConfirmPassword}
+                      onChange={(e) => setAdminConfirmPassword(e.target.value)}
+                      className="w-full px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-purple-200 dark:border-zinc-700 text-sm focus:outline-none focus:border-purple-600 dark:focus:border-amber-400 text-zinc-900 dark:text-zinc-100"
+                    />
+                  </div>
                 </div>
 
                 <button
@@ -987,7 +1054,7 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab
                   ) : (
                     <>
                       <KeyRound className="w-4 h-4" />
-                      <span>Send Reset Email to Administrator</span>
+                      <span>Update Admin Master Password</span>
                     </>
                   )}
                 </button>
@@ -1014,9 +1081,6 @@ export const AuthGatewayScreen: React.FC<AuthGatewayScreenProps> = ({ initialTab
                 <ShieldCheck className="w-4 h-4 text-emerald-500" />
                 <span>Verified Account Access • 100% Real-Time Cloud Security</span>
               </div>
-              <p className="text-[11px] text-zinc-500">
-                All client booking records and advance deposits are secured directly in the salon database.
-              </p>
             </div>
           </div>
         </div>
